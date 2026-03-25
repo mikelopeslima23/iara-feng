@@ -1,16 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages } from '../lib/supabase'
-import { PIPELINE_INITIAL, ACTIVITIES_INITIAL } from '../data/pipeline'
+import { PIPELINE_INITIAL, ACTIVITIES_INITIAL, USERS } from '../data/pipeline'
 
 const ADMINS = ['Mike Lopes', 'Bruno Braga']
 
 function buildCtx(leads, acts, userName) {
-  if (userName) {
-  const u = USERS.find(u => u.nome === userName)
-  if (u?.perfil) c += `\nPERFIL DO USUÁRIO: ${u.perfil}\n`
-}
-  
   const hoje = new Date().toLocaleDateString('pt-BR')
   const pend = acts.filter(a => !a.ok)
   const mine = pend.filter(a => a.resp?.toLowerCase().includes(userName.split(' ')[0].toLowerCase()))
@@ -33,6 +28,10 @@ function buildCtx(leads, acts, userName) {
   const outros = leads.filter(l => !l.g12 && !l.op && !l.off && l.aging !== 'Geladeira')
   if (outros.length) { c += `\n📋 OUTROS ATIVOS:\n`; outros.forEach(l => c += `• ${l.nome}|${l.etapa}|${l.resp}|${l.dias}d\n  Mov:${l.mov?.slice(0, 80)}\n`) }
   if (mine.length) { c += `\n📌 PENDENTES(${userName}):\n`; mine.forEach(a => c += `• [${a.id}]${a.lead}:${a.descricao}|até ${a.dt}\n`) }
+
+  const u = USERS?.find(u => u.nome === userName)
+  if (u?.perfil) c += `\nPERFIL DO USUÁRIO: ${u.perfil}\n`
+
   return c
 }
 
@@ -98,7 +97,7 @@ export default function Chat() {
   useEffect(() => { init() }, [])
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, loading])
   useEffect(() => {
-    if (txRef.current) { txRef.current.style.height = 'auto'; txRef.current.style.height = Math.min(txRef.current.scrollHeight, 120) + 'px' }
+    if (txRef.current) { txRef.current.style.height = 'auto'; txRef.current.style.height = Math.min(txRef.current.scrollHeight, 140) + 'px' }
   }, [inp])
 
   async function init() {
@@ -210,68 +209,81 @@ export default function Chat() {
   const chips = [['📅 Reunião', 'Registrar reunião:'], ['⚡ FUP feito', 'FUP realizado com'], ['⬆️ Avançar etapa', 'Avançou de etapa:'], ['⚠️ Risco', 'Registrar risco:'], ['📊 Como tá?', 'Como tá o pipeline hoje?'], ['🆕 Novo lead', 'Novo lead:']]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0D0A14', color: '#F0E8FF', fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#0D0A14', color: '#F0E8FF', fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden' }}>
       <style>{`
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
-        @keyframes blink{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
-        ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:#0D0A14}::-webkit-scrollbar-thumb{background:#2D1F45;border-radius:3px}
+        @keyframes blink{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        ::-webkit-scrollbar{width:3px}
+        ::-webkit-scrollbar-track{background:#0D0A14}
+        ::-webkit-scrollbar-thumb{background:#2D1F45;border-radius:3px}
         textarea::placeholder{color:#3D2E5A}
+        textarea { -webkit-appearance: none; }
         .chip:hover{background:#241839!important;border-color:#4D3080!important}
+        .chip:active{transform:scale(0.95)}
+        .send-btn:active{transform:scale(0.92)}
+        @media(max-width:600px){
+          .header-extras { display: none !important; }
+          .header-stats { font-size: 10px !important; padding: 2px 8px !important; }
+          .msg-text { font-size: 15px !important; }
+          .chip-label { font-size: 12px !important; }
+        }
       `}</style>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #1E1433', background: '#0A0810', flexShrink: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid #1E1433', background: 'linear-gradient(180deg,#0F0B1A 0%,#0A0810 100%)', flexShrink: 0, boxShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: 'white', flexShrink: 0 }}>IA</div>
+          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: 'white', flexShrink: 0, boxShadow: '0 0 12px rgba(168,85,247,0.4)' }}>IA</div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{ fontSize: 15, fontWeight: 700, color: '#F0E8FF', letterSpacing: '0.05em' }}>IAra</span>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', display: 'inline-block', animation: 'pulse 2s ease infinite' }} />
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', display: 'inline-block', animation: 'pulse 2s ease infinite', boxShadow: '0 0 6px #10B981' }} />
               <span style={{ fontSize: 10, color: '#10B981' }}>online</span>
               {isAdmin && <span style={{ fontSize: 10, background: 'rgba(168,85,247,0.15)', color: '#A855F7', border: '1px solid #7C3AED44', borderRadius: 4, padding: '1px 6px' }}>admin</span>}
             </div>
-            <div style={{ fontSize: 10, color: '#6B5A90' }}>Agente comercial da FENG • Sempre ligada</div>
+            <div style={{ fontSize: 10, color: '#6B5A90' }}>Agente comercial da FENG</div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#6B5A90' }}>
-            <span style={{ color: '#A855F7', fontWeight: 600 }}>{ativosCount}</span> ativos · <span style={{ color: '#FF6B1A', fontWeight: 600 }}>{pendCount}</span> pendentes
+
+        <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+          <div className="header-stats" style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#6B5A90' }}>
+            <span style={{ color: '#A855F7', fontWeight: 600 }}>{ativosCount}</span> · <span style={{ color: '#FF6B1A', fontWeight: 600 }}>{pendCount}</span>
           </div>
           {isAdmin && (
-            <button onClick={() => send('IAra fechar Radar')} style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid #1D9E75', borderRadius: 6, color: '#1D9E75', padding: '4px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
-              📊 Fechar Radar
+            <button onClick={() => send('IAra fechar Radar')} className="header-extras" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid #1D9E75', borderRadius: 6, color: '#1D9E75', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
+              📊 Radar
             </button>
           )}
           {isAdmin && radarReady && (
-            <button onClick={() => navigate('/radar')} style={{ background: '#1D9E75', border: 'none', borderRadius: 6, color: 'white', padding: '4px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500, animation: 'pulse 1.5s ease infinite' }}>
-              Ver Radar →
+            <button onClick={() => navigate('/radar')} style={{ background: '#1D9E75', border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>
+              Ver →
             </button>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 6, padding: '3px 10px', cursor: 'pointer' }} onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
-            <div style={{ width: 20, height: 20, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white' }}>{user.iniciais}</div>
-            <span style={{ fontSize: 11, color: '#C084FC' }}>{user.nome?.split(' ')[0]}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }} onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
+            <div style={{ width: 22, height: 22, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', boxShadow: `0 0 8px ${user.cor}66` }}>{user.iniciais}</div>
+            <span style={{ fontSize: 11, color: '#C084FC', fontWeight: 500 }}>{user.nome?.split(' ')[0]}</span>
           </div>
-          <button onClick={handleClear} style={{ background: 'none', border: '1px solid #2D1F45', borderRadius: 6, color: '#6B5A90', padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}>🗑</button>
+          <button onClick={handleClear} style={{ background: 'none', border: '1px solid #2D1F45', borderRadius: 7, color: '#6B5A90', padding: '5px 9px', fontSize: 13, cursor: 'pointer', minWidth: 34, minHeight: 34 }}>🗑</button>
         </div>
       </div>
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 8px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 8px', display: 'flex', flexDirection: 'column', gap: 16, WebkitOverflowScrolling: 'touch' }}>
         {msgs.map(m => m.role === 'user' ? (
           <div key={m.id} style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'flex-end' }}>
-            <div style={{ background: '#7C3AED', borderRadius: '14px 14px 2px 14px', padding: '10px 14px', maxWidth: '78%', fontSize: 14, lineHeight: 1.55, color: '#fff', wordBreak: 'break-word' }}>{m.text}</div>
-            <div style={{ width: 22, height: 22, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', flexShrink: 0 }}>{user.iniciais}</div>
+            <div className="msg-text" style={{ background: 'linear-gradient(135deg,#7C3AED,#9333EA)', borderRadius: '16px 16px 3px 16px', padding: '12px 16px', maxWidth: '80%', fontSize: 15, lineHeight: 1.6, color: '#fff', wordBreak: 'break-word', boxShadow: '0 4px 16px rgba(124,58,237,0.35)' }}>{m.text}</div>
+            <div style={{ width: 26, height: 26, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', flexShrink: 0, boxShadow: `0 2px 8px ${user.cor}66` }}>{user.iniciais}</div>
           </div>
         ) : (
-          <div key={m.id} style={{ display: 'flex', gap: 10, maxWidth: '88%' }}>
-            <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0, marginTop: 16 }}>IA</div>
+          <div key={m.id} style={{ display: 'flex', gap: 10, maxWidth: '90%' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0, marginTop: 18, boxShadow: '0 0 10px rgba(168,85,247,0.4)' }}>IA</div>
             <div>
-              <div style={{ fontSize: 10, color: '#A855F7', fontWeight: 700, marginBottom: 4, letterSpacing: '0.05em' }}>IAra ⚡</div>
-              <div style={{ background: '#130F1E', border: '1px solid #1E1433', borderLeft: '3px solid #A855F7', borderRadius: '0 12px 12px 12px', padding: '10px 14px', fontSize: 14, lineHeight: 1.6, color: '#E8DCFF', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
+              <div style={{ fontSize: 10, color: '#A855F7', fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>IAra ⚡</div>
+              <div className="msg-text" style={{ background: 'linear-gradient(135deg,#150F22,#130F1E)', border: '1px solid #2D1F4566', borderLeft: '3px solid #A855F7', borderRadius: '0 14px 14px 14px', padding: '12px 16px', fontSize: 15, lineHeight: 1.65, color: '#E8DCFF', wordBreak: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
                 {m.text}
                 {m.results?.length > 0 && (
                   <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {m.results.map((r, i) => <span key={i} style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 6, padding: '3px 9px', fontSize: 12, color: '#10B981' }}>{r}</span>)}
+                    {m.results.map((r, i) => <span key={i} style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: '#10B981' }}>{r}</span>)}
                   </div>
                 )}
               </div>
@@ -279,12 +291,12 @@ export default function Chat() {
           </div>
         ))}
         {loading && (
-          <div style={{ display: 'flex', gap: 10, maxWidth: '88%' }}>
-            <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#7C3AED', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0, marginTop: 16 }}>IA</div>
+          <div style={{ display: 'flex', gap: 10, maxWidth: '90%' }}>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0, marginTop: 18, boxShadow: '0 0 10px rgba(168,85,247,0.4)' }}>IA</div>
             <div>
-              <div style={{ fontSize: 10, color: '#A855F7', fontWeight: 700, marginBottom: 4 }}>IAra ⚡</div>
-              <div style={{ background: '#130F1E', border: '1px solid #1E1433', borderLeft: '3px solid #A855F7', borderRadius: '0 12px 12px 12px', padding: '12px 18px', display: 'flex', gap: 5, alignItems: 'center' }}>
-                {[0, 1, 2].map(i => <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#A855F7', animation: `blink 1s ease-in-out ${i * 0.2}s infinite` }} />)}
+              <div style={{ fontSize: 10, color: '#A855F7', fontWeight: 700, marginBottom: 5 }}>IAra ⚡</div>
+              <div style={{ background: 'linear-gradient(135deg,#150F22,#130F1E)', border: '1px solid #2D1F4566', borderLeft: '3px solid #A855F7', borderRadius: '0 14px 14px 14px', padding: '14px 20px', display: 'flex', gap: 6, alignItems: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+                {[0, 1, 2].map(i => <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: '#A855F7', animation: `blink 1s ease-in-out ${i * 0.2}s infinite` }} />)}
               </div>
             </div>
           </div>
@@ -293,24 +305,24 @@ export default function Chat() {
       </div>
 
       {/* Chips */}
-      <div style={{ display: 'flex', gap: 7, padding: '8px 16px', overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none' }}>
+      <div style={{ display: 'flex', gap: 7, padding: '8px 14px', overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
         {chips.map(([label, prompt]) => (
-          <button key={label} className="chip" onClick={() => { setInp(prompt); txRef.current?.focus() }} style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 20, padding: '5px 12px', fontSize: 12, color: '#C084FC', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s' }}>{label}</button>
+          <button key={label} className="chip" onClick={() => { setInp(prompt); txRef.current?.focus() }} style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 20, padding: '7px 14px', fontSize: 12, color: '#C084FC', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', minHeight: 34 }}>{label}</button>
         ))}
-        {isAdmin && <button className="chip" onClick={() => send('IAra fechar Radar')} style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid #1D9E7566', borderRadius: 20, padding: '5px 12px', fontSize: 12, color: '#1D9E75', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s' }}>📊 Fechar Radar</button>}
+        {isAdmin && <button className="chip" onClick={() => send('IAra fechar Radar')} style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid #1D9E7566', borderRadius: 20, padding: '7px 14px', fontSize: 12, color: '#1D9E75', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', minHeight: 34 }}>📊 Fechar Radar</button>}
       </div>
 
       {/* Input */}
-      <div style={{ display: 'flex', gap: 8, padding: '10px 16px 14px', borderTop: '1px solid #1E1433', background: '#0A0810', flexShrink: 0, alignItems: 'flex-end' }}>
-        <button onClick={toggleRec} style={{ width: 40, height: 40, borderRadius: 10, border: `1px solid ${rec ? '#FF6B1A' : '#2D1F45'}`, background: rec ? 'rgba(255,107,26,0.15)' : '#1A1428', color: rec ? '#FF6B1A' : '#6B5A90', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, fontSize: 15 }}>
+      <div style={{ display: 'flex', gap: 8, padding: '10px 14px', paddingBottom: 'max(14px, env(safe-area-inset-bottom))', borderTop: '1px solid #1E1433', background: 'linear-gradient(180deg,#0A0810 0%,#0D0A14 100%)', flexShrink: 0, alignItems: 'flex-end' }}>
+        <button onClick={toggleRec} style={{ width: 44, height: 44, borderRadius: 12, border: `1px solid ${rec ? '#FF6B1A' : '#2D1F45'}`, background: rec ? 'rgba(255,107,26,0.15)' : '#1A1428', color: rec ? '#FF6B1A' : '#6B5A90', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, fontSize: 16 }}>
           {rec ? '🔴' : '🎤'}
         </button>
         <textarea ref={txRef} value={inp} onChange={e => setInp(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-          placeholder="Mensagem para a IAra... (Enter para enviar)"
-          style={{ flex: 1, background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 10, padding: '10px 14px', color: '#F0E8FF', fontSize: 14, outline: 'none', resize: 'none', fontFamily: 'inherit', minHeight: 40, maxHeight: 120, lineHeight: 1.5 }}
+          placeholder="Mensagem para a IAra..."
+          style={{ flex: 1, background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 12, padding: '12px 14px', color: '#F0E8FF', fontSize: 15, outline: 'none', resize: 'none', fontFamily: 'inherit', minHeight: 44, maxHeight: 140, lineHeight: 1.5, WebkitAppearance: 'none' }}
           onFocus={e => e.target.style.borderColor = '#7C3AED'} onBlur={e => e.target.style.borderColor = '#2D1F45'} rows={1} />
-        <button onClick={() => send()} disabled={loading || !inp.trim()} style={{ width: 40, height: 40, borderRadius: 10, border: 'none', background: loading || !inp.trim() ? '#1A1428' : '#FF6B1A', color: loading || !inp.trim() ? '#3D2E5A' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loading || !inp.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, fontSize: 16 }}>
+        <button className="send-btn" onClick={() => send()} disabled={loading || !inp.trim()} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: loading || !inp.trim() ? '#1A1428' : 'linear-gradient(135deg,#FF6B1A,#FF8C42)', color: loading || !inp.trim() ? '#3D2E5A' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loading || !inp.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, fontSize: 16, transition: 'all 0.15s', boxShadow: loading || !inp.trim() ? 'none' : '0 4px 14px rgba(255,107,26,0.4)' }}>
           ➤
         </button>
       </div>
