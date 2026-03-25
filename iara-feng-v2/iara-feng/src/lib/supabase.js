@@ -1,0 +1,71 @@
+import { createClient } from '@supabase/supabase-js'
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+
+// ─── DATABASE HELPERS ────────────────────────────────────────────────────────
+
+export async function getLeads() {
+  const { data, error } = await supabase.from('iara_leads').select('*').order('nome')
+  if (error) throw error
+  return data || []
+}
+
+export async function upsertLead(lead) {
+  const { error } = await supabase.from('iara_leads').upsert(lead, { onConflict: 'id' })
+  if (error) throw error
+}
+
+export async function getActivities() {
+  const { data, error } = await supabase.from('iara_activities').select('*').order('criado', { ascending: false })
+  if (error) throw error
+  return data || []
+}
+
+export async function upsertActivity(act) {
+  const { error } = await supabase.from('iara_activities').upsert(act, { onConflict: 'id' })
+  if (error) throw error
+}
+
+export async function getMessages(userId) {
+  const { data, error } = await supabase
+    .from('iara_messages')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: true })
+    .limit(50)
+  if (error) throw error
+  return data || []
+}
+
+export async function saveMessage(userId, role, text, results = []) {
+  const { error } = await supabase.from('iara_messages').insert({
+    user_id: userId, role, text, results
+  })
+  if (error) throw error
+}
+
+export async function clearMessages(userId) {
+  const { error } = await supabase.from('iara_messages').delete().eq('user_id', userId)
+  if (error) throw error
+}
+
+export async function saveRadarSnapshot(title, content, createdBy) {
+  const { data, error } = await supabase.from('iara_radars').insert({
+    title, content, created_by: createdBy
+  }).select()
+  if (error) throw error
+  return data?.[0]
+}
+
+export async function getRadarSnapshots() {
+  const { data, error } = await supabase
+    .from('iara_radars')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(20)
+  if (error) throw error
+  return data || []
+}
