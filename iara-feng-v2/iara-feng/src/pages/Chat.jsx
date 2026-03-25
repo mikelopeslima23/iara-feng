@@ -259,6 +259,10 @@ export default function Chat() {
               Ver →
             </button>
           )}
+          {/* ✅ BOTÃO PIPELINE ADICIONADO AQUI */}
+          <button onClick={() => navigate('/pipeline')} className="header-extras" style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid #7C3AED66', borderRadius: 6, color: '#A855F7', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
+            📋 Pipeline
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }} onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
             <div style={{ width: 22, height: 22, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', boxShadow: `0 0 8px ${user.cor}66` }}>{user.iniciais}</div>
             <span style={{ fontSize: 11, color: '#C084FC', fontWeight: 500 }}>{user.nome?.split(' ')[0]}</span>
