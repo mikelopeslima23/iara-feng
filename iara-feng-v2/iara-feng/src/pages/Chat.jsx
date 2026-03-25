@@ -140,7 +140,7 @@ export default function Chat() {
 
     try {
       const ctx = buildCtx(leads, acts, user.nome)
-      const apiMsgs = newMsgs.slice(-20).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
+      const apiMsgs = newMsgs.slice(-40).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
       const raw = await callAI(apiMsgs, SYSTEM + '\n\n' + ctx)
       const actions = parseActions(raw)
       const cleanTxt = strip(raw)
