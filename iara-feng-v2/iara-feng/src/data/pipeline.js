@@ -41,9 +41,14 @@ export const ACTIVITIES_INITIAL = [
 ]
 
 export const USERS = [
-  {id:"mike",nome:"Mike Lopes",iniciais:"ML",cor:"#7C3AED",admin:true},
-  {id:"bruno",nome:"Bruno Braga",iniciais:"BB",cor:"#1D9E75",admin:true},
-  {id:"jardel",nome:"Jardel Rocha",iniciais:"JR",cor:"#EF9F27",admin:false},
-  {id:"silvio",nome:"Silvio Vázquez",iniciais:"SV",cor:"#D85A30",admin:false},
-  {id:"beni",nome:"Beni Ertel",iniciais:"BE",cor:"#D4537E",admin:false},
+  { id: 'mike', nome: 'Mike Lopes', iniciais: 'ML', cor: '#7C3AED', admin: true,
+    perfil: 'Fundador e CEO. Visão estratégica. Quer respostas diretas, sem rodeios. Aceita ironia pesada.' },
+  { id: 'bruno', nome: 'Bruno Braga', iniciais: 'BB', cor: '#10B981', admin: true,
+    perfil: 'Co-founder. Perfil comercial. Gosta de dados e métricas. Tom direto e objetivo.' },
+  { id: 'jardel', nome: 'Jardel Rocha', iniciais: 'JR', cor: '#F59E0B', admin: false,
+    perfil: 'Executivo de vendas. Foco em leads e pipeline. Tom motivacional mas direto.' },
+  { id: 'silvio', nome: 'Silvio Vázquez', iniciais: 'SV', cor: '#FF6B1A', admin: false,
+    perfil: 'Executivo de vendas. Perfil técnico. Prefere contexto antes de agir.' },
+  { id: 'beni', nome: 'Beni Ertel', iniciais: 'BE', cor: '#EC4899', admin: false,
+    perfil: 'Executivo de vendas. Perfil relacionamento. Tom mais leve e colaborativo.' },
 ]
