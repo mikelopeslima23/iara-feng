@@ -6,6 +6,11 @@ import { PIPELINE_INITIAL, ACTIVITIES_INITIAL } from '../data/pipeline'
 const ADMINS = ['Mike Lopes', 'Bruno Braga']
 
 function buildCtx(leads, acts, userName) {
+  if (userName) {
+  const u = USERS.find(u => u.nome === userName)
+  if (u?.perfil) c += `\nPERFIL DO USUÁRIO: ${u.perfil}\n`
+}
+  
   const hoje = new Date().toLocaleDateString('pt-BR')
   const pend = acts.filter(a => !a.ok)
   const mine = pend.filter(a => a.resp?.toLowerCase().includes(userName.split(' ')[0].toLowerCase()))
