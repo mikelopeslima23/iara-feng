@@ -5,15 +5,19 @@ import Login from './pages/Login'
 import Chat from './pages/Chat'
 import Radar from './pages/Radar'
 
-function App() {
+function ProtectedRoute({ children }) {
   const user = localStorage.getItem('iara_user')
+  return user ? children : <Navigate to="/login" />
+}
+
+function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/chat" element={user ? <Chat /> : <Navigate to="/login" />} />
-        <Route path="/radar" element={user ? <Radar /> : <Navigate to="/login" />} />
-        <Route path="*" element={<Navigate to={user ? "/chat" : "/login"} />} />
+        <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+        <Route path="/radar" element={<ProtectedRoute><Radar /></ProtectedRoute>} />
+        <Route path="*" element={<Navigate to="/login" />} />
       </Routes>
     </BrowserRouter>
   )
