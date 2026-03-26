@@ -2729,6 +2729,21 @@ export const PIPELINE_INITIAL = [
     "g12": false,
     "risco": ""
   }
+  { id: 'golive-flamengo-nacao', nome: 'Flamengo — Nação', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-flamengo-flapr', nome: 'Flamengo — Fla-Prêmios', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-flamengo-site', nome: 'Flamengo — Site', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-flamengo-lake', nome: 'Flamengo — DataLake', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-spfc', nome: 'São Paulo FC', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-vasco-saf', nome: 'Vasco — SAF', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-vasco-est', nome: 'Vasco — Estatutário', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-fluminense', nome: 'Fluminense', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-botafogo', nome: 'Botafogo', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-ze-delivery', nome: 'Zé Delivery', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-maracana-club', nome: 'Maracanã Club', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-maracana-portal', nome: 'Portal Maracanã', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-barcelona', nome: 'Barcelona EQU', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-cob', nome: 'COB', etapa: 'Implementação', resp: 'Jardel Rocha', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
+{ id: 'golive-inter', nome: 'Internacional', etapa: 'Implementação', resp: 'Jardel Rocha', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
 ]
 
 export const ACTIVITIES_INITIAL = []
