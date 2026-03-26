@@ -5,6 +5,14 @@ import { PIPELINE_INITIAL, ACTIVITIES_INITIAL, USERS } from '../data/pipeline'
 
 const ADMINS = ['Mike Lopes', 'Bruno Braga']
 
+const CARGOS = {
+  'Mike Lopes': { cargo: 'CEO e Fundador da FENG', primeiro: true },
+  'Bruno Braga': { cargo: 'Gerente Comercial', primeiro: false },
+  'Jardel Rocha': { cargo: 'Coordenador Comercial', primeiro: false },
+  'Beni Ertel': { cargo: 'Analista Comercial', primeiro: false },
+  'Silvio Vázquez': { cargo: 'Advisor LATAM', primeiro: false },
+}
+
 function buildCtx(leads, acts, userName) {
   const hoje = new Date().toLocaleDateString('pt-BR')
   const pend = acts.filter(a => !a.ok)
@@ -33,6 +41,53 @@ function buildCtx(leads, acts, userName) {
   if (u?.perfil) c += `\nPERFIL DO USUÁRIO: ${u.perfil}\n`
 
   return c
+}
+
+function buildOnboardingPrompt(userName, cargo, ctx) {
+  const nome = userName.split(' ')[0]
+  const isMike = userName === 'Mike Lopes'
+
+  if (isMike) {
+    return `Você está abrindo a IAra pela primeira vez para apresentá-la ao time. 
+Faça uma apresentação sua para o Mike — o criador da plataforma — com seu tom irônico e inteligente. 
+Reconheça que ele sabe muito bem quem você é, afinal foi ele quem te criou. 
+Diga algo como "então você finalmente resolveu me visitar" ou similar. 
+Seja direta, irônica e mostre personalidade. 2-3 frases no máximo.`
+  }
+
+  return `Este é o PRIMEIRO ACESSO de ${userName}, ${cargo} da FENG.
+Faça uma apresentação completa e envolvente. Use seu tom característico — direto, inteligente, com humor seco.
+
+Estruture sua mensagem assim (sem títulos, em prosa fluida):
+
+1. BOAS-VINDAS PERSONALIZADAS: Cumprimente pelo nome e cargo. Diga que foi o Mike Lopes, CEO da FENG, quem te trouxe para o time.
+
+2. CONTEXTO E DOR: A FENG é uma empresa de tecnologia para clubes de futebol e esportes na América Latina. O time comercial vivia num caos de planilhas, WhatsApp e reuniões sem registro — informação espalhada, follow-ups esquecidos, pipeline invisível. Você (IAra) nasceu para resolver isso.
+
+3. QUEM VOCÊ É: IAra — Intelligence and Action for Revenue Acceleration. Não é um chatbot. É a inteligência comercial do time. Trabalha com o ${nome} no dia a dia.
+
+4. O QUE VOCÊ FAZ:
+- Acompanha o pipeline em tempo real — sabe o status de cada lead, quem está quente, quem esfriou
+- Transforma conversas em registros e ações — o ${nome} fala, você registra, cria atividades, atualiza etapas
+- Lembra de tudo — histórico completo de cada negociação
+- Gera alertas de risco — avisa quando um lead está esfriando ou travado
+- Fecha o Radar Semanal — relatório executivo para o Mike e Bruno
+
+5. SEÇÕES DA PLATAFORMA:
+- 💬 Chat (aqui): onde vocês conversam e tudo vira registro
+- 📋 Pipeline: visão Kanban de todos os leads por etapa
+- 📊 Radar: relatório semanal gerado automaticamente
+
+6. PAPEL DO ${cargo.toUpperCase()}: Mencione especificamente como você pode ajudar no papel dele — ${
+    cargo === 'Gerente Comercial' ? 'visão geral do time, performance, tomada de decisão com dados' :
+    cargo === 'Coordenador Comercial' ? 'organização das atividades do time, acompanhamento de leads, garantir que nada caia' :
+    cargo === 'Analista Comercial' ? 'registro das atividades do dia a dia, atualização de leads, preparação de materiais' :
+    cargo === 'Advisor LATAM' ? 'inteligência sobre o mercado LATAM, leads internacionais, contexto estratégico regional' : 'suporte comercial'
+  }
+
+7. ENCERRAMENTO: Uma frase curta e direta convidando para começar. Com o seu estilo — sem entusiasmo exagerado.
+
+Escreva em português do Brasil, informal, fluido. Sem bullet points na resposta — texto corrido. Máximo 250 palavras.`
 }
 
 const SYSTEM = `Você é a IAra, agente de inteligência comercial da FENG — empresa de tecnologia para clubes de futebol e esportes na América Latina.
@@ -115,10 +170,15 @@ export default function Chat() {
         setInitialized(true); setLoading(false); return
       }
 
+      // PRIMEIRO ACESSO — onboarding personalizado
       const ctx = buildCtx(l, a, user.nome)
-      const h = new Date().getHours()
-      const greet = h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'
-      const raw = await callAI([{ role: 'user', content: `Abra a conversa. ${greet} para ${user.nome}. Seja específica (2-3 frases), mencione algo real do pipeline.` }], SYSTEM + '\n\n' + ctx)
+      const cargoInfo = CARGOS[user.nome] || { cargo: 'membro do time comercial', primeiro: false }
+      const onboardingPrompt = buildOnboardingPrompt(user.nome, cargoInfo.cargo, ctx)
+
+      const raw = await callAI(
+        [{ role: 'user', content: onboardingPrompt }],
+        SYSTEM + '\n\n' + ctx
+      )
       const txt = strip(raw)
       const g = [{ id: 'g1', role: 'assistant', text: txt, results: [] }]
       setMsgs(g)
@@ -259,8 +319,7 @@ export default function Chat() {
               Ver →
             </button>
           )}
-          {/* ✅ BOTÃO PIPELINE ADICIONADO AQUI */}
-          <button onClick={() => navigate('/pipeline')} className="header-extras" style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid #7C3AED66', borderRadius: 6, color: '#A855F7', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
+          <button onClick={() => navigate('/pipeline')} style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid #7C3AED66', borderRadius: 6, color: '#A855F7', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
             📋 Pipeline
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }} onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
