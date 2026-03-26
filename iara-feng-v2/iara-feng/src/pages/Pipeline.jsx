@@ -4,6 +4,12 @@ import { getLeads, getActivities, upsertLead } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL } from '../data/pipeline'
 
 const ETAPAS = ['Prospecção', 'Qualificação', 'Proposta', 'Negociação', 'Fechamento']
+const PARALELO_OPTIONS = [
+  { label: 'Proposta', color: '#A855F7' },
+  { label: 'Negociação', color: '#FF6B1A' },
+  { label: 'Jurídico', color: '#3B82F6' },
+  { label: 'Go-Live', color: '#10B981' },
+]
 
 function agingLabel(dias) {
   if (dias <= 3) return { label: 'Hot', color: '#10B981' }
@@ -35,13 +41,6 @@ function vencimentoLabel(dias) {
   if (dias <= 90) return { label: `Vence em ${dias}d`, color: '#F59E0B' }
   return { label: `Vence em ${dias}d`, color: '#10B981' }
 }
-const PARALELO_OPTIONS = [
-  { label: 'Proposta', color: '#A855F7' },
-  { label: 'Negociação', color: '#FF6B1A' },
-  { label: 'Jurídico', color: '#3B82F6' },
-  { label: 'Go-Live', color: '#10B981' },
-]
-
 function ParaleloBadges({ paralelo }) {
   if (!paralelo) return null
   const tags = paralelo.split(',').map(t => t.trim()).filter(Boolean)
