@@ -88,6 +88,41 @@ function Modal({ lead, acts, onClose, onSave, onReativar }) {
           {!lead.op && (
             <div>
               <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>ETAPA</div>
+<div>
+  <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 8 }}>ETAPAS PARALELAS ATIVAS</div>
+  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+    {PARALELO_OPTIONS.map(opt => {
+      const tags = (form.paralelo || '').split(',').map(t => t.trim()).filter(Boolean)
+      const ativo = tags.includes(opt.label)
+      return (
+        <button key={opt.label} onClick={() => {
+          const current = (form.paralelo || '').split(',').map(t => t.trim()).filter(Boolean)
+          const next = ativo ? current.filter(t => t !== opt.label) : [...current, opt.label]
+          set('paralelo', next.join(', '))
+        }} style={{
+          background: ativo ? `${opt.color}20` : '#1A1428',
+          border: `1px solid ${ativo ? opt.color : '#2D1F45'}`,
+          borderRadius: 8, padding: '6px 14px', fontSize: 12,
+          color: ativo ? opt.color : '#6B5A90',
+          cursor: 'pointer', fontWeight: ativo ? 600 : 400,
+          transition: 'all 0.15s'
+        }}>
+          {ativo ? '✓ ' : ''}{opt.label}
+        </button>
+      )
+    })}
+  </div>
+  {form.paralelo && (
+    <div style={{ fontSize: 11, color: '#4D3D6A', marginTop: 6 }}>
+      Ativo: {form.paralelo}
+    </div>
+  )}
+</div>
+
+
+
+
+              
               <select value={form.etapa || ''} onChange={e => set('etapa', e.target.value)} style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }}>
                 {ETAPAS.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
