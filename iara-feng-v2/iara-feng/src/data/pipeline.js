@@ -2728,7 +2728,7 @@ export const PIPELINE_INITIAL = [
     "off": false,
     "g12": false,
     "risco": ""
-  }
+  },
   { id: 'golive-flamengo-nacao', nome: 'Flamengo — Nação', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
 { id: 'golive-flamengo-flapr', nome: 'Flamengo — Fla-Prêmios', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
 { id: 'golive-flamengo-site', nome: 'Flamengo — Site', etapa: 'Implementação', resp: 'Mike Lopes', dias: 0, aging: 'Hot', mov: 'Cliente ativo em Go-Live', prox: 'Verificar vencimento de contrato', dt: '', op: true, off: false, g12: false, risco: '', vencimento: '' },
