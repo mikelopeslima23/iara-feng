@@ -41,6 +41,7 @@ function vencimentoLabel(dias) {
   if (dias <= 90) return { label: `Vence em ${dias}d`, color: '#F59E0B' }
   return { label: `Vence em ${dias}d`, color: '#10B981' }
 }
+
 function ParaleloBadges({ paralelo }) {
   if (!paralelo) return null
   const tags = paralelo.split(',').map(t => t.trim()).filter(Boolean)
@@ -69,15 +70,20 @@ function Modal({ lead, acts, onClose, onSave, onReativar }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16, backdropFilter: 'blur(4px)' }} onClick={onClose}>
       <div style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 16, padding: 24, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+
+        {/* Header do modal */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div>
             <div style={{ fontSize: 18, fontWeight: 700, color: '#F0E8FF' }}>{lead.nome}</div>
-            <div style={{ fontSize: 11, color: '#6B5A90', marginTop: 2 }}>{lead.etapa} · {lead.resp} {lead.op ? '· 🏭 Go-Live' : `· ${lead.dias}d sem atualização`}</div>
+            <div style={{ fontSize: 11, color: '#6B5A90', marginTop: 2 }}>
+              {lead.etapa} · {lead.resp} {lead.op ? '· 🏭 Go-Live' : `· ${lead.dias}d sem atualização`}
+            </div>
             {lead.risco && <div style={{ fontSize: 12, color: '#FF6B1A', marginTop: 4 }}>⚠️ {lead.risco}</div>}
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6B5A90', fontSize: 20, cursor: 'pointer' }}>✕</button>
         </div>
 
+        {/* Botão reativar */}
         {lead.off && (
           <button onClick={() => onReativar(form)} style={{ width: '100%', background: 'linear-gradient(135deg,#10B981,#059669)', border: 'none', borderRadius: 10, color: 'white', padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 20, boxShadow: '0 4px 14px rgba(16,185,129,0.35)' }}>
             ⚡ Reativar Lead
@@ -85,91 +91,87 @@ function Modal({ lead, acts, onClose, onSave, onReativar }) {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Etapa principal — só para não Go-Live */}
           {!lead.op && (
             <div>
-              <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>ETAPA</div>
-<div>
-  <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 8 }}>ETAPAS PARALELAS ATIVAS</div>
-  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-    {PARALELO_OPTIONS.map(opt => {
-      const tags = (form.paralelo || '').split(',').map(t => t.trim()).filter(Boolean)
-      const ativo = tags.includes(opt.label)
-      return (
-        <button key={opt.label} onClick={() => {
-          const current = (form.paralelo || '').split(',').map(t => t.trim()).filter(Boolean)
-          const next = ativo ? current.filter(t => t !== opt.label) : [...current, opt.label]
-          set('paralelo', next.join(', '))
-        }} style={{
-          background: ativo ? `${opt.color}20` : '#1A1428',
-          border: `1px solid ${ativo ? opt.color : '#2D1F45'}`,
-          borderRadius: 8, padding: '6px 14px', fontSize: 12,
-          color: ativo ? opt.color : '#6B5A90',
-          cursor: 'pointer', fontWeight: ativo ? 600 : 400,
-          transition: 'all 0.15s'
-        }}>
-          {ativo ? '✓ ' : ''}{opt.label}
-        </button>
-      )
-    })}
-  </div>
-  {form.paralelo && (
-    <div style={{ fontSize: 11, color: '#4D3D6A', marginTop: 6 }}>
-      Ativo: {form.paralelo}
-    </div>
-  )}
-</div>
-
-
-
-
-              
+              <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>ETAPA PRINCIPAL</div>
               <select value={form.etapa || ''} onChange={e => set('etapa', e.target.value)} style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }}>
                 {ETAPAS.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
           )}
+
+          {/* Etapas paralelas — só para não Go-Live */}
+          {!lead.op && (
+            <div>
+              <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 8 }}>ETAPAS PARALELAS ATIVAS</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {PARALELO_OPTIONS.map(opt => {
+                  const tags = (form.paralelo || '').split(',').map(t => t.trim()).filter(Boolean)
+                  const ativo = tags.includes(opt.label)
+                  return (
+                    <button key={opt.label} onClick={() => {
+                      const current = (form.paralelo || '').split(',').map(t => t.trim()).filter(Boolean)
+                      const next = ativo ? current.filter(t => t !== opt.label) : [...current, opt.label]
+                      set('paralelo', next.join(', '))
+                    }} style={{
+                      background: ativo ? `${opt.color}20` : '#1A1428',
+                      border: `1px solid ${ativo ? opt.color : '#2D1F45'}`,
+                      borderRadius: 8, padding: '6px 14px', fontSize: 12,
+                      color: ativo ? opt.color : '#6B5A90',
+                      cursor: 'pointer', fontWeight: ativo ? 600 : 400,
+                      transition: 'all 0.15s'
+                    }}>
+                      {ativo ? '✓ ' : ''}{opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+              {form.paralelo && (
+                <div style={{ fontSize: 11, color: '#4D3D6A', marginTop: 6 }}>Ativo: {form.paralelo}</div>
+              )}
+            </div>
+          )}
+
+          {/* Responsável */}
           <div>
             <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>RESPONSÁVEL</div>
             <input value={form.resp || ''} onChange={e => set('resp', e.target.value)} style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }} />
           </div>
 
-          {/* Campo exclusivo para Go-Live */}
+          {/* Vencimento — só Go-Live */}
           {lead.op && (
             <div>
               <div style={{ fontSize: 11, color: '#10B981', marginBottom: 5, fontWeight: 600 }}>📅 VENCIMENTO DO CONTRATO</div>
-              <input
-                type="date"
-                value={form.vencimento || ''}
-                onChange={e => set('vencimento', e.target.value)}
-                style={{ width: '100%', background: '#1A1428', border: `1px solid ${vencLabel && diasVenc <= 90 ? '#F59E0B' : '#2D1F45'}`, borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }}
-              />
-              {vencLabel && (
-                <div style={{ fontSize: 12, color: vencLabel.color, marginTop: 6, fontWeight: 500 }}>
-                  {vencLabel.label}
-                </div>
-              )}
-              {!form.vencimento && (
-                <div style={{ fontSize: 11, color: '#4D3D6A', marginTop: 4 }}>
-                  Preencha para receber alertas 90 dias antes da renovação
-                </div>
-              )}
+              <input type="date" value={form.vencimento || ''} onChange={e => set('vencimento', e.target.value)}
+                style={{ width: '100%', background: '#1A1428', border: `1px solid ${vencLabel && diasVenc <= 90 ? '#F59E0B' : '#2D1F45'}`, borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }} />
+              {vencLabel && <div style={{ fontSize: 12, color: vencLabel.color, marginTop: 6, fontWeight: 500 }}>{vencLabel.label}</div>}
+              {!form.vencimento && <div style={{ fontSize: 11, color: '#4D3D6A', marginTop: 4 }}>Preencha para receber alertas 90 dias antes da renovação</div>}
             </div>
           )}
 
+          {/* Último movimento */}
           <div>
             <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>ÚLTIMO MOVIMENTO</div>
             <textarea value={form.mov || ''} onChange={e => set('mov', e.target.value)} rows={3} style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
           </div>
+
+          {/* Próxima ação */}
           <div>
             <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>PRÓXIMA AÇÃO</div>
             <input value={form.prox || ''} onChange={e => set('prox', e.target.value)} style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }} />
           </div>
+
+          {/* Risco — só não Go-Live */}
           {!lead.op && (
             <div>
               <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>RISCO</div>
               <input value={form.risco || ''} onChange={e => set('risco', e.target.value)} placeholder="Descreva o risco se houver..." style={{ width: '100%', background: '#1A1428', border: '1px solid #FF6B1A33', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }} />
             </div>
           )}
+
+          {/* Pendentes */}
           {pendentes.length > 0 && (
             <div>
               <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 8 }}>ATIVIDADES PENDENTES</div>
@@ -251,14 +253,7 @@ export default function Pipeline() {
   const todosAtivos = leads.filter(l => !l.off && !l.op)
   const todosGeladeira = leads.filter(l => l.off && !l.op).sort((a, b) => b.dias - a.dias)
   const goLive = leads.filter(l => l.op)
-
-  // Alertas de renovação — contratos vencendo em 90 dias ou já vencidos
-  const renovacoes = goLive.filter(l => {
-    const d = diasParaVencer(l.vencimento)
-    return d !== null && d <= 90
-  }).sort((a, b) => diasParaVencer(a.vencimento) - diasParaVencer(b.vencimento))
-
-  // Sem data ainda
+  const renovacoes = goLive.filter(l => { const d = diasParaVencer(l.vencimento); return d !== null && d <= 90 }).sort((a, b) => diasParaVencer(a.vencimento) - diasParaVencer(b.vencimento))
   const semData = goLive.filter(l => !l.vencimento)
 
   const resps = ['Todos', ...Array.from(new Set([...todosAtivos, ...todosGeladeira].map(l => l.resp?.split(' ')[0]).filter(Boolean)))]
@@ -316,7 +311,7 @@ export default function Pipeline() {
       <div style={{ display: 'flex', borderBottom: '1px solid #1E1433', background: '#0A0810', padding: '0 20px' }}>
         {[
           { id: 'pipeline', label: `📋 Pipeline (${ativos.length})`, color: '#A855F7' },
-          { id: 'golive', label: `🏭 Go-Live (${goLive.length})${renovacoes.length > 0 ? ` ⚠️` : ''}`, color: '#10B981' },
+          { id: 'golive', label: `🏭 Go-Live (${goLive.length})${renovacoes.length > 0 ? ' ⚠️' : ''}`, color: '#10B981' },
           { id: 'geladeira', label: `🧊 Geladeira (${geladeira.length})`, color: '#9CA3AF' },
         ].map(tab => (
           <button key={tab.id} onClick={() => setAba(tab.id)} style={{ background: 'none', border: 'none', borderBottom: aba === tab.id ? `2px solid ${tab.color}` : '2px solid transparent', color: aba === tab.id ? tab.color : '#6B5A90', padding: '12px 16px', fontSize: 13, cursor: 'pointer', fontWeight: aba === tab.id ? 600 : 400, transition: 'all 0.15s' }}>
@@ -342,6 +337,8 @@ export default function Pipeline() {
               </div>
             </div>
           )}
+
+          {/* Kanban */}
           <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch' }}>
             {ETAPAS.map(etapa => {
               const cards = byEtapa[etapa] || []
@@ -365,12 +362,14 @@ export default function Pipeline() {
                             <span style={{ background: `${agColor}22`, border: `1px solid ${agColor}55`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: agColor, whiteSpace: 'nowrap', fontWeight: 600 }}>{agLabel}</span>
                           </div>
                           <div style={{ fontSize: 11, color: '#6B5A90' }}>👤 {l.resp}</div>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 11, color: l.dias > 7 ? '#FF6B1A' : '#6B5A90' }}>🕐 {l.dias}d</span>
                             {pendLead.length > 0 && <span style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid #7C3AED44', borderRadius: 6, padding: '1px 7px', fontSize: 10, color: '#A855F7' }}>{pendLead.length} pend.</span>}
                             {l.risco && <span style={{ fontSize: 11 }}>⚠️</span>}
                             {l.g12 && <span style={{ fontSize: 11 }}>⭐</span>}
                           </div>
+                          {/* ✅ BADGES DE ETAPAS PARALELAS */}
+                          {l.paralelo && <ParaleloBadges paralelo={l.paralelo} />}
                           {l.prox && <div style={{ fontSize: 11, color: '#4D3D6A', borderTop: '1px solid #1E1433', paddingTop: 6 }}>→ {l.prox}</div>}
                         </div>
                       )
@@ -384,8 +383,6 @@ export default function Pipeline() {
 
         {/* ===== ABA GO-LIVE ===== */}
         {aba === 'golive' && <>
-
-          {/* Alertas de renovação */}
           {renovacoes.length > 0 && (
             <div style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ fontSize: 12, color: '#EF4444', fontWeight: 700, marginBottom: 10 }}>🔔 RENOVAÇÕES URGENTES ({renovacoes.length})</div>
@@ -407,7 +404,6 @@ export default function Pipeline() {
             </div>
           )}
 
-          {/* Sem data preenchida */}
           {semData.length > 0 && (
             <div style={{ background: 'rgba(107,90,144,0.08)', border: '1px solid #2D1F45', borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ fontSize: 12, color: '#6B5A90', fontWeight: 700, marginBottom: 10 }}>📅 SEM DATA DE VENCIMENTO ({semData.length}) — clique para preencher</div>
@@ -423,7 +419,6 @@ export default function Pipeline() {
             </div>
           )}
 
-          {/* Todos os Go-Live com data OK */}
           {goLive.filter(l => l.vencimento && diasParaVencer(l.vencimento) > 90).length > 0 && (
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: '#10B981', marginBottom: 10 }}>✅ CONTRATOS OK</div>
