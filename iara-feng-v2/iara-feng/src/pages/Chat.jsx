@@ -1,19 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages } from '../lib/supabase'
+import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL, USERS } from '../data/pipeline'
 
 const ADMINS = ['Mike Lopes', 'Bruno Braga']
 
 const CARGOS = {
-  'Mike Lopes': { cargo: 'CEO e Fundador da FENG', primeiro: true },
-  'Bruno Braga': { cargo: 'Gerente Comercial', primeiro: false },
-  'Jardel Rocha': { cargo: 'Coordenador Comercial', primeiro: false },
-  'Beni Ertel': { cargo: 'Analista Comercial', primeiro: false },
-  'Silvio Vázquez': { cargo: 'Advisor LATAM', primeiro: false },
+  'Mike Lopes': { cargo: 'CEO e Fundador da FENG' },
+  'Bruno Braga': { cargo: 'Gerente Comercial' },
+  'Jardel Rocha': { cargo: 'Coordenador Comercial' },
+  'Beni Ertel': { cargo: 'Analista Comercial' },
+  'Silvio Vázquez': { cargo: 'Advisor LATAM' },
 }
 
-function buildCtx(leads, acts, userName) {
+function buildCtx(leads, acts, userName, memories = []) {
   const hoje = new Date().toLocaleDateString('pt-BR')
   const pend = acts.filter(a => !a.ok)
   const mine = pend.filter(a => a.resp?.toLowerCase().includes(userName.split(' ')[0].toLowerCase()))
@@ -39,6 +39,26 @@ function buildCtx(leads, acts, userName) {
 
   const u = USERS?.find(u => u.nome === userName)
   if (u?.perfil) c += `\nPERFIL DO USUÁRIO: ${u.perfil}\n`
+
+  // Injeta memórias
+  if (memories.length > 0) {
+    const pessoal = memories.filter(m => m.user_id === (USERS.find(u => u.nome === userName)?.id || userName) && m.tipo === 'pessoal')
+    const perfil = memories.filter(m => m.user_id === (USERS.find(u => u.nome === userName)?.id || userName) && m.tipo === 'perfil')
+    const time = memories.filter(m => m.tipo === 'time')
+
+    if (pessoal.length) {
+      c += `\n🧠 MEMÓRIAS PESSOAIS (${userName}):\n`
+      pessoal.forEach(m => c += `• ${m.conteudo}\n`)
+    }
+    if (perfil.length) {
+      c += `\n👤 PERFIL OBSERVADO (${userName}):\n`
+      perfil.forEach(m => c += `• ${m.conteudo}\n`)
+    }
+    if (time.length) {
+      c += `\n🏢 MEMÓRIAS DO TIME:\n`
+      time.slice(0, 20).forEach(m => c += `• ${m.conteudo}\n`)
+    }
+  }
 
   return c
 }
@@ -67,27 +87,22 @@ Estruture sua mensagem assim (sem títulos, em prosa fluida):
 3. QUEM VOCÊ É: IAra — Intelligence and Action for Revenue Acceleration. Não é um chatbot. É a inteligência comercial do time. Trabalha com o ${nome} no dia a dia.
 
 4. O QUE VOCÊ FAZ:
-- Acompanha o pipeline em tempo real — sabe o status de cada lead, quem está quente, quem esfriou
+- Acompanha o pipeline em tempo real
 - Transforma conversas em registros e ações — o ${nome} fala, você registra, cria atividades, atualiza etapas
-- Lembra de tudo — histórico completo de cada negociação
-- Gera alertas de risco — avisa quando um lead está esfriando ou travado
-- Fecha o Radar Semanal — relatório executivo para o Mike e Bruno
+- Lembra de tudo — histórico completo, memória persistente entre sessões
+- Gera alertas de risco
+- Fecha o Radar Semanal
 
 5. SEÇÕES DA PLATAFORMA:
-- 💬 Chat (aqui): onde vocês conversam e tudo vira registro
-- 📋 Pipeline: visão Kanban de todos os leads por etapa
-- 📊 Radar: relatório semanal gerado automaticamente
+- 💬 Chat: onde vocês conversam e tudo vira registro
+- 📋 Pipeline: visão Kanban de todos os leads
+- 📊 Radar: relatório semanal automático
 
-6. PAPEL DO ${cargo.toUpperCase()}: Mencione especificamente como você pode ajudar no papel dele — ${
-    cargo === 'Gerente Comercial' ? 'visão geral do time, performance, tomada de decisão com dados' :
-    cargo === 'Coordenador Comercial' ? 'organização das atividades do time, acompanhamento de leads, garantir que nada caia' :
-    cargo === 'Analista Comercial' ? 'registro das atividades do dia a dia, atualização de leads, preparação de materiais' :
-    cargo === 'Advisor LATAM' ? 'inteligência sobre o mercado LATAM, leads internacionais, contexto estratégico regional' : 'suporte comercial'
-  }
+6. PAPEL: Como você ajuda especificamente um ${cargo}.
 
-7. ENCERRAMENTO: Uma frase curta e direta convidando para começar. Com o seu estilo — sem entusiasmo exagerado.
+7. ENCERRAMENTO: Uma frase curta e direta. Sem entusiasmo exagerado.
 
-Escreva em português do Brasil, informal, fluido. Sem bullet points na resposta — texto corrido. Máximo 250 palavras.`
+Prosa fluida, sem bullet points. Máximo 250 palavras.`
 }
 
 const SYSTEM = `Você é a IAra, agente de inteligência comercial da FENG — empresa de tecnologia para clubes de futebol e esportes na América Latina.
@@ -98,10 +113,15 @@ COMANDO EXCLUSIVO "IAra fechar Radar" (só Mike Lopes e Bruno Braga):
 - Se ADMIN:false → "Esse comando é exclusivo para você e o Bruno."
 - Se ADMIN:true → confirmar, depois emitir [AÇÃO:GERAR_RADAR]{}[/AÇÃO] e fazer resumo textual dos destaques da semana.
 
+COMANDO DE AVALIAÇÃO (só admins): "raio-x do [nome]" ou "avalie o [nome]"
+- Fazer análise completa da pessoa com base nas memórias de perfil acumuladas
+- Cobertura: estilo de trabalho, pontos fortes, padrões observados, áreas de atenção
+- Tom: honesto, direto, sem papas na língua — é para o CEO, não para RH
+
 REGRAS DE SAVE:
 - UMA ação: resumo → aguardar "sim/pode/confirma" → executar
 - MÚLTIPLAS: listar numeradas → confirmação única → executar juntas
-- Consultas ("como está X?") = LEITURA, nunca save
+- Consultas = LEITURA, nunca save
 - NUNCA dizer "radar tá limpo" após save
 
 MARCADORES (após confirmação do usuário):
@@ -112,6 +132,22 @@ MARCADORES (após confirmação do usuário):
 
 ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE. Se travar: suponha e confirme.
 MODO BRIEFING: Relato verbal, dados reais, sem tabela.`
+
+const EXTRACT_SYSTEM = `Você é um extrator de memórias. Analise a troca e extraia APENAS fatos relevantes e duráveis.
+
+TIPOS:
+- pessoal: informações sobre a vida/contexto pessoal do usuário (família, preferências, eventos)
+- time: informações sobre leads, negociações, contexto comercial (relevante para todo o time)
+- perfil: padrões de comportamento, estilo de trabalho, forma de comunicar do usuário
+
+REGRAS:
+- Só extraia se for REALMENTE relevante e durável (não extraia perguntas, respostas genéricas, saudações)
+- Máximo 3 memórias por troca
+- Se não houver nada relevante, retorne {"memorias": []}
+- Conteúdo deve ser uma frase curta e factual
+
+Retorne APENAS JSON válido, sem markdown:
+{"memorias": [{"tipo": "pessoal|time|perfil", "conteudo": "fato relevante"}]}`
 
 function parseActions(txt) {
   const r = [], re = /\[AÇÃO:(\w+)\]([\s\S]*?)\[\/AÇÃO\]/g
@@ -134,12 +170,34 @@ async function callAI(messages, system) {
   return d.text || ''
 }
 
+async function extractAndSaveMemories(userId, userMsg, assistantMsg) {
+  try {
+    const raw = await callAI([{
+      role: 'user',
+      content: `Usuário disse: "${userMsg}"\nIAra respondeu: "${assistantMsg.slice(0, 300)}"\n\nExtraia memórias relevantes.`
+    }], EXTRACT_SYSTEM)
+
+    const clean = raw.replace(/```json|```/g, '').trim()
+    const parsed = JSON.parse(clean)
+    if (parsed.memorias?.length > 0) {
+      for (const m of parsed.memorias) {
+        if (m.tipo && m.conteudo) {
+          await saveMemory(userId, m.tipo, m.conteudo)
+        }
+      }
+    }
+  } catch (e) {
+    // Silencioso — extração de memória não pode quebrar o chat
+  }
+}
+
 export default function Chat() {
   const navigate = useNavigate()
   const user = JSON.parse(localStorage.getItem('iara_user') || '{}')
   const [msgs, setMsgs] = useState([])
   const [leads, setLeads] = useState([])
   const [acts, setActs] = useState([])
+  const [memories, setMemories] = useState([])
   const [inp, setInp] = useState('')
   const [loading, setLoading] = useState(false)
   const [rec, setRec] = useState(false)
@@ -164,24 +222,24 @@ export default function Chat() {
       if (!a.length) { for (const act of ACTIVITIES_INITIAL) await upsertActivity(act); a = ACTIVITIES_INITIAL }
       setLeads(l); setActs(a)
 
+      // Carrega memórias
+      const mems = await getMemories(user.id)
+      setMemories(mems)
+
       const history = await getMessages(user.id)
       if (history.length > 0) {
         setMsgs(history.map((m, i) => ({ id: i, role: m.role, text: m.text, results: m.results })))
         setInitialized(true); setLoading(false); return
       }
 
-      // PRIMEIRO ACESSO — onboarding personalizado
-      const ctx = buildCtx(l, a, user.nome)
-      const cargoInfo = CARGOS[user.nome] || { cargo: 'membro do time comercial', primeiro: false }
+      // Primeiro acesso
+      const ctx = buildCtx(l, a, user.nome, mems)
+      const cargoInfo = CARGOS[user.nome] || { cargo: 'membro do time comercial' }
       const onboardingPrompt = buildOnboardingPrompt(user.nome, cargoInfo.cargo, ctx)
 
-      const raw = await callAI(
-        [{ role: 'user', content: onboardingPrompt }],
-        SYSTEM + '\n\n' + ctx
-      )
+      const raw = await callAI([{ role: 'user', content: onboardingPrompt }], SYSTEM + '\n\n' + ctx)
       const txt = strip(raw)
-      const g = [{ id: 'g1', role: 'assistant', text: txt, results: [] }]
-      setMsgs(g)
+      setMsgs([{ id: 'g1', role: 'assistant', text: txt, results: [] }])
       await saveMessage(user.id, 'assistant', txt)
     } catch (e) {
       console.error(e)
@@ -198,7 +256,7 @@ export default function Chat() {
     await saveMessage(user.id, 'user', t)
 
     try {
-      const ctx = buildCtx(leads, acts, user.nome)
+      const ctx = buildCtx(leads, acts, user.nome, memories)
       const apiMsgs = newMsgs.slice(-40).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
       const raw = await callAI(apiMsgs, SYSTEM + '\n\n' + ctx)
       const actions = parseActions(raw)
@@ -215,8 +273,7 @@ export default function Chat() {
           results.push(`✅ Concluído: ${found?.descricao || act.data.id}`)
         } else if (act.type === 'CRIAR') {
           const nA = { id: `act-${Date.now()}`, ok: false, criado: new Date().toISOString().split('T')[0], lead: act.data.lead, descricao: act.data.descricao, dt: act.data.dt, resp: act.data.resp, tipo: act.data.tipo || 'Atividade' }
-          curA = [...curA, nA]
-          await upsertActivity(nA)
+          curA = [...curA, nA]; await upsertActivity(nA)
           results.push(`✅ Criado: ${act.data.descricao}`)
         } else if (act.type === 'UPDATE_LEAD') {
           const { nome, campo, valor } = act.data
@@ -234,6 +291,13 @@ export default function Chat() {
       const aMsg = { id: Date.now() + 1, role: 'assistant', text: cleanTxt, results }
       setMsgs([...newMsgs, aMsg])
       await saveMessage(user.id, 'assistant', cleanTxt, results)
+
+      // Extrai memórias em background — silencioso
+      extractAndSaveMemories(user.id, t, cleanTxt).then(async () => {
+        const mems = await getMemories(user.id)
+        setMemories(mems)
+      })
+
     } catch (e) {
       const err = { id: Date.now() + 1, role: 'assistant', text: 'Eita, tive um problema técnico. Tenta de novo?', results: [] }
       setMsgs([...newMsgs, err])
@@ -244,7 +308,7 @@ export default function Chat() {
   async function handleClear() {
     await clearMessages(user.id); setMsgs([]); setLoading(true)
     try {
-      const ctx = buildCtx(leads, acts, user.nome)
+      const ctx = buildCtx(leads, acts, user.nome, memories)
       const raw = await callAI([{ role: 'user', content: `Reabra a conversa com ${user.nome} com nova saudação breve.` }], SYSTEM + '\n\n' + ctx)
       const txt = strip(raw)
       setMsgs([{ id: Date.now(), role: 'assistant', text: txt, results: [] }])
@@ -266,6 +330,7 @@ export default function Chat() {
   const isAdmin = ADMINS.includes(user.nome)
   const pendCount = acts.filter(a => !a.ok).length
   const ativosCount = leads.filter(l => !l.off && !l.op && l.aging !== 'Geladeira').length
+  const memCount = memories.length
   const chips = [['📅 Reunião', 'Registrar reunião:'], ['⚡ FUP feito', 'FUP realizado com'], ['⬆️ Avançar etapa', 'Avançou de etapa:'], ['⚠️ Risco', 'Registrar risco:'], ['📊 Como tá?', 'Como tá o pipeline hoje?'], ['🆕 Novo lead', 'Novo lead:']]
 
   return (
@@ -286,7 +351,6 @@ export default function Chat() {
           .header-extras { display: none !important; }
           .header-stats { font-size: 10px !important; padding: 2px 8px !important; }
           .msg-text { font-size: 15px !important; }
-          .chip-label { font-size: 12px !important; }
         }
       `}</style>
 
@@ -301,7 +365,10 @@ export default function Chat() {
               <span style={{ fontSize: 10, color: '#10B981' }}>online</span>
               {isAdmin && <span style={{ fontSize: 10, background: 'rgba(168,85,247,0.15)', color: '#A855F7', border: '1px solid #7C3AED44', borderRadius: 4, padding: '1px 6px' }}>admin</span>}
             </div>
-            <div style={{ fontSize: 10, color: '#6B5A90' }}>Agente comercial da FENG</div>
+            <div style={{ fontSize: 10, color: '#6B5A90' }}>
+              Agente comercial da FENG
+              {memCount > 0 && <span style={{ color: '#A855F7', marginLeft: 6 }}>· 🧠 {memCount} memórias</span>}
+            </div>
           </div>
         </div>
 
@@ -373,6 +440,7 @@ export default function Chat() {
           <button key={label} className="chip" onClick={() => { setInp(prompt); txRef.current?.focus() }} style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 20, padding: '7px 14px', fontSize: 12, color: '#C084FC', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', minHeight: 34 }}>{label}</button>
         ))}
         {isAdmin && <button className="chip" onClick={() => send('IAra fechar Radar')} style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid #1D9E7566', borderRadius: 20, padding: '7px 14px', fontSize: 12, color: '#1D9E75', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', minHeight: 34 }}>📊 Fechar Radar</button>}
+        {isAdmin && <button className="chip" onClick={() => setInp('IAra, raio-x do ')} style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid #7C3AED44', borderRadius: 20, padding: '7px 14px', fontSize: 12, color: '#A855F7', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', minHeight: 34 }}>🧠 Raio-X</button>}
       </div>
 
       {/* Input */}
