@@ -69,3 +69,16 @@ export async function getRadarSnapshots() {
   if (error) throw error
   return data || []
 }
+export async function getMemories(userId) {
+  const { data } = await supabase
+    .from('memories')
+    .select('*')
+    .or(`user_id.eq.${userId},tipo.eq.time`)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  return data || []
+}
+
+export async function saveMemory(userId, tipo, conteudo) {
+  await supabase.from('memories').insert({ user_id: userId, tipo, conteudo })
+}
