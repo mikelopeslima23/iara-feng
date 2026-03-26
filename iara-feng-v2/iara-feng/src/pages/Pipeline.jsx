@@ -35,6 +35,30 @@ function vencimentoLabel(dias) {
   if (dias <= 90) return { label: `Vence em ${dias}d`, color: '#F59E0B' }
   return { label: `Vence em ${dias}d`, color: '#10B981' }
 }
+const PARALELO_OPTIONS = [
+  { label: 'Proposta', color: '#A855F7' },
+  { label: 'Negociação', color: '#FF6B1A' },
+  { label: 'Jurídico', color: '#3B82F6' },
+  { label: 'Go-Live', color: '#10B981' },
+]
+
+function ParaleloBadges({ paralelo }) {
+  if (!paralelo) return null
+  const tags = paralelo.split(',').map(t => t.trim()).filter(Boolean)
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+      {tags.map(tag => {
+        const opt = PARALELO_OPTIONS.find(o => o.label === tag)
+        const color = opt?.color || '#6B5A90'
+        return (
+          <span key={tag} style={{ fontSize: 10, fontWeight: 600, color, background: `${color}18`, border: `1px solid ${color}44`, borderRadius: 4, padding: '1px 6px' }}>
+            {tag}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
 
 function Modal({ lead, acts, onClose, onSave, onReativar }) {
   const [form, setForm] = useState({ ...lead })
