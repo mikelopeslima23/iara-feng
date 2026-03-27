@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory, getKnowledge } from '../lib/supabase'
+import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory, getKnowledge, getNotifications, markNotificationRead, markAllRead, createNotification } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL, USERS } from '../data/pipeline'
 
 const FENG_LOGO = `data:image/png;base64,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`
@@ -21,6 +21,12 @@ const SUGESTAO_CONFIG = {
   juridico: { label: '⚖️ Briefing para o Jurídico', color: '#3B82F6', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.25)' },
 }
 
+const NOTIF_TIPO_CONFIG = {
+  tarefa: { color: '#A855F7', bg: 'rgba(168,85,247,0.1)', icon: '📌' },
+  aviso: { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', icon: '⚠️' },
+  alerta: { color: '#EF4444', bg: 'rgba(239,68,68,0.1)', icon: '🔴' },
+}
+
 function SugestaoCard({ tipo, texto }) {
   const [copied, setCopied] = useState(false)
   const cfg = SUGESTAO_CONFIG[tipo] || SUGESTAO_CONFIG.discord
@@ -34,6 +40,62 @@ function SugestaoCard({ tipo, texto }) {
         </button>
       </div>
       <div style={{ fontSize: 13, color: '#E8DCFF', lineHeight: 1.6, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{texto}</div>
+    </div>
+  )
+}
+
+function NotifModal({ notifs, onClose, onMarkRead, onMarkAll, userId }) {
+  const naoLidas = notifs.filter(n => !n.lida)
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+      <div style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: '0 0 0 16px', width: '100%', maxWidth: 380, maxHeight: '80vh', display: 'flex', flexDirection: 'column', marginTop: 56, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
+
+        {/* Header modal */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid #1E1433' }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#F0E8FF' }}>🔔 Notificações</div>
+            <div style={{ fontSize: 11, color: '#6B5A90' }}>{naoLidas.length} não lida{naoLidas.length !== 1 ? 's' : ''}</div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {naoLidas.length > 0 && (
+              <button onClick={() => onMarkAll(userId)} style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid #7C3AED44', borderRadius: 6, color: '#A855F7', padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>
+                Marcar todas
+              </button>
+            )}
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6B5A90', fontSize: 18, cursor: 'pointer' }}>✕</button>
+          </div>
+        </div>
+
+        {/* Lista */}
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {notifs.length === 0 && (
+            <div style={{ padding: 40, textAlign: 'center', color: '#4D3D6A', fontSize: 13 }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>🔕</div>
+              Nenhuma notificação ainda
+            </div>
+          )}
+          {notifs.map(n => {
+            const cfg = NOTIF_TIPO_CONFIG[n.tipo] || NOTIF_TIPO_CONFIG.tarefa
+            return (
+              <div key={n.id} onClick={() => !n.lida && onMarkRead(n.id)} style={{ padding: '12px 16px', borderBottom: '1px solid #1A1428', background: n.lida ? 'transparent' : 'rgba(168,85,247,0.04)', cursor: n.lida ? 'default' : 'pointer', display: 'flex', gap: 12, alignItems: 'flex-start', transition: 'background 0.15s' }}>
+                <div style={{ width: 32, height: 32, borderRadius: '50%', background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{cfg.icon}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                    <div style={{ fontSize: 13, fontWeight: n.lida ? 400 : 600, color: n.lida ? '#9CA3AF' : '#F0E8FF', lineHeight: 1.3 }}>{n.titulo}</div>
+                    {!n.lida && <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.color, flexShrink: 0, marginTop: 4 }} />}
+                  </div>
+                  {n.descricao && <div style={{ fontSize: 12, color: '#6B5A90', marginTop: 3, lineHeight: 1.4 }}>{n.descricao}</div>}
+                  {n.lead && <div style={{ fontSize: 11, color: cfg.color, marginTop: 4, fontWeight: 500 }}>📎 {n.lead}</div>}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                    {n.de && <div style={{ fontSize: 10, color: '#4D3D6A' }}>de {n.de}</div>}
+                    <div style={{ fontSize: 10, color: '#4D3D6A' }}>{new Date(n.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
@@ -77,6 +139,12 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
   const u = USERS?.find(u => u.nome === userName)
   if (u?.perfil) c += `\nPERFIL DO USUÁRIO: ${u.perfil}\n`
 
+  // REGRA DE OWNERS
+  c += `\nOWNERS DOS LEADS:\n`
+  c += `• Leads Brasil → responsável direto: Jardel Rocha\n`
+  c += `• Leads LATAM (fora do Brasil) → responsável direto: Silvio Vázquez\n`
+  c += `• Outros membros podem ter atividades/registros mas o owner principal segue essa regra\n`
+
   if (memories.length > 0) {
     const userId = USERS.find(u => u.nome === userName)?.id || userName
     const pessoal = memories.filter(m => m.user_id === userId && m.tipo === 'pessoal')
@@ -106,12 +174,10 @@ Seja direta, irônica e mostre personalidade. 2-3 frases no máximo.`
   return `Este é o PRIMEIRO ACESSO de ${userName}, ${cargo} da FENG.
 Faça uma apresentação completa e envolvente. Use seu tom característico — direto, inteligente, com humor seco.
 
-Estruture sua mensagem assim (sem títulos, em prosa fluida):
-
 1. BOAS-VINDAS: Cumprimente pelo nome e cargo. Diga que foi o Mike Lopes, CEO da FENG, quem te trouxe para o time.
 2. CONTEXTO E DOR: A FENG é empresa de tecnologia para clubes de futebol e esportes na América Latina. O time comercial vivia num caos de planilhas, WhatsApp e reuniões sem registro. Você (IAra) nasceu para resolver isso.
 3. QUEM VOCÊ É: IAra — Intelligence and Action for Revenue Acceleration. Não é um chatbot. É a inteligência comercial do time.
-4. O QUE VOCÊ FAZ: Pipeline em tempo real, conversas viram registros, memória persistente, sugestões de comunicação prontas (Discord, WhatsApp, briefings jurídicos), Radar Semanal.
+4. O QUE VOCÊ FAZ: Pipeline em tempo real, conversas viram registros, memória persistente, sugestões de comunicação prontas (Discord, WhatsApp, briefings jurídicos), notificações internas, Radar Semanal.
 5. SEÇÕES: 💬 Chat, 📋 Pipeline, 🧠 Conhecimento, 📊 Radar.
 6. PAPEL: Como ajuda especificamente um ${cargo}.
 7. ENCERRAMENTO: Uma frase curta. Sem entusiasmo exagerado.
@@ -123,18 +189,21 @@ const SYSTEM = `Você é a IAra, agente de inteligência comercial da FENG — e
 
 IDENTIDADE: IAra — Intelligence and Action for Revenue Acceleration. Tom: colega descontraída, direta, bem-humorada. Português informal. NUNCA diz "Como posso te ajudar?". NUNCA repete a mesma frase.
 
+OWNERS DOS LEADS (regra fixa):
+- Leads Brasil → owner: Jardel Rocha (ID: jardel)
+- Leads LATAM (fora do Brasil) → owner: Silvio Vázquez (ID: silvio)
+- Outros membros podem ter atividades/registros mas o owner principal segue essa regra
+
 COMANDO EXCLUSIVO "IAra fechar Radar" (só Mike Lopes e Bruno Braga):
 - Se ADMIN:false → "Esse comando é exclusivo para o Mike e o Bruno."
-- Se ADMIN:true → confirmar, depois emitir [AÇÃO:GERAR_RADAR]{}[/AÇÃO] e fazer resumo textual dos destaques da semana.
+- Se ADMIN:true → confirmar, depois emitir [AÇÃO:GERAR_RADAR]{}[/AÇÃO] e fazer resumo textual.
 
-COMANDO DE AVALIAÇÃO (só admins): "raio-x do [nome]" ou "avalie o [nome]"
-- Análise completa com base nas memórias de perfil acumuladas. Tom honesto e direto.
+COMANDO DE AVALIAÇÃO (só admins): "raio-x do [nome]" → análise com memórias de perfil. Tom honesto e direto.
 
 REGRAS DE SAVE:
 - UMA ação: resumo → aguardar "sim/pode/confirma" → executar
 - MÚLTIPLAS: listar numeradas → confirmação única → executar juntas
 - Consultas = LEITURA, nunca save
-- NUNCA dizer "radar tá limpo" após save
 
 MARCADORES (após confirmação do usuário):
 [AÇÃO:CONCLUIR]{"id":"ID_ATIVIDADE"}[/AÇÃO]
@@ -142,29 +211,36 @@ MARCADORES (após confirmação do usuário):
 [AÇÃO:UPDATE_LEAD]{"nome":"NOME","campo":"etapa|prox|mov","valor":"VALOR"}[/AÇÃO]
 [AÇÃO:GERAR_RADAR]{}[/AÇÃO]
 
-SUGESTÕES PROATIVAS (após salvar qualquer ação confirmada):
-Avalie se cabe sugerir uma comunicação pronta. Use SOMENTE quando relevante.
+NOTIFICAÇÕES — quando criar atividade para outro usuário, emita também:
+[NOTIF:{"para":"ID","titulo":"TITULO","descricao":"DESC","lead":"LEAD","tipo":"tarefa|aviso|alerta"}][/NOTIF]
+
+IDs: mike=mike | bruno=bruno | jardel=jardel | silvio=silvio | beni=beni
+
+Exemplo: Mike pede ATA para Jardel sobre Grêmio:
+[AÇÃO:CRIAR]{"lead":"Grêmio","desc":"Registrar ATA da reunião","dt":"2026-03-28","resp":"Jardel Rocha","tipo":"Reunião"}[/AÇÃO]
+[NOTIF:{"para":"jardel","titulo":"ATA da reunião — Grêmio","descricao":"Registrar ATA da reunião realizada hoje","lead":"Grêmio","tipo":"tarefa"}][/NOTIF]
+
+SUGESTÕES PROATIVAS (após salvar qualquer ação confirmada — SOMENTE quando relevante):
 
 FUP ou REUNIÃO realizada → sugerir post para Discord:
 [SUGESTÃO:discord]📌 **[LEAD]** | [Etapa] — [data]
 [Narrativa do que aconteceu em 2-3 frases, tom profissional]
 Próximo passo: [próxima ação] até [data][/SUGESTÃO]
 
-LEAD G12/G15 ou envolvendo SÓCIO FENG → sugerir mensagem WhatsApp para diretoria:
+LEAD G12/G15 ou SÓCIO FENG → sugerir WhatsApp para diretoria:
 [SUGESTÃO:whatsapp]🏆 *[LEAD]* — Atualização rápida
 [Status em 2-3 linhas, tom executivo]
 Resp: [nome][/SUGESTÃO]
 
-JURÍDICO (tratativas, contrato, minuta) → sugerir briefing:
+JURÍDICO → sugerir briefing:
 [SUGESTÃO:juridico]Briefing Jurídico — [Lead]
 Contexto: [o que é o projeto]
 Necessidade: [o que precisa do jurídico]
 Prazo: [se houver]
 Resp comercial: [nome][/SUGESTÃO]
 
-REGRA: Sugira APÓS confirmar a ação. Máximo 2 sugestões por resposta. Não sugira em consultas.
-
-ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE. Se travar: suponha e confirme.
+REGRA: Máximo 2 sugestões por resposta. Não sugira em consultas.
+ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE.
 MODO BRIEFING: Relato verbal, dados reais, sem tabela.`
 
 const EXTRACT_SYSTEM = `Você é um extrator de memórias. Analise a troca e extraia APENAS fatos relevantes e duráveis.
@@ -183,17 +259,26 @@ function parseActions(txt) {
 }
 
 function parseSugestoes(txt) {
-  const sugestoes = []
-  const re = /\[SUGESTÃO:(\w+)\]([\s\S]*?)\[\/SUGESTÃO\]/g
+  const s = [], re = /\[SUGESTÃO:(\w+)\]([\s\S]*?)\[\/SUGESTÃO\]/g
   let m
-  while ((m = re.exec(txt)) !== null) sugestoes.push({ tipo: m[1], texto: m[2].trim() })
-  return sugestoes
+  while ((m = re.exec(txt)) !== null) s.push({ tipo: m[1], texto: m[2].trim() })
+  return s
+}
+
+function parseNotifs(txt) {
+  const n = [], re = /\[NOTIF:([\s\S]*?)\]\[\/NOTIF\]/g
+  let m
+  while ((m = re.exec(txt)) !== null) {
+    try { n.push(JSON.parse(m[1].trim())) } catch { /* silencioso */ }
+  }
+  return n
 }
 
 function strip(txt) {
   return txt
     .replace(/\[AÇÃO:\w+\][\s\S]*?\[\/AÇÃO\]/g, '')
     .replace(/\[SUGESTÃO:\w+\][\s\S]*?\[\/SUGESTÃO\]/g, '')
+    .replace(/\[NOTIF:[\s\S]*?\]\[\/NOTIF\]/g, '')
     .trim()
 }
 
@@ -220,6 +305,8 @@ export default function Chat() {
   const [acts, setActs] = useState([])
   const [memories, setMemories] = useState([])
   const [knowledge, setKnowledge] = useState([])
+  const [notifs, setNotifs] = useState([])
+  const [showNotifs, setShowNotifs] = useState(false)
   const [inp, setInp] = useState('')
   const [loading, setLoading] = useState(false)
   const [rec, setRec] = useState(false)
@@ -235,17 +322,30 @@ export default function Chat() {
     if (txRef.current) { txRef.current.style.height = 'auto'; txRef.current.style.height = Math.min(txRef.current.scrollHeight, 140) + 'px' }
   }, [inp])
 
+  // Polling de notificações a cada 30s
+  useEffect(() => {
+    if (!user.id) return
+    const poll = setInterval(async () => {
+      const n = await getNotifications(user.id)
+      setNotifs(n)
+    }, 30000)
+    return () => clearInterval(poll)
+  }, [user.id])
+
   async function init() {
     setLoading(true)
     try {
-      let l = await getLeads()
-      let a = await getActivities()
+      let l = await getLeads(); let a = await getActivities()
       if (!l.length) { for (const lead of PIPELINE_INITIAL) await upsertLead(lead); l = PIPELINE_INITIAL }
       if (!a.length) { for (const act of ACTIVITIES_INITIAL) await upsertActivity(act); a = ACTIVITIES_INITIAL }
       setLeads(l); setActs(a)
 
-      const [mems, know] = await Promise.all([getMemories(user.id), getKnowledge()])
-      setMemories(mems); setKnowledge(know)
+      const [mems, know, nots] = await Promise.all([
+        getMemories(user.id),
+        getKnowledge(),
+        getNotifications(user.id)
+      ])
+      setMemories(mems); setKnowledge(know); setNotifs(nots)
 
       const history = await getMessages(user.id)
       if (history.length > 0) {
@@ -279,6 +379,7 @@ export default function Chat() {
       const raw = await callAI(apiMsgs, SYSTEM + '\n\n' + ctx)
       const actions = parseActions(raw)
       const sugestoes = parseSugestoes(raw)
+      const notifsParsed = parseNotifs(raw)
       const cleanTxt = strip(raw)
       const results = []
       let curL = [...leads], curA = [...acts]
@@ -305,6 +406,19 @@ export default function Chat() {
         }
       }
 
+      // Processa notificações
+      for (const n of notifsParsed) {
+        if (n.para) {
+          await createNotification(n.para, n.titulo, n.descricao, n.lead || null, user.nome, n.tipo || 'tarefa')
+          results.push(`🔔 Notificado: ${n.titulo}`)
+        }
+      }
+      // Recarrega notificações do próprio usuário
+      if (notifsParsed.some(n => n.para === user.id)) {
+        const nots = await getNotifications(user.id)
+        setNotifs(nots)
+      }
+
       setLeads(curL); setActs(curA)
       if (openRadar) setRadarReady(true)
       const aMsg = { id: Date.now() + 1, role: 'assistant', text: cleanTxt, results, sugestoes }
@@ -329,6 +443,16 @@ export default function Chat() {
     setLoading(false)
   }
 
+  async function handleMarkRead(id) {
+    await markNotificationRead(id)
+    setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n))
+  }
+
+  async function handleMarkAll(userId) {
+    await markAllRead(userId)
+    setNotifs(prev => prev.map(n => ({ ...n, lida: true })))
+  }
+
   function toggleRec() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) return alert('Ditado disponível no Chrome/Edge')
@@ -344,6 +468,7 @@ export default function Chat() {
   const ativosCount = leads.filter(l => !l.off && !l.op && l.aging !== 'Geladeira').length
   const memCount = memories.length
   const knowCount = knowledge.length
+  const unreadCount = notifs.filter(n => !n.lida).length
   const chips = [['📅 Reunião', 'Registrar reunião:'], ['⚡ FUP feito', 'FUP realizado com'], ['⬆️ Avançar etapa', 'Avançou de etapa:'], ['⚠️ Risco', 'Registrar risco:'], ['📊 Como tá?', 'Como tá o pipeline hoje?'], ['🆕 Novo lead', 'Novo lead:']]
 
   return (
@@ -351,15 +476,17 @@ export default function Chat() {
       <style>{`
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
         @keyframes blink{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+        @keyframes badgePop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
         ::-webkit-scrollbar{width:3px} ::-webkit-scrollbar-track{background:#0D0A14} ::-webkit-scrollbar-thumb{background:#2D1F45;border-radius:3px}
         textarea::placeholder{color:#3D2E5A} textarea{-webkit-appearance:none}
         .chip:hover{background:#241839!important;border-color:#4D3080!important} .chip:active{transform:scale(0.95)} .send-btn:active{transform:scale(0.92)}
+        .notif-btn:hover{background:rgba(168,85,247,0.15)!important}
         @media(max-width:600px){ .header-extras{display:none!important} .header-stats{font-size:10px!important;padding:2px 8px!important} .msg-text{font-size:15px!important} }
       `}</style>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid #1E1433', background: 'linear-gradient(180deg,#0F0B1A 0%,#0A0810 100%)', flexShrink: 0, boxShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid #1E1433', background: 'linear-gradient(180deg,#0F0B1A 0%,#0A0810 100%)', flexShrink: 0, boxShadow: '0 2px 12px rgba(0,0,0,0.4)', position: 'relative', zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: 'white', flexShrink: 0, boxShadow: '0 0 12px rgba(168,85,247,0.4)' }}>IA</div>
           <div>
@@ -369,7 +496,6 @@ export default function Chat() {
               <span style={{ fontSize: 10, color: '#10B981' }}>online</span>
               {isAdmin && <span style={{ fontSize: 10, background: 'rgba(168,85,247,0.15)', color: '#A855F7', border: '1px solid #7C3AED44', borderRadius: 4, padding: '1px 6px' }}>admin</span>}
             </div>
-            {/* ✅ LOGO FENG NO HEADER */}
             <div style={{ fontSize: 10, color: '#6B5A90', display: 'flex', alignItems: 'center', gap: 5 }}>
               <span>Agente comercial</span>
               <img src={FENG_LOGO} alt="FENG" style={{ height: 10, opacity: 0.35, filter: 'brightness(0) invert(1)' }} />
@@ -383,6 +509,17 @@ export default function Chat() {
           <div className="header-stats" style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#6B5A90' }}>
             <span style={{ color: '#A855F7', fontWeight: 600 }}>{ativosCount}</span> · <span style={{ color: '#FF6B1A', fontWeight: 600 }}>{pendCount}</span>
           </div>
+
+          {/* ✅ SINO DE NOTIFICAÇÕES */}
+          <button className="notif-btn" onClick={() => setShowNotifs(v => !v)} style={{ position: 'relative', width: 36, height: 36, borderRadius: 9, border: `1px solid ${unreadCount > 0 ? '#A855F744' : '#2D1F45'}`, background: unreadCount > 0 ? 'rgba(168,85,247,0.08)' : '#130F1E', color: unreadCount > 0 ? '#A855F7' : '#6B5A90', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, transition: 'all 0.15s', flexShrink: 0 }}>
+            🔔
+            {unreadCount > 0 && (
+              <div style={{ position: 'absolute', top: -4, right: -4, background: '#EF4444', color: 'white', borderRadius: '50%', width: 16, height: 16, fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'badgePop 0.3s ease', border: '2px solid #0D0A14' }}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </div>
+            )}
+          </button>
+
           {isAdmin && (
             <button onClick={() => send('IAra fechar Radar')} className="header-extras" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid #1D9E75', borderRadius: 6, color: '#1D9E75', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📊 Radar</button>
           )}
@@ -398,6 +535,17 @@ export default function Chat() {
           <button onClick={handleClear} style={{ background: 'none', border: '1px solid #2D1F45', borderRadius: 7, color: '#6B5A90', padding: '5px 9px', fontSize: 13, cursor: 'pointer', minWidth: 34, minHeight: 34 }}>🗑</button>
         </div>
       </div>
+
+      {/* Modal de notificações */}
+      {showNotifs && (
+        <NotifModal
+          notifs={notifs}
+          userId={user.id}
+          onClose={() => setShowNotifs(false)}
+          onMarkRead={handleMarkRead}
+          onMarkAll={handleMarkAll}
+        />
+      )}
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 8px', display: 'flex', flexDirection: 'column', gap: 16, WebkitOverflowScrolling: 'touch' }}>
@@ -465,7 +613,7 @@ export default function Chat() {
         </button>
       </div>
 
-      {/* ✅ POWERED BY FENG — rodapé discreto */}
+      {/* ✅ POWERED BY FENG */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '3px 0', background: '#0A0810', borderTop: '1px solid #0F0B1A' }}>
         <span style={{ fontSize: 9, color: '#2D1F45', letterSpacing: '0.08em' }}>powered by</span>
         <img src={FENG_LOGO} alt="FENG" style={{ height: 9, opacity: 0.18, filter: 'brightness(0) invert(1)' }} />
