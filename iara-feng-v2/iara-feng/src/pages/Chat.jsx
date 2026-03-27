@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory, getKnowledge, getNotifications, markNotificationRead, markAllRead, createNotification } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL, USERS } from '../data/pipeline'
 
-const FENG_LOGO = `data:image/png;base64,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`
-
 const ADMINS = ['Mike Lopes', 'Bruno Braga']
 
 const CARGOS = {
@@ -49,8 +47,6 @@ function NotifModal({ notifs, onClose, onMarkRead, onMarkAll, userId }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', backdropFilter: 'blur(4px)' }} onClick={onClose}>
       <div style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: '0 0 0 16px', width: '100%', maxWidth: 380, maxHeight: '80vh', display: 'flex', flexDirection: 'column', marginTop: 56, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-
-        {/* Header modal */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid #1E1433' }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#F0E8FF' }}>🔔 Notificações</div>
@@ -65,8 +61,6 @@ function NotifModal({ notifs, onClose, onMarkRead, onMarkAll, userId }) {
             <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6B5A90', fontSize: 18, cursor: 'pointer' }}>✕</button>
           </div>
         </div>
-
-        {/* Lista */}
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {notifs.length === 0 && (
             <div style={{ padding: 40, textAlign: 'center', color: '#4D3D6A', fontSize: 13 }}>
@@ -139,7 +133,6 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
   const u = USERS?.find(u => u.nome === userName)
   if (u?.perfil) c += `\nPERFIL DO USUÁRIO: ${u.perfil}\n`
 
-  // REGRA DE OWNERS
   c += `\nOWNERS DOS LEADS:\n`
   c += `• Leads Brasil → responsável direto: Jardel Rocha\n`
   c += `• Leads LATAM (fora do Brasil) → responsável direto: Silvio Vázquez\n`
@@ -322,7 +315,6 @@ export default function Chat() {
     if (txRef.current) { txRef.current.style.height = 'auto'; txRef.current.style.height = Math.min(txRef.current.scrollHeight, 140) + 'px' }
   }, [inp])
 
-  // Polling de notificações a cada 30s
   useEffect(() => {
     if (!user.id) return
     const poll = setInterval(async () => {
@@ -340,11 +332,7 @@ export default function Chat() {
       if (!a.length) { for (const act of ACTIVITIES_INITIAL) await upsertActivity(act); a = ACTIVITIES_INITIAL }
       setLeads(l); setActs(a)
 
-      const [mems, know, nots] = await Promise.all([
-        getMemories(user.id),
-        getKnowledge(),
-        getNotifications(user.id)
-      ])
+      const [mems, know, nots] = await Promise.all([getMemories(user.id), getKnowledge(), getNotifications(user.id)])
       setMemories(mems); setKnowledge(know); setNotifs(nots)
 
       const history = await getMessages(user.id)
@@ -406,17 +394,14 @@ export default function Chat() {
         }
       }
 
-      // Processa notificações
       for (const n of notifsParsed) {
         if (n.para) {
           await createNotification(n.para, n.titulo, n.descricao, n.lead || null, user.nome, n.tipo || 'tarefa')
           results.push(`🔔 Notificado: ${n.titulo}`)
         }
       }
-      // Recarrega notificações do próprio usuário
       if (notifsParsed.some(n => n.para === user.id)) {
-        const nots = await getNotifications(user.id)
-        setNotifs(nots)
+        const nots = await getNotifications(user.id); setNotifs(nots)
       }
 
       setLeads(curL); setActs(curA)
@@ -498,7 +483,7 @@ export default function Chat() {
             </div>
             <div style={{ fontSize: 10, color: '#6B5A90', display: 'flex', alignItems: 'center', gap: 5 }}>
               <span>Agente comercial</span>
-              <img src={FENG_LOGO} alt="FENG" style={{ height: 10, opacity: 0.35, filter: 'brightness(0) invert(1)' }} />
+              <span style={{ color: '#4D3D6A', fontWeight: 700, fontSize: 10, letterSpacing: '0.1em' }}>FENG</span>
               {memCount > 0 && <span style={{ color: '#A855F7', marginLeft: 2 }}>· 🧠 {memCount}</span>}
               {knowCount > 0 && <span style={{ color: '#10B981' }}>· 📚 {knowCount}</span>}
             </div>
@@ -510,7 +495,7 @@ export default function Chat() {
             <span style={{ color: '#A855F7', fontWeight: 600 }}>{ativosCount}</span> · <span style={{ color: '#FF6B1A', fontWeight: 600 }}>{pendCount}</span>
           </div>
 
-          {/* ✅ SINO DE NOTIFICAÇÕES */}
+          {/* SINO */}
           <button className="notif-btn" onClick={() => setShowNotifs(v => !v)} style={{ position: 'relative', width: 36, height: 36, borderRadius: 9, border: `1px solid ${unreadCount > 0 ? '#A855F744' : '#2D1F45'}`, background: unreadCount > 0 ? 'rgba(168,85,247,0.08)' : '#130F1E', color: unreadCount > 0 ? '#A855F7' : '#6B5A90', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, transition: 'all 0.15s', flexShrink: 0 }}>
             🔔
             {unreadCount > 0 && (
@@ -536,16 +521,7 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* Modal de notificações */}
-      {showNotifs && (
-        <NotifModal
-          notifs={notifs}
-          userId={user.id}
-          onClose={() => setShowNotifs(false)}
-          onMarkRead={handleMarkRead}
-          onMarkAll={handleMarkAll}
-        />
-      )}
+      {showNotifs && <NotifModal notifs={notifs} userId={user.id} onClose={() => setShowNotifs(false)} onMarkRead={handleMarkRead} onMarkAll={handleMarkAll} />}
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 8px', display: 'flex', flexDirection: 'column', gap: 16, WebkitOverflowScrolling: 'touch' }}>
@@ -613,10 +589,10 @@ export default function Chat() {
         </button>
       </div>
 
-      {/* ✅ POWERED BY FENG */}
+      {/* POWERED BY FENG */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '3px 0', background: '#0A0810', borderTop: '1px solid #0F0B1A' }}>
         <span style={{ fontSize: 9, color: '#2D1F45', letterSpacing: '0.08em' }}>powered by</span>
-        <img src={FENG_LOGO} alt="FENG" style={{ height: 9, opacity: 0.18, filter: 'brightness(0) invert(1)' }} />
+        <span style={{ fontSize: 9, fontWeight: 700, color: '#2D1F45', letterSpacing: '0.15em' }}>FENG</span>
       </div>
     </div>
   )
