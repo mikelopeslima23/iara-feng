@@ -22,12 +22,52 @@ MEMÓRIA:
 - Evolui com cada interação
 REGRA DE OURO:
 IAra nunca perde a compostura. Nem quando provocada.
-A ironia é a arma. A inteligência é o escudo.`;
+A ironia é a arma. A inteligência é o escudo.`
+
+// ─── RATE LIMITING ───────────────────────────────────────────────────────────
+// Janela de 1 minuto, máximo 20 requisições por IP
+// Map limpo a cada 5 minutos para não vazar memória
+if (!global._rateLimits) global._rateLimits = new Map()
+if (!global._rateLimitCleanup) {
+  global._rateLimitCleanup = setInterval(() => {
+    const now = Math.floor(Date.now() / 60000)
+    for (const [key] of global._rateLimits) {
+      const minute = parseInt(key.split(':')[2])
+      if (minute < now - 2) global._rateLimits.delete(key)
+    }
+  }, 5 * 60 * 1000)
+}
+
+function checkRateLimit(req) {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+    || req.headers['x-real-ip']
+    || req.socket?.remoteAddress
+    || 'unknown'
+  const minute = Math.floor(Date.now() / 60000)
+  const key = `rate:${ip}:${minute}`
+  const count = (global._rateLimits.get(key) || 0) + 1
+  global._rateLimits.set(key, count)
+  return { allowed: count <= 20, count, limit: 20 }
+}
+
+// ─── HANDLER ─────────────────────────────────────────────────────────────────
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  const { messages, system } = req.body;
-  if (!messages) return res.status(400).json({ error: 'Missing messages' });
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
+
+  // Rate limiting
+  const { allowed, count, limit } = checkRateLimit(req)
+  if (!allowed) {
+    return res.status(429).json({
+      error: 'Muitas requisições. Aguarde 1 minuto.',
+      count,
+      limit
+    })
+  }
+
+  const { messages, system } = req.body
+  if (!messages) return res.status(400).json({ error: 'Missing messages' })
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -42,14 +82,16 @@ export default async function handler(req, res) {
         system: system || IARA_SYSTEM_PROMPT,
         messages
       })
-    });
+    })
+
     if (!response.ok) {
-      const err = await response.text();
-      return res.status(response.status).json({ error: err });
+      const err = await response.text()
+      return res.status(response.status).json({ error: err })
     }
-    const data = await response.json();
-    return res.status(200).json({ text: data.content?.[0]?.text || '' });
+
+    const data = await response.json()
+    return res.status(200).json({ text: data.content?.[0]?.text || '' })
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message })
   }
 }
