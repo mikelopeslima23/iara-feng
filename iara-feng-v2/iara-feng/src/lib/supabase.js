@@ -5,7 +5,7 @@ const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
 
-// ─── DATABASE HELPERS ────────────────────────────────────────────────────────
+// ─── LEADS ───────────────────────────────────────────────────────────────────
 
 export async function getLeads() {
   const { data, error } = await supabase.from('iara_leads').select('*').order('nome')
@@ -18,6 +18,8 @@ export async function upsertLead(lead) {
   if (error) throw error
 }
 
+// ─── ACTIVITIES ──────────────────────────────────────────────────────────────
+
 export async function getActivities() {
   const { data, error } = await supabase.from('iara_activities').select('*').order('criado', { ascending: false })
   if (error) throw error
@@ -28,6 +30,8 @@ export async function upsertActivity(act) {
   const { error } = await supabase.from('iara_activities').upsert(act, { onConflict: 'id' })
   if (error) throw error
 }
+
+// ─── MESSAGES ────────────────────────────────────────────────────────────────
 
 export async function getMessages(userId) {
   const { data, error } = await supabase
@@ -52,6 +56,8 @@ export async function clearMessages(userId) {
   if (error) throw error
 }
 
+// ─── RADAR ───────────────────────────────────────────────────────────────────
+
 export async function saveRadarSnapshot(title, content, createdBy) {
   const { data, error } = await supabase.from('iara_radars').insert({
     title, content, created_by: createdBy
@@ -69,6 +75,9 @@ export async function getRadarSnapshots() {
   if (error) throw error
   return data || []
 }
+
+// ─── MEMORIES ────────────────────────────────────────────────────────────────
+
 export async function getMemories(userId) {
   const { data } = await supabase
     .from('memories')
@@ -82,6 +91,9 @@ export async function getMemories(userId) {
 export async function saveMemory(userId, tipo, conteudo) {
   await supabase.from('memories').insert({ user_id: userId, tipo, conteudo })
 }
+
+// ─── KNOWLEDGE ───────────────────────────────────────────────────────────────
+
 export async function getKnowledge(categoria = null) {
   let q = supabase.from('knowledge').select('*').order('created_at', { ascending: false })
   if (categoria) q = q.eq('categoria', categoria)
@@ -97,6 +109,9 @@ export async function saveKnowledge(item) {
 export async function deleteKnowledge(id) {
   await supabase.from('knowledge').delete().eq('id', id)
 }
+
+// ─── NOTIFICATIONS ───────────────────────────────────────────────────────────
+
 export async function getNotifications(userId) {
   const { data } = await supabase
     .from('notifications')
@@ -118,15 +133,3 @@ export async function markAllRead(userId) {
 export async function createNotification(para, titulo, descricao, lead = null, de = null, tipo = 'tarefa') {
   await supabase.from('notifications').insert({ para, titulo, descricao, lead, de, tipo })
 }
-```
-
-**3. No `SYSTEM` do `Chat.jsx`**, adicione este marcador:
-```
-NOTIFICAÇÕES: Quando criar uma atividade para outro usuário, emita também:
-[NOTIF:{"para":"ID_USUARIO","titulo":"TITULO","descricao":"DESC","lead":"LEAD"}][/NOTIF]
-
-IDs dos usuários: mike=mike, bruno=bruno, jardel=jardel, silvio=silvio, beni=beni
-
-Exemplo: Mike pede para notificar Jardel sobre ATA do Grêmio →
-[AÇÃO:CRIAR]{...}[/AÇÃO]
-[NOTIF:{"para":"jardel","titulo":"ATA da reunião — Grêmio","descricao":"Registrar ATA da reunião realizada hoje","lead":"Grêmio"}][/NOTIF]
