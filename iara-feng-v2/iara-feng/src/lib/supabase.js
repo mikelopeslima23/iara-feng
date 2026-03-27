@@ -97,3 +97,36 @@ export async function saveKnowledge(item) {
 export async function deleteKnowledge(id) {
   await supabase.from('knowledge').delete().eq('id', id)
 }
+export async function getNotifications(userId) {
+  const { data } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('para', userId)
+    .order('created_at', { ascending: false })
+    .limit(50)
+  return data || []
+}
+
+export async function markNotificationRead(id) {
+  await supabase.from('notifications').update({ lida: true }).eq('id', id)
+}
+
+export async function markAllRead(userId) {
+  await supabase.from('notifications').update({ lida: true }).eq('para', userId)
+}
+
+export async function createNotification(para, titulo, descricao, lead = null, de = null, tipo = 'tarefa') {
+  await supabase.from('notifications').insert({ para, titulo, descricao, lead, de, tipo })
+}
+```
+
+**3. No `SYSTEM` do `Chat.jsx`**, adicione este marcador:
+```
+NOTIFICAÇÕES: Quando criar uma atividade para outro usuário, emita também:
+[NOTIF:{"para":"ID_USUARIO","titulo":"TITULO","descricao":"DESC","lead":"LEAD"}][/NOTIF]
+
+IDs dos usuários: mike=mike, bruno=bruno, jardel=jardel, silvio=silvio, beni=beni
+
+Exemplo: Mike pede para notificar Jardel sobre ATA do Grêmio →
+[AÇÃO:CRIAR]{...}[/AÇÃO]
+[NOTIF:{"para":"jardel","titulo":"ATA da reunião — Grêmio","descricao":"Registrar ATA da reunião realizada hoje","lead":"Grêmio"}][/NOTIF]
