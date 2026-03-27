@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Chat from './pages/Chat'
 import Radar from './pages/Radar'
 import Pipeline from './pages/Pipeline'
+import Conhecimento from './pages/Conhecimento'
 
 function ProtectedRoute({ children }) {
   const user = localStorage.getItem('iara_user')
@@ -20,6 +21,7 @@ function App() {
         <Route path="/radar" element={<ProtectedRoute><Radar /></ProtectedRoute>} />
         <Route path="/pipeline" element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/login" />} />
+        <Route path="/conhecimento" element={<ProtectedRoute><Conhecimento /></ProtectedRoute>} />
       </Routes>
     </BrowserRouter>
   )
