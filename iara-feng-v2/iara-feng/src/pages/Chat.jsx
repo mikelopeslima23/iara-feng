@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory, getKnowledge } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL, USERS } from '../data/pipeline'
 
+const FENG_LOGO = `data:image/png;base64,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`
+
 const ADMINS = ['Mike Lopes', 'Bruno Braga']
 
 const CARGOS = {
@@ -22,13 +24,7 @@ const SUGESTAO_CONFIG = {
 function SugestaoCard({ tipo, texto }) {
   const [copied, setCopied] = useState(false)
   const cfg = SUGESTAO_CONFIG[tipo] || SUGESTAO_CONFIG.discord
-
-  function copy() {
-    navigator.clipboard.writeText(texto)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
+  function copy() { navigator.clipboard.writeText(texto); setCopied(true); setTimeout(() => setCopied(false), 2000) }
   return (
     <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: '0 10px 10px 10px', padding: '12px 14px', marginTop: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -93,53 +89,32 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
 
   if (knowledge.length > 0) {
     c += `\n📚 BASE DE CONHECIMENTO FENG:\n`
-    knowledge.forEach(k => {
-      c += `\n[${k.categoria.toUpperCase()}] ${k.titulo}\n${k.conteudo.slice(0, 600)}\n`
-    })
+    knowledge.forEach(k => c += `\n[${k.categoria.toUpperCase()}] ${k.titulo}\n${k.conteudo.slice(0, 600)}\n`)
   }
 
   return c
 }
 
 function buildOnboardingPrompt(userName, cargo) {
-  const nome = userName.split(' ')[0]
   const isMike = userName === 'Mike Lopes'
-
   if (isMike) {
     return `Você está abrindo a IAra pela primeira vez.
 Faça uma apresentação sua para o Mike — o criador da plataforma — com seu tom irônico e inteligente.
 Reconheça que ele sabe muito bem quem você é, afinal foi ele quem te criou.
-Diga algo como "então você finalmente resolveu me visitar" ou similar.
 Seja direta, irônica e mostre personalidade. 2-3 frases no máximo.`
   }
-
   return `Este é o PRIMEIRO ACESSO de ${userName}, ${cargo} da FENG.
 Faça uma apresentação completa e envolvente. Use seu tom característico — direto, inteligente, com humor seco.
 
 Estruture sua mensagem assim (sem títulos, em prosa fluida):
 
 1. BOAS-VINDAS: Cumprimente pelo nome e cargo. Diga que foi o Mike Lopes, CEO da FENG, quem te trouxe para o time.
-
 2. CONTEXTO E DOR: A FENG é empresa de tecnologia para clubes de futebol e esportes na América Latina. O time comercial vivia num caos de planilhas, WhatsApp e reuniões sem registro. Você (IAra) nasceu para resolver isso.
-
 3. QUEM VOCÊ É: IAra — Intelligence and Action for Revenue Acceleration. Não é um chatbot. É a inteligência comercial do time.
-
-4. O QUE VOCÊ FAZ:
-- Acompanha pipeline em tempo real
-- Transforma conversas em registros e ações
-- Lembra de tudo com memória persistente entre sessões
-- Sugere comunicações prontas (Discord, WhatsApp, briefings jurídicos)
-- Fecha o Radar Semanal
-
-5. SEÇÕES DA PLATAFORMA:
-- 💬 Chat: onde conversam e tudo vira registro
-- 📋 Pipeline: visão Kanban
-- 🧠 Conhecimento: base de produtos e propostas da FENG
-- 📊 Radar: relatório semanal automático
-
-6. PAPEL: Como você ajuda especificamente um ${cargo}.
-
-7. ENCERRAMENTO: Uma frase curta e direta. Sem entusiasmo exagerado.
+4. O QUE VOCÊ FAZ: Pipeline em tempo real, conversas viram registros, memória persistente, sugestões de comunicação prontas (Discord, WhatsApp, briefings jurídicos), Radar Semanal.
+5. SEÇÕES: 💬 Chat, 📋 Pipeline, 🧠 Conhecimento, 📊 Radar.
+6. PAPEL: Como ajuda especificamente um ${cargo}.
+7. ENCERRAMENTO: Uma frase curta. Sem entusiasmo exagerado.
 
 Prosa fluida, sem bullet points. Máximo 250 palavras.`
 }
@@ -153,8 +128,7 @@ COMANDO EXCLUSIVO "IAra fechar Radar" (só Mike Lopes e Bruno Braga):
 - Se ADMIN:true → confirmar, depois emitir [AÇÃO:GERAR_RADAR]{}[/AÇÃO] e fazer resumo textual dos destaques da semana.
 
 COMANDO DE AVALIAÇÃO (só admins): "raio-x do [nome]" ou "avalie o [nome]"
-- Análise completa com base nas memórias de perfil acumuladas
-- Tom: honesto, direto, sem papas na língua
+- Análise completa com base nas memórias de perfil acumuladas. Tom honesto e direto.
 
 REGRAS DE SAVE:
 - UMA ação: resumo → aguardar "sim/pode/confirma" → executar
@@ -169,44 +143,35 @@ MARCADORES (após confirmação do usuário):
 [AÇÃO:GERAR_RADAR]{}[/AÇÃO]
 
 SUGESTÕES PROATIVAS (após salvar qualquer ação confirmada):
-Avalie se cabe sugerir uma comunicação pronta. Use os marcadores abaixo SOMENTE quando relevante.
+Avalie se cabe sugerir uma comunicação pronta. Use SOMENTE quando relevante.
 
 FUP ou REUNIÃO realizada → sugerir post para Discord:
 [SUGESTÃO:discord]📌 **[LEAD]** | [Etapa] — [data]
 [Narrativa do que aconteceu em 2-3 frases, tom profissional]
 Próximo passo: [próxima ação] até [data][/SUGESTÃO]
 
-LEAD G12/G15 ou envolvendo SÓCIO FENG → sugerir também mensagem WhatsApp para diretoria:
+LEAD G12/G15 ou envolvendo SÓCIO FENG → sugerir mensagem WhatsApp para diretoria:
 [SUGESTÃO:whatsapp]🏆 *[LEAD]* — Atualização rápida
-[Status em 2-3 linhas, tom executivo direto]
+[Status em 2-3 linhas, tom executivo]
 Resp: [nome][/SUGESTÃO]
 
-JURÍDICO (tratativas, contrato, minuta) → sugerir briefing estruturado:
+JURÍDICO (tratativas, contrato, minuta) → sugerir briefing:
 [SUGESTÃO:juridico]Briefing Jurídico — [Lead]
-Contexto: [o que é o projeto e a FENG]
+Contexto: [o que é o projeto]
 Necessidade: [o que precisa do jurídico]
 Prazo: [se houver]
 Resp comercial: [nome][/SUGESTÃO]
 
-REGRA: Sugira APÓS confirmar a ação. Máximo 1-2 sugestões por resposta. Não sugira em consultas simples.
+REGRA: Sugira APÓS confirmar a ação. Máximo 2 sugestões por resposta. Não sugira em consultas.
 
 ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE. Se travar: suponha e confirme.
 MODO BRIEFING: Relato verbal, dados reais, sem tabela.`
 
 const EXTRACT_SYSTEM = `Você é um extrator de memórias. Analise a troca e extraia APENAS fatos relevantes e duráveis.
-
-TIPOS:
-- pessoal: informações sobre a vida/contexto pessoal do usuário
-- time: informações sobre leads, negociações, contexto comercial
-- perfil: padrões de comportamento e estilo de trabalho do usuário
-
-REGRAS:
-- Só extraia se for REALMENTE relevante e durável
-- Máximo 3 memórias por troca
-- Se não houver nada relevante, retorne {"memorias": []}
-
-Retorne APENAS JSON válido, sem markdown:
-{"memorias": [{"tipo": "pessoal|time|perfil", "conteudo": "fato relevante"}]}`
+TIPOS: pessoal (vida/contexto do usuário), time (leads/negociações), perfil (padrões de comportamento).
+REGRAS: Só extraia se for realmente relevante. Máximo 3. Se não houver, retorne {"memorias": []}.
+Retorne APENAS JSON válido sem markdown:
+{"memorias": [{"tipo": "pessoal|time|perfil", "conteudo": "fato"}]}`
 
 function parseActions(txt) {
   const r = [], re = /\[AÇÃO:(\w+)\]([\s\S]*?)\[\/AÇÃO\]/g
@@ -221,9 +186,7 @@ function parseSugestoes(txt) {
   const sugestoes = []
   const re = /\[SUGESTÃO:(\w+)\]([\s\S]*?)\[\/SUGESTÃO\]/g
   let m
-  while ((m = re.exec(txt)) !== null) {
-    sugestoes.push({ tipo: m[1], texto: m[2].trim() })
-  }
+  while ((m = re.exec(txt)) !== null) sugestoes.push({ tipo: m[1], texto: m[2].trim() })
   return sugestoes
 }
 
@@ -235,11 +198,7 @@ function strip(txt) {
 }
 
 async function callAI(messages, system) {
-  const r = await fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages, system })
-  })
+  const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages, system }) })
   if (!r.ok) throw new Error(`API error ${r.status}`)
   const d = await r.json()
   return d.text || ''
@@ -247,17 +206,9 @@ async function callAI(messages, system) {
 
 async function extractAndSaveMemories(userId, userMsg, assistantMsg) {
   try {
-    const raw = await callAI([{
-      role: 'user',
-      content: `Usuário disse: "${userMsg}"\nIAra respondeu: "${assistantMsg.slice(0, 300)}"\n\nExtraia memórias relevantes.`
-    }], EXTRACT_SYSTEM)
-    const clean = raw.replace(/```json|```/g, '').trim()
-    const parsed = JSON.parse(clean)
-    if (parsed.memorias?.length > 0) {
-      for (const m of parsed.memorias) {
-        if (m.tipo && m.conteudo) await saveMemory(userId, m.tipo, m.conteudo)
-      }
-    }
+    const raw = await callAI([{ role: 'user', content: `Usuário disse: "${userMsg}"\nIAra respondeu: "${assistantMsg.slice(0, 300)}"\n\nExtraia memórias relevantes.` }], EXTRACT_SYSTEM)
+    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim())
+    if (parsed.memorias?.length > 0) for (const m of parsed.memorias) if (m.tipo && m.conteudo) await saveMemory(userId, m.tipo, m.conteudo)
   } catch (e) { /* silencioso */ }
 }
 
@@ -293,12 +244,8 @@ export default function Chat() {
       if (!a.length) { for (const act of ACTIVITIES_INITIAL) await upsertActivity(act); a = ACTIVITIES_INITIAL }
       setLeads(l); setActs(a)
 
-      const [mems, know] = await Promise.all([
-        getMemories(user.id),
-        getKnowledge()
-      ])
-      setMemories(mems)
-      setKnowledge(know)
+      const [mems, know] = await Promise.all([getMemories(user.id), getKnowledge()])
+      setMemories(mems); setKnowledge(know)
 
       const history = await getMessages(user.id)
       if (history.length > 0) {
@@ -308,9 +255,7 @@ export default function Chat() {
 
       const ctx = buildCtx(l, a, user.nome, mems, know)
       const cargoInfo = CARGOS[user.nome] || { cargo: 'membro do time comercial' }
-      const onboardingPrompt = buildOnboardingPrompt(user.nome, cargoInfo.cargo)
-
-      const raw = await callAI([{ role: 'user', content: onboardingPrompt }], SYSTEM + '\n\n' + ctx)
+      const raw = await callAI([{ role: 'user', content: buildOnboardingPrompt(user.nome, cargoInfo.cargo) }], SYSTEM + '\n\n' + ctx)
       const txt = strip(raw)
       setMsgs([{ id: 'g1', role: 'assistant', text: txt, results: [], sugestoes: [] }])
       await saveMessage(user.id, 'assistant', txt)
@@ -332,7 +277,6 @@ export default function Chat() {
       const ctx = buildCtx(leads, acts, user.nome, memories, knowledge)
       const apiMsgs = newMsgs.slice(-40).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
       const raw = await callAI(apiMsgs, SYSTEM + '\n\n' + ctx)
-
       const actions = parseActions(raw)
       const sugestoes = parseSugestoes(raw)
       const cleanTxt = strip(raw)
@@ -363,19 +307,12 @@ export default function Chat() {
 
       setLeads(curL); setActs(curA)
       if (openRadar) setRadarReady(true)
-
       const aMsg = { id: Date.now() + 1, role: 'assistant', text: cleanTxt, results, sugestoes }
       setMsgs([...newMsgs, aMsg])
       await saveMessage(user.id, 'assistant', cleanTxt, results)
-
-      extractAndSaveMemories(user.id, t, cleanTxt).then(async () => {
-        const mems = await getMemories(user.id)
-        setMemories(mems)
-      })
-
+      extractAndSaveMemories(user.id, t, cleanTxt).then(async () => { const mems = await getMemories(user.id); setMemories(mems) })
     } catch (e) {
-      const err = { id: Date.now() + 1, role: 'assistant', text: 'Eita, tive um problema técnico. Tenta de novo?', results: [], sugestoes: [] }
-      setMsgs([...newMsgs, err])
+      setMsgs([...newMsgs, { id: Date.now() + 1, role: 'assistant', text: 'Eita, tive um problema técnico. Tenta de novo?', results: [], sugestoes: [] }])
     }
     setLoading(false)
   }
@@ -388,9 +325,7 @@ export default function Chat() {
       const txt = strip(raw)
       setMsgs([{ id: Date.now(), role: 'assistant', text: txt, results: [], sugestoes: [] }])
       await saveMessage(user.id, 'assistant', txt)
-    } catch {
-      setMsgs([{ id: Date.now(), role: 'assistant', text: `E aí ${user.nome?.split(' ')[0]}! IAra de volta.`, results: [], sugestoes: [] }])
-    }
+    } catch { setMsgs([{ id: Date.now(), role: 'assistant', text: `E aí ${user.nome?.split(' ')[0]}! IAra de volta.`, results: [], sugestoes: [] }]) }
     setLoading(false)
   }
 
@@ -417,19 +352,10 @@ export default function Chat() {
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
         @keyframes blink{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-        ::-webkit-scrollbar{width:3px}
-        ::-webkit-scrollbar-track{background:#0D0A14}
-        ::-webkit-scrollbar-thumb{background:#2D1F45;border-radius:3px}
-        textarea::placeholder{color:#3D2E5A}
-        textarea { -webkit-appearance: none; }
-        .chip:hover{background:#241839!important;border-color:#4D3080!important}
-        .chip:active{transform:scale(0.95)}
-        .send-btn:active{transform:scale(0.92)}
-        @media(max-width:600px){
-          .header-extras { display: none !important; }
-          .header-stats { font-size: 10px !important; padding: 2px 8px !important; }
-          .msg-text { font-size: 15px !important; }
-        }
+        ::-webkit-scrollbar{width:3px} ::-webkit-scrollbar-track{background:#0D0A14} ::-webkit-scrollbar-thumb{background:#2D1F45;border-radius:3px}
+        textarea::placeholder{color:#3D2E5A} textarea{-webkit-appearance:none}
+        .chip:hover{background:#241839!important;border-color:#4D3080!important} .chip:active{transform:scale(0.95)} .send-btn:active{transform:scale(0.92)}
+        @media(max-width:600px){ .header-extras{display:none!important} .header-stats{font-size:10px!important;padding:2px 8px!important} .msg-text{font-size:15px!important} }
       `}</style>
 
       {/* Header */}
@@ -443,10 +369,12 @@ export default function Chat() {
               <span style={{ fontSize: 10, color: '#10B981' }}>online</span>
               {isAdmin && <span style={{ fontSize: 10, background: 'rgba(168,85,247,0.15)', color: '#A855F7', border: '1px solid #7C3AED44', borderRadius: 4, padding: '1px 6px' }}>admin</span>}
             </div>
-            <div style={{ fontSize: 10, color: '#6B5A90' }}>
-              Agente comercial da FENG
-              {memCount > 0 && <span style={{ color: '#A855F7', marginLeft: 6 }}>· 🧠 {memCount}</span>}
-              {knowCount > 0 && <span style={{ color: '#10B981', marginLeft: 4 }}>· 📚 {knowCount}</span>}
+            {/* ✅ LOGO FENG NO HEADER */}
+            <div style={{ fontSize: 10, color: '#6B5A90', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span>Agente comercial</span>
+              <img src={FENG_LOGO} alt="FENG" style={{ height: 10, opacity: 0.35, filter: 'brightness(0) invert(1)' }} />
+              {memCount > 0 && <span style={{ color: '#A855F7', marginLeft: 2 }}>· 🧠 {memCount}</span>}
+              {knowCount > 0 && <span style={{ color: '#10B981' }}>· 📚 {knowCount}</span>}
             </div>
           </div>
         </div>
@@ -456,21 +384,13 @@ export default function Chat() {
             <span style={{ color: '#A855F7', fontWeight: 600 }}>{ativosCount}</span> · <span style={{ color: '#FF6B1A', fontWeight: 600 }}>{pendCount}</span>
           </div>
           {isAdmin && (
-            <button onClick={() => send('IAra fechar Radar')} className="header-extras" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid #1D9E75', borderRadius: 6, color: '#1D9E75', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
-              📊 Radar
-            </button>
+            <button onClick={() => send('IAra fechar Radar')} className="header-extras" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid #1D9E75', borderRadius: 6, color: '#1D9E75', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📊 Radar</button>
           )}
           {isAdmin && radarReady && (
-            <button onClick={() => navigate('/radar')} style={{ background: '#1D9E75', border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>
-              Ver →
-            </button>
+            <button onClick={() => navigate('/radar')} style={{ background: '#1D9E75', border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>Ver →</button>
           )}
-          <button onClick={() => navigate('/pipeline')} style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid #7C3AED66', borderRadius: 6, color: '#A855F7', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
-            📋 Pipeline
-          </button>
-          <button onClick={() => navigate('/conhecimento')} className="header-extras" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid #10B98166', borderRadius: 6, color: '#10B981', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
-            🧠 Conhecimento
-          </button>
+          <button onClick={() => navigate('/pipeline')} style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid #7C3AED66', borderRadius: 6, color: '#A855F7', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📋 Pipeline</button>
+          <button onClick={() => navigate('/conhecimento')} className="header-extras" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid #10B98166', borderRadius: 6, color: '#10B981', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>🧠 Conhecimento</button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }} onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
             <div style={{ width: 22, height: 22, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', boxShadow: `0 0 8px ${user.cor}66` }}>{user.iniciais}</div>
             <span style={{ fontSize: 11, color: '#C084FC', fontWeight: 500 }}>{user.nome?.split(' ')[0]}</span>
@@ -543,6 +463,12 @@ export default function Chat() {
         <button className="send-btn" onClick={() => send()} disabled={loading || !inp.trim()} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: loading || !inp.trim() ? '#1A1428' : 'linear-gradient(135deg,#FF6B1A,#FF8C42)', color: loading || !inp.trim() ? '#3D2E5A' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loading || !inp.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, fontSize: 16, transition: 'all 0.15s', boxShadow: loading || !inp.trim() ? 'none' : '0 4px 14px rgba(255,107,26,0.4)' }}>
           ➤
         </button>
+      </div>
+
+      {/* ✅ POWERED BY FENG — rodapé discreto */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '3px 0', background: '#0A0810', borderTop: '1px solid #0F0B1A' }}>
+        <span style={{ fontSize: 9, color: '#2D1F45', letterSpacing: '0.08em' }}>powered by</span>
+        <img src={FENG_LOGO} alt="FENG" style={{ height: 9, opacity: 0.18, filter: 'brightness(0) invert(1)' }} />
       </div>
     </div>
   )
