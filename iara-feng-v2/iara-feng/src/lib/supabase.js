@@ -82,3 +82,18 @@ export async function getMemories(userId) {
 export async function saveMemory(userId, tipo, conteudo) {
   await supabase.from('memories').insert({ user_id: userId, tipo, conteudo })
 }
+export async function getKnowledge(categoria = null) {
+  let q = supabase.from('knowledge').select('*').order('created_at', { ascending: false })
+  if (categoria) q = q.eq('categoria', categoria)
+  const { data } = await q
+  return data || []
+}
+
+export async function saveKnowledge(item) {
+  const { data, error } = await supabase.from('knowledge').upsert(item)
+  return { data, error }
+}
+
+export async function deleteKnowledge(id) {
+  await supabase.from('knowledge').delete().eq('id', id)
+}
