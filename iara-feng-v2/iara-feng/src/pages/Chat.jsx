@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory } from '../lib/supabase'
+import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory, getKnowledge } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL, USERS } from '../data/pipeline'
 
 const ADMINS = ['Mike Lopes', 'Bruno Braga']
@@ -13,7 +13,36 @@ const CARGOS = {
   'Silvio Vázquez': { cargo: 'Advisor LATAM' },
 }
 
-function buildCtx(leads, acts, userName, memories = []) {
+const SUGESTAO_CONFIG = {
+  discord: { label: '💬 Sugestão para Discord', color: '#5865F2', bg: 'rgba(88,101,242,0.08)', border: 'rgba(88,101,242,0.25)' },
+  whatsapp: { label: '📱 Sugestão WhatsApp — Diretoria', color: '#25D366', bg: 'rgba(37,211,102,0.08)', border: 'rgba(37,211,102,0.25)' },
+  juridico: { label: '⚖️ Briefing para o Jurídico', color: '#3B82F6', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.25)' },
+}
+
+function SugestaoCard({ tipo, texto }) {
+  const [copied, setCopied] = useState(false)
+  const cfg = SUGESTAO_CONFIG[tipo] || SUGESTAO_CONFIG.discord
+
+  function copy() {
+    navigator.clipboard.writeText(texto)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: '0 10px 10px 10px', padding: '12px 14px', marginTop: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: cfg.color, letterSpacing: '0.03em' }}>{cfg.label}</span>
+        <button onClick={copy} style={{ background: copied ? `${cfg.color}22` : 'transparent', border: `1px solid ${cfg.color}44`, borderRadius: 6, color: cfg.color, padding: '3px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' }}>
+          {copied ? '✓ Copiado!' : 'Copiar'}
+        </button>
+      </div>
+      <div style={{ fontSize: 13, color: '#E8DCFF', lineHeight: 1.6, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{texto}</div>
+    </div>
+  )
+}
+
+function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
   const hoje = new Date().toLocaleDateString('pt-BR')
   const pend = acts.filter(a => !a.ok)
   const mine = pend.filter(a => a.resp?.toLowerCase().includes(userName.split(' ')[0].toLowerCase()))
@@ -23,55 +52,64 @@ function buildCtx(leads, acts, userName, memories = []) {
 
   let c = `DATA:${hoje} | USUÁRIO:${userName} | ADMIN:${isAdmin}\n`
   c += `RESUMO:${ativos.length} ativos | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
-  c += `⭐ G12/G15:\n`
+
+  c += `⭐ G12/G15 (leads prioritários — maiores clubes):\n`
+  if (g12.length === 0) c += `• Nenhum marcado ainda\n`
   g12.forEach(l => {
     c += `• ${l.nome}|${l.etapa}|${l.resp}|${l.dias}d|${l.aging}`
     if (l.dual) c += `[DUAL:${l.notaDual}]`
+    if (l.socio) c += `[SÓCIO FENG]`
     c += `\n  Mov:${l.mov}\n  Próx:${l.prox}(${l.dt})`
     if (l.contato) c += `|Contato:${l.contato}`
     if (l.risco) c += `\n  ⚠️RISCO:${l.risco}`
     c += '\n'
   })
-  c += `\n🏭 GO-LIVE:\n${leads.filter(l => l.op).map(l => `• ${l.nome}|${l.resp}`).join('\n')}\n`
+
+  c += `\n🏭 GO-LIVE:\n${leads.filter(l => l.op).map(l => `• ${l.nome}|${l.resp}`).join('\n') || '• Nenhum'}\n`
+
   const outros = leads.filter(l => !l.g12 && !l.op && !l.off && l.aging !== 'Geladeira')
-  if (outros.length) { c += `\n📋 OUTROS ATIVOS:\n`; outros.forEach(l => c += `• ${l.nome}|${l.etapa}|${l.resp}|${l.dias}d\n  Mov:${l.mov?.slice(0, 80)}\n`) }
-  if (mine.length) { c += `\n📌 PENDENTES(${userName}):\n`; mine.forEach(a => c += `• [${a.id}]${a.lead}:${a.descricao}|até ${a.dt}\n`) }
+  if (outros.length) {
+    c += `\n📋 OUTROS ATIVOS:\n`
+    outros.forEach(l => c += `• ${l.nome}|${l.etapa}|${l.resp}|${l.dias}d${l.socio ? '[SÓCIO]' : ''}\n  Mov:${l.mov?.slice(0, 80)}\n`)
+  }
+
+  if (mine.length) {
+    c += `\n📌 PENDENTES(${userName}):\n`
+    mine.forEach(a => c += `• [${a.id}]${a.lead}:${a.descricao}|até ${a.dt}\n`)
+  }
 
   const u = USERS?.find(u => u.nome === userName)
   if (u?.perfil) c += `\nPERFIL DO USUÁRIO: ${u.perfil}\n`
 
-  // Injeta memórias
   if (memories.length > 0) {
-    const pessoal = memories.filter(m => m.user_id === (USERS.find(u => u.nome === userName)?.id || userName) && m.tipo === 'pessoal')
-    const perfil = memories.filter(m => m.user_id === (USERS.find(u => u.nome === userName)?.id || userName) && m.tipo === 'perfil')
+    const userId = USERS.find(u => u.nome === userName)?.id || userName
+    const pessoal = memories.filter(m => m.user_id === userId && m.tipo === 'pessoal')
+    const perfil = memories.filter(m => m.user_id === userId && m.tipo === 'perfil')
     const time = memories.filter(m => m.tipo === 'time')
+    if (pessoal.length) { c += `\n🧠 MEMÓRIAS PESSOAIS:\n`; pessoal.forEach(m => c += `• ${m.conteudo}\n`) }
+    if (perfil.length) { c += `\n👤 PERFIL OBSERVADO:\n`; perfil.forEach(m => c += `• ${m.conteudo}\n`) }
+    if (time.length) { c += `\n🏢 MEMÓRIAS DO TIME:\n`; time.slice(0, 15).forEach(m => c += `• ${m.conteudo}\n`) }
+  }
 
-    if (pessoal.length) {
-      c += `\n🧠 MEMÓRIAS PESSOAIS (${userName}):\n`
-      pessoal.forEach(m => c += `• ${m.conteudo}\n`)
-    }
-    if (perfil.length) {
-      c += `\n👤 PERFIL OBSERVADO (${userName}):\n`
-      perfil.forEach(m => c += `• ${m.conteudo}\n`)
-    }
-    if (time.length) {
-      c += `\n🏢 MEMÓRIAS DO TIME:\n`
-      time.slice(0, 20).forEach(m => c += `• ${m.conteudo}\n`)
-    }
+  if (knowledge.length > 0) {
+    c += `\n📚 BASE DE CONHECIMENTO FENG:\n`
+    knowledge.forEach(k => {
+      c += `\n[${k.categoria.toUpperCase()}] ${k.titulo}\n${k.conteudo.slice(0, 600)}\n`
+    })
   }
 
   return c
 }
 
-function buildOnboardingPrompt(userName, cargo, ctx) {
+function buildOnboardingPrompt(userName, cargo) {
   const nome = userName.split(' ')[0]
   const isMike = userName === 'Mike Lopes'
 
   if (isMike) {
-    return `Você está abrindo a IAra pela primeira vez para apresentá-la ao time. 
-Faça uma apresentação sua para o Mike — o criador da plataforma — com seu tom irônico e inteligente. 
-Reconheça que ele sabe muito bem quem você é, afinal foi ele quem te criou. 
-Diga algo como "então você finalmente resolveu me visitar" ou similar. 
+    return `Você está abrindo a IAra pela primeira vez.
+Faça uma apresentação sua para o Mike — o criador da plataforma — com seu tom irônico e inteligente.
+Reconheça que ele sabe muito bem quem você é, afinal foi ele quem te criou.
+Diga algo como "então você finalmente resolveu me visitar" ou similar.
 Seja direta, irônica e mostre personalidade. 2-3 frases no máximo.`
   }
 
@@ -80,22 +118,23 @@ Faça uma apresentação completa e envolvente. Use seu tom característico — 
 
 Estruture sua mensagem assim (sem títulos, em prosa fluida):
 
-1. BOAS-VINDAS PERSONALIZADAS: Cumprimente pelo nome e cargo. Diga que foi o Mike Lopes, CEO da FENG, quem te trouxe para o time.
+1. BOAS-VINDAS: Cumprimente pelo nome e cargo. Diga que foi o Mike Lopes, CEO da FENG, quem te trouxe para o time.
 
-2. CONTEXTO E DOR: A FENG é uma empresa de tecnologia para clubes de futebol e esportes na América Latina. O time comercial vivia num caos de planilhas, WhatsApp e reuniões sem registro — informação espalhada, follow-ups esquecidos, pipeline invisível. Você (IAra) nasceu para resolver isso.
+2. CONTEXTO E DOR: A FENG é empresa de tecnologia para clubes de futebol e esportes na América Latina. O time comercial vivia num caos de planilhas, WhatsApp e reuniões sem registro. Você (IAra) nasceu para resolver isso.
 
-3. QUEM VOCÊ É: IAra — Intelligence and Action for Revenue Acceleration. Não é um chatbot. É a inteligência comercial do time. Trabalha com o ${nome} no dia a dia.
+3. QUEM VOCÊ É: IAra — Intelligence and Action for Revenue Acceleration. Não é um chatbot. É a inteligência comercial do time.
 
 4. O QUE VOCÊ FAZ:
-- Acompanha o pipeline em tempo real
-- Transforma conversas em registros e ações — o ${nome} fala, você registra, cria atividades, atualiza etapas
-- Lembra de tudo — histórico completo, memória persistente entre sessões
-- Gera alertas de risco
+- Acompanha pipeline em tempo real
+- Transforma conversas em registros e ações
+- Lembra de tudo com memória persistente entre sessões
+- Sugere comunicações prontas (Discord, WhatsApp, briefings jurídicos)
 - Fecha o Radar Semanal
 
 5. SEÇÕES DA PLATAFORMA:
-- 💬 Chat: onde vocês conversam e tudo vira registro
-- 📋 Pipeline: visão Kanban de todos os leads
+- 💬 Chat: onde conversam e tudo vira registro
+- 📋 Pipeline: visão Kanban
+- 🧠 Conhecimento: base de produtos e propostas da FENG
 - 📊 Radar: relatório semanal automático
 
 6. PAPEL: Como você ajuda especificamente um ${cargo}.
@@ -110,13 +149,12 @@ const SYSTEM = `Você é a IAra, agente de inteligência comercial da FENG — e
 IDENTIDADE: IAra — Intelligence and Action for Revenue Acceleration. Tom: colega descontraída, direta, bem-humorada. Português informal. NUNCA diz "Como posso te ajudar?". NUNCA repete a mesma frase.
 
 COMANDO EXCLUSIVO "IAra fechar Radar" (só Mike Lopes e Bruno Braga):
-- Se ADMIN:false → "Esse comando é exclusivo para você e o Bruno."
+- Se ADMIN:false → "Esse comando é exclusivo para o Mike e o Bruno."
 - Se ADMIN:true → confirmar, depois emitir [AÇÃO:GERAR_RADAR]{}[/AÇÃO] e fazer resumo textual dos destaques da semana.
 
 COMANDO DE AVALIAÇÃO (só admins): "raio-x do [nome]" ou "avalie o [nome]"
-- Fazer análise completa da pessoa com base nas memórias de perfil acumuladas
-- Cobertura: estilo de trabalho, pontos fortes, padrões observados, áreas de atenção
-- Tom: honesto, direto, sem papas na língua — é para o CEO, não para RH
+- Análise completa com base nas memórias de perfil acumuladas
+- Tom: honesto, direto, sem papas na língua
 
 REGRAS DE SAVE:
 - UMA ação: resumo → aguardar "sim/pode/confirma" → executar
@@ -130,21 +168,42 @@ MARCADORES (após confirmação do usuário):
 [AÇÃO:UPDATE_LEAD]{"nome":"NOME","campo":"etapa|prox|mov","valor":"VALOR"}[/AÇÃO]
 [AÇÃO:GERAR_RADAR]{}[/AÇÃO]
 
+SUGESTÕES PROATIVAS (após salvar qualquer ação confirmada):
+Avalie se cabe sugerir uma comunicação pronta. Use os marcadores abaixo SOMENTE quando relevante.
+
+FUP ou REUNIÃO realizada → sugerir post para Discord:
+[SUGESTÃO:discord]📌 **[LEAD]** | [Etapa] — [data]
+[Narrativa do que aconteceu em 2-3 frases, tom profissional]
+Próximo passo: [próxima ação] até [data][/SUGESTÃO]
+
+LEAD G12/G15 ou envolvendo SÓCIO FENG → sugerir também mensagem WhatsApp para diretoria:
+[SUGESTÃO:whatsapp]🏆 *[LEAD]* — Atualização rápida
+[Status em 2-3 linhas, tom executivo direto]
+Resp: [nome][/SUGESTÃO]
+
+JURÍDICO (tratativas, contrato, minuta) → sugerir briefing estruturado:
+[SUGESTÃO:juridico]Briefing Jurídico — [Lead]
+Contexto: [o que é o projeto e a FENG]
+Necessidade: [o que precisa do jurídico]
+Prazo: [se houver]
+Resp comercial: [nome][/SUGESTÃO]
+
+REGRA: Sugira APÓS confirmar a ação. Máximo 1-2 sugestões por resposta. Não sugira em consultas simples.
+
 ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE. Se travar: suponha e confirme.
 MODO BRIEFING: Relato verbal, dados reais, sem tabela.`
 
 const EXTRACT_SYSTEM = `Você é um extrator de memórias. Analise a troca e extraia APENAS fatos relevantes e duráveis.
 
 TIPOS:
-- pessoal: informações sobre a vida/contexto pessoal do usuário (família, preferências, eventos)
-- time: informações sobre leads, negociações, contexto comercial (relevante para todo o time)
-- perfil: padrões de comportamento, estilo de trabalho, forma de comunicar do usuário
+- pessoal: informações sobre a vida/contexto pessoal do usuário
+- time: informações sobre leads, negociações, contexto comercial
+- perfil: padrões de comportamento e estilo de trabalho do usuário
 
 REGRAS:
-- Só extraia se for REALMENTE relevante e durável (não extraia perguntas, respostas genéricas, saudações)
+- Só extraia se for REALMENTE relevante e durável
 - Máximo 3 memórias por troca
 - Se não houver nada relevante, retorne {"memorias": []}
-- Conteúdo deve ser uma frase curta e factual
 
 Retorne APENAS JSON válido, sem markdown:
 {"memorias": [{"tipo": "pessoal|time|perfil", "conteudo": "fato relevante"}]}`
@@ -157,7 +216,23 @@ function parseActions(txt) {
   }
   return r
 }
-function strip(txt) { return txt.replace(/\[AÇÃO:\w+\][\s\S]*?\[\/AÇÃO\]/g, '').trim() }
+
+function parseSugestoes(txt) {
+  const sugestoes = []
+  const re = /\[SUGESTÃO:(\w+)\]([\s\S]*?)\[\/SUGESTÃO\]/g
+  let m
+  while ((m = re.exec(txt)) !== null) {
+    sugestoes.push({ tipo: m[1], texto: m[2].trim() })
+  }
+  return sugestoes
+}
+
+function strip(txt) {
+  return txt
+    .replace(/\[AÇÃO:\w+\][\s\S]*?\[\/AÇÃO\]/g, '')
+    .replace(/\[SUGESTÃO:\w+\][\s\S]*?\[\/SUGESTÃO\]/g, '')
+    .trim()
+}
 
 async function callAI(messages, system) {
   const r = await fetch('/api/chat', {
@@ -176,19 +251,14 @@ async function extractAndSaveMemories(userId, userMsg, assistantMsg) {
       role: 'user',
       content: `Usuário disse: "${userMsg}"\nIAra respondeu: "${assistantMsg.slice(0, 300)}"\n\nExtraia memórias relevantes.`
     }], EXTRACT_SYSTEM)
-
     const clean = raw.replace(/```json|```/g, '').trim()
     const parsed = JSON.parse(clean)
     if (parsed.memorias?.length > 0) {
       for (const m of parsed.memorias) {
-        if (m.tipo && m.conteudo) {
-          await saveMemory(userId, m.tipo, m.conteudo)
-        }
+        if (m.tipo && m.conteudo) await saveMemory(userId, m.tipo, m.conteudo)
       }
     }
-  } catch (e) {
-    // Silencioso — extração de memória não pode quebrar o chat
-  }
+  } catch (e) { /* silencioso */ }
 }
 
 export default function Chat() {
@@ -198,6 +268,7 @@ export default function Chat() {
   const [leads, setLeads] = useState([])
   const [acts, setActs] = useState([])
   const [memories, setMemories] = useState([])
+  const [knowledge, setKnowledge] = useState([])
   const [inp, setInp] = useState('')
   const [loading, setLoading] = useState(false)
   const [rec, setRec] = useState(false)
@@ -222,28 +293,30 @@ export default function Chat() {
       if (!a.length) { for (const act of ACTIVITIES_INITIAL) await upsertActivity(act); a = ACTIVITIES_INITIAL }
       setLeads(l); setActs(a)
 
-      // Carrega memórias
-      const mems = await getMemories(user.id)
+      const [mems, know] = await Promise.all([
+        getMemories(user.id),
+        getKnowledge()
+      ])
       setMemories(mems)
+      setKnowledge(know)
 
       const history = await getMessages(user.id)
       if (history.length > 0) {
-        setMsgs(history.map((m, i) => ({ id: i, role: m.role, text: m.text, results: m.results })))
+        setMsgs(history.map((m, i) => ({ id: i, role: m.role, text: m.text, results: m.results, sugestoes: m.sugestoes || [] })))
         setInitialized(true); setLoading(false); return
       }
 
-      // Primeiro acesso
-      const ctx = buildCtx(l, a, user.nome, mems)
+      const ctx = buildCtx(l, a, user.nome, mems, know)
       const cargoInfo = CARGOS[user.nome] || { cargo: 'membro do time comercial' }
-      const onboardingPrompt = buildOnboardingPrompt(user.nome, cargoInfo.cargo, ctx)
+      const onboardingPrompt = buildOnboardingPrompt(user.nome, cargoInfo.cargo)
 
       const raw = await callAI([{ role: 'user', content: onboardingPrompt }], SYSTEM + '\n\n' + ctx)
       const txt = strip(raw)
-      setMsgs([{ id: 'g1', role: 'assistant', text: txt, results: [] }])
+      setMsgs([{ id: 'g1', role: 'assistant', text: txt, results: [], sugestoes: [] }])
       await saveMessage(user.id, 'assistant', txt)
     } catch (e) {
       console.error(e)
-      setMsgs([{ id: 'g1', role: 'assistant', text: `E aí ${user.nome?.split(' ')[0]}! IAra ligada. O que rolou hoje?`, results: [] }])
+      setMsgs([{ id: 'g1', role: 'assistant', text: `E aí ${user.nome?.split(' ')[0]}! IAra ligada. O que rolou hoje?`, results: [], sugestoes: [] }])
     }
     setInitialized(true); setLoading(false)
   }
@@ -256,10 +329,12 @@ export default function Chat() {
     await saveMessage(user.id, 'user', t)
 
     try {
-      const ctx = buildCtx(leads, acts, user.nome, memories)
+      const ctx = buildCtx(leads, acts, user.nome, memories, knowledge)
       const apiMsgs = newMsgs.slice(-40).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
       const raw = await callAI(apiMsgs, SYSTEM + '\n\n' + ctx)
+
       const actions = parseActions(raw)
+      const sugestoes = parseSugestoes(raw)
       const cleanTxt = strip(raw)
       const results = []
       let curL = [...leads], curA = [...acts]
@@ -288,18 +363,18 @@ export default function Chat() {
 
       setLeads(curL); setActs(curA)
       if (openRadar) setRadarReady(true)
-      const aMsg = { id: Date.now() + 1, role: 'assistant', text: cleanTxt, results }
+
+      const aMsg = { id: Date.now() + 1, role: 'assistant', text: cleanTxt, results, sugestoes }
       setMsgs([...newMsgs, aMsg])
       await saveMessage(user.id, 'assistant', cleanTxt, results)
 
-      // Extrai memórias em background — silencioso
       extractAndSaveMemories(user.id, t, cleanTxt).then(async () => {
         const mems = await getMemories(user.id)
         setMemories(mems)
       })
 
     } catch (e) {
-      const err = { id: Date.now() + 1, role: 'assistant', text: 'Eita, tive um problema técnico. Tenta de novo?', results: [] }
+      const err = { id: Date.now() + 1, role: 'assistant', text: 'Eita, tive um problema técnico. Tenta de novo?', results: [], sugestoes: [] }
       setMsgs([...newMsgs, err])
     }
     setLoading(false)
@@ -308,12 +383,14 @@ export default function Chat() {
   async function handleClear() {
     await clearMessages(user.id); setMsgs([]); setLoading(true)
     try {
-      const ctx = buildCtx(leads, acts, user.nome, memories)
+      const ctx = buildCtx(leads, acts, user.nome, memories, knowledge)
       const raw = await callAI([{ role: 'user', content: `Reabra a conversa com ${user.nome} com nova saudação breve.` }], SYSTEM + '\n\n' + ctx)
       const txt = strip(raw)
-      setMsgs([{ id: Date.now(), role: 'assistant', text: txt, results: [] }])
+      setMsgs([{ id: Date.now(), role: 'assistant', text: txt, results: [], sugestoes: [] }])
       await saveMessage(user.id, 'assistant', txt)
-    } catch { setMsgs([{ id: Date.now(), role: 'assistant', text: `E aí ${user.nome?.split(' ')[0]}! IAra de volta.`, results: [] }]) }
+    } catch {
+      setMsgs([{ id: Date.now(), role: 'assistant', text: `E aí ${user.nome?.split(' ')[0]}! IAra de volta.`, results: [], sugestoes: [] }])
+    }
     setLoading(false)
   }
 
@@ -331,6 +408,7 @@ export default function Chat() {
   const pendCount = acts.filter(a => !a.ok).length
   const ativosCount = leads.filter(l => !l.off && !l.op && l.aging !== 'Geladeira').length
   const memCount = memories.length
+  const knowCount = knowledge.length
   const chips = [['📅 Reunião', 'Registrar reunião:'], ['⚡ FUP feito', 'FUP realizado com'], ['⬆️ Avançar etapa', 'Avançou de etapa:'], ['⚠️ Risco', 'Registrar risco:'], ['📊 Como tá?', 'Como tá o pipeline hoje?'], ['🆕 Novo lead', 'Novo lead:']]
 
   return (
@@ -367,7 +445,8 @@ export default function Chat() {
             </div>
             <div style={{ fontSize: 10, color: '#6B5A90' }}>
               Agente comercial da FENG
-              {memCount > 0 && <span style={{ color: '#A855F7', marginLeft: 6 }}>· 🧠 {memCount} memórias</span>}
+              {memCount > 0 && <span style={{ color: '#A855F7', marginLeft: 6 }}>· 🧠 {memCount}</span>}
+              {knowCount > 0 && <span style={{ color: '#10B981', marginLeft: 4 }}>· 📚 {knowCount}</span>}
             </div>
           </div>
         </div>
@@ -389,6 +468,9 @@ export default function Chat() {
           <button onClick={() => navigate('/pipeline')} style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid #7C3AED66', borderRadius: 6, color: '#A855F7', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
             📋 Pipeline
           </button>
+          <button onClick={() => navigate('/conhecimento')} className="header-extras" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid #10B98166', borderRadius: 6, color: '#10B981', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>
+            🧠 Conhecimento
+          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }} onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
             <div style={{ width: 22, height: 22, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', boxShadow: `0 0 8px ${user.cor}66` }}>{user.iniciais}</div>
             <span style={{ fontSize: 11, color: '#C084FC', fontWeight: 500 }}>{user.nome?.split(' ')[0]}</span>
@@ -405,9 +487,9 @@ export default function Chat() {
             <div style={{ width: 26, height: 26, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', flexShrink: 0, boxShadow: `0 2px 8px ${user.cor}66` }}>{user.iniciais}</div>
           </div>
         ) : (
-          <div key={m.id} style={{ display: 'flex', gap: 10, maxWidth: '90%' }}>
+          <div key={m.id} style={{ display: 'flex', gap: 10, maxWidth: '92%' }}>
             <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0, marginTop: 18, boxShadow: '0 0 10px rgba(168,85,247,0.4)' }}>IA</div>
-            <div>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 10, color: '#A855F7', fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>IAra ⚡</div>
               <div className="msg-text" style={{ background: 'linear-gradient(135deg,#150F22,#130F1E)', border: '1px solid #2D1F4566', borderLeft: '3px solid #A855F7', borderRadius: '0 14px 14px 14px', padding: '12px 16px', fontSize: 15, lineHeight: 1.65, color: '#E8DCFF', wordBreak: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
                 {m.text}
@@ -416,12 +498,17 @@ export default function Chat() {
                     {m.results.map((r, i) => <span key={i} style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: '#10B981' }}>{r}</span>)}
                   </div>
                 )}
+                {m.sugestoes?.length > 0 && (
+                  <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    {m.sugestoes.map((s, i) => <SugestaoCard key={i} tipo={s.tipo} texto={s.texto} />)}
+                  </div>
+                )}
               </div>
             </div>
           </div>
         ))}
         {loading && (
-          <div style={{ display: 'flex', gap: 10, maxWidth: '90%' }}>
+          <div style={{ display: 'flex', gap: 10, maxWidth: '92%' }}>
             <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0, marginTop: 18, boxShadow: '0 0 10px rgba(168,85,247,0.4)' }}>IA</div>
             <div>
               <div style={{ fontSize: 10, color: '#A855F7', fontWeight: 700, marginBottom: 5 }}>IAra ⚡</div>
