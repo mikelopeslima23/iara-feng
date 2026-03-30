@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { getLeads, getActivities, upsertLead } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL } from '../data/pipeline'
 
-const ETAPAS = ['Prospecção', 'Qualificação', 'Proposta', 'Negociação', 'Fechamento']
+const ETAPAS = ['Prospecção', 'Oportunidade', 'Proposta', 'Negociação', 'Operação / Go-Live']
+
 const PARALELO_OPTIONS = [
   { label: 'Proposta', color: '#A855F7' },
   { label: 'Negociação', color: '#FF6B1A' },
@@ -62,7 +63,7 @@ function ParaleloBadges({ paralelo }) {
 
 function Modal({ lead, acts, onClose, onSave, onReativar }) {
   const [form, setForm] = useState({ ...lead })
-  const pendentes = acts.filter(a => a.lead?.toLowerCase().includes(lead.nome?.toLowerCase()) && !a.ok)
+  const pendentes = acts.filter(a => a.lead?.toLowerCase().includes((lead.conta || lead.nome)?.toLowerCase()) && !a.ok)
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
   const diasVenc = diasParaVencer(form.vencimento)
   const vencLabel = vencimentoLabel(diasVenc)
@@ -71,10 +72,10 @@ function Modal({ lead, acts, onClose, onSave, onReativar }) {
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16, backdropFilter: 'blur(4px)' }} onClick={onClose}>
       <div style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 16, padding: 24, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
 
-        {/* Header do modal */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#F0E8FF' }}>{lead.nome}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#F0E8FF' }}>{lead.conta || lead.nome}</div>
+            {lead.servico && <div style={{ fontSize: 13, color: '#A855F7', fontWeight: 600, marginTop: 2 }}>📦 {lead.servico}</div>}
             <div style={{ fontSize: 11, color: '#6B5A90', marginTop: 2 }}>
               {lead.etapa} · {lead.resp} {lead.op ? '· 🏭 Go-Live' : `· ${lead.dias}d sem atualização`}
             </div>
@@ -83,26 +84,51 @@ function Modal({ lead, acts, onClose, onSave, onReativar }) {
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6B5A90', fontSize: 20, cursor: 'pointer' }}>✕</button>
         </div>
 
-        {/* Botão reativar */}
         {lead.off && (
           <button onClick={() => onReativar(form)} style={{ width: '100%', background: 'linear-gradient(135deg,#10B981,#059669)', border: 'none', borderRadius: 10, color: 'white', padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 20, boxShadow: '0 4px 14px rgba(16,185,129,0.35)' }}>
-            ⚡ Reativar Lead
+            ⚡ Reativar Oportunidade
           </button>
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-          {/* Etapa principal — só para não Go-Live */}
+          {/* Conta */}
+          <div>
+            <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>CONTA (CLUBE / EMPRESA)</div>
+            <input value={form.conta || ''} onChange={e => set('conta', e.target.value)}
+              placeholder="Ex: Internacional, Flamengo..."
+              style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }} />
+          </div>
+
+          {/* Serviço */}
+          <div>
+            <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>SERVIÇO / PRODUTO</div>
+            <input value={form.servico || ''} onChange={e => {
+              set('servico', e.target.value)
+              const conta = form.conta || lead.conta || ''
+              if (conta && e.target.value) set('nome', `${conta} — ${e.target.value}`)
+            }}
+              placeholder="Ex: Sócio Torcedor, DataLake, CRM, Mídia Paga..."
+              style={{ width: '100%', background: '#1A1428', border: '1px solid #A855F744', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }} />
+            {form.conta && form.servico && (
+              <div style={{ fontSize: 11, color: '#4D3D6A', marginTop: 4 }}>
+                Oportunidade: {form.conta} — {form.servico}
+              </div>
+            )}
+          </div>
+
+          {/* Etapa principal */}
           {!lead.op && (
             <div>
               <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>ETAPA PRINCIPAL</div>
-              <select value={form.etapa || ''} onChange={e => set('etapa', e.target.value)} style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }}>
+              <select value={form.etapa || ''} onChange={e => set('etapa', e.target.value)}
+                style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }}>
                 {ETAPAS.map(e => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
           )}
 
-          {/* Etapas paralelas — só para não Go-Live */}
+          {/* Etapas paralelas */}
           {!lead.op && (
             <div>
               <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 8 }}>ETAPAS PARALELAS ATIVAS</div>
@@ -115,59 +141,54 @@ function Modal({ lead, acts, onClose, onSave, onReativar }) {
                       const current = (form.paralelo || '').split(',').map(t => t.trim()).filter(Boolean)
                       const next = ativo ? current.filter(t => t !== opt.label) : [...current, opt.label]
                       set('paralelo', next.join(', '))
-                    }} style={{
-                      background: ativo ? `${opt.color}20` : '#1A1428',
-                      border: `1px solid ${ativo ? opt.color : '#2D1F45'}`,
-                      borderRadius: 8, padding: '6px 14px', fontSize: 12,
-                      color: ativo ? opt.color : '#6B5A90',
-                      cursor: 'pointer', fontWeight: ativo ? 600 : 400,
-                      transition: 'all 0.15s'
-                    }}>
+                    }} style={{ background: ativo ? `${opt.color}20` : '#1A1428', border: `1px solid ${ativo ? opt.color : '#2D1F45'}`, borderRadius: 8, padding: '6px 14px', fontSize: 12, color: ativo ? opt.color : '#6B5A90', cursor: 'pointer', fontWeight: ativo ? 600 : 400, transition: 'all 0.15s' }}>
                       {ativo ? '✓ ' : ''}{opt.label}
                     </button>
                   )
                 })}
               </div>
-              {form.paralelo && (
-                <div style={{ fontSize: 11, color: '#4D3D6A', marginTop: 6 }}>Ativo: {form.paralelo}</div>
-              )}
             </div>
           )}
 
           {/* Responsável */}
           <div>
             <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>RESPONSÁVEL</div>
-            <input value={form.resp || ''} onChange={e => set('resp', e.target.value)} style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }} />
+            <input value={form.resp || ''} onChange={e => set('resp', e.target.value)}
+              style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }} />
           </div>
 
-          {/* Vencimento — só Go-Live */}
+          {/* Vencimento Go-Live */}
           {lead.op && (
             <div>
               <div style={{ fontSize: 11, color: '#10B981', marginBottom: 5, fontWeight: 600 }}>📅 VENCIMENTO DO CONTRATO</div>
               <input type="date" value={form.vencimento || ''} onChange={e => set('vencimento', e.target.value)}
                 style={{ width: '100%', background: '#1A1428', border: `1px solid ${vencLabel && diasVenc <= 90 ? '#F59E0B' : '#2D1F45'}`, borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }} />
               {vencLabel && <div style={{ fontSize: 12, color: vencLabel.color, marginTop: 6, fontWeight: 500 }}>{vencLabel.label}</div>}
-              {!form.vencimento && <div style={{ fontSize: 11, color: '#4D3D6A', marginTop: 4 }}>Preencha para receber alertas 90 dias antes da renovação</div>}
+              {!form.vencimento && <div style={{ fontSize: 11, color: '#4D3D6A', marginTop: 4 }}>Preencha para alertas 90 dias antes da renovação</div>}
             </div>
           )}
 
           {/* Último movimento */}
           <div>
             <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>ÚLTIMO MOVIMENTO</div>
-            <textarea value={form.mov || ''} onChange={e => set('mov', e.target.value)} rows={3} style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+            <textarea value={form.mov || ''} onChange={e => set('mov', e.target.value)} rows={3}
+              style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
           </div>
 
           {/* Próxima ação */}
           <div>
             <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>PRÓXIMA AÇÃO</div>
-            <input value={form.prox || ''} onChange={e => set('prox', e.target.value)} style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }} />
+            <input value={form.prox || ''} onChange={e => set('prox', e.target.value)}
+              style={{ width: '100%', background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }} />
           </div>
 
-          {/* Risco — só não Go-Live */}
+          {/* Risco */}
           {!lead.op && (
             <div>
               <div style={{ fontSize: 11, color: '#6B5A90', marginBottom: 5 }}>RISCO</div>
-              <input value={form.risco || ''} onChange={e => set('risco', e.target.value)} placeholder="Descreva o risco se houver..." style={{ width: '100%', background: '#1A1428', border: '1px solid #FF6B1A33', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }} />
+              <input value={form.risco || ''} onChange={e => set('risco', e.target.value)}
+                placeholder="Descreva o risco se houver..."
+                style={{ width: '100%', background: '#1A1428', border: '1px solid #FF6B1A33', borderRadius: 8, padding: '9px 12px', color: '#F0E8FF', fontSize: 14, outline: 'none' }} />
             </div>
           )}
 
@@ -188,7 +209,12 @@ function Modal({ lead, acts, onClose, onSave, onReativar }) {
 
         <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
           <button onClick={onClose} style={{ flex: 1, background: 'none', border: '1px solid #2D1F45', borderRadius: 10, color: '#6B5A90', padding: '11px', fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
-          <button onClick={() => onSave(form)} style={{ flex: 2, background: 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 10, color: 'white', padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.4)' }}>Salvar</button>
+          <button onClick={() => onSave({
+            ...form,
+            nome: form.conta && form.servico ? `${form.conta} — ${form.servico}` : (form.nome || form.conta || ''),
+          })} style={{ flex: 2, background: 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 10, color: 'white', padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.4)' }}>
+            Salvar
+          </button>
         </div>
       </div>
     </div>
@@ -212,8 +238,7 @@ export default function Pipeline() {
   async function load() {
     setLoading(true)
     try {
-      let l = await getLeads()
-      let a = await getActivities()
+      let l = await getLeads(); let a = await getActivities()
       if (!l.length) l = PIPELINE_INITIAL
       if (!a.length) a = ACTIVITIES_INITIAL
       const lAged = applyAging(l)
@@ -232,7 +257,7 @@ export default function Pipeline() {
       const toSync = applyAging(PIPELINE_INITIAL)
       for (const lead of toSync) await upsertLead(lead)
       await load()
-      alert(`✅ Sincronizados!`)
+      alert('✅ Sincronizados!')
     } catch (e) { alert('Erro: ' + e.message) }
     setSyncing(false)
   }
@@ -262,8 +287,17 @@ export default function Pipeline() {
   const byEtapa = ETAPAS.reduce((acc, e) => { acc[e] = ativos.filter(l => l.etapa === e); return acc }, {})
   const riscos = ativos.filter(l => l.risco)
 
+  // Agrupa por conta para mostrar badge de múltiplas oportunidades
+  const contasAtivas = ativos.reduce((acc, l) => {
+    const conta = l.conta || l.nome
+    acc[conta] = (acc[conta] || 0) + 1
+    return acc
+  }, {})
+
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0D0A14', color: '#A855F7', fontSize: 14 }}>Carregando pipeline...</div>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0D0A14', color: '#A855F7', fontSize: 14 }}>
+      Carregando pipeline...
+    </div>
   )
 
   return (
@@ -288,10 +322,11 @@ export default function Pipeline() {
           <div>
             <div style={{ fontSize: 16, fontWeight: 700, color: '#F0E8FF' }}>Pipeline</div>
             <div style={{ fontSize: 10, color: '#6B5A90' }}>
-              <span style={{ color: '#A855F7' }}>{todosAtivos.length}</span> ativos ·
-              <span style={{ color: '#10B981', marginLeft: 4 }}>🏭 {goLive.length}</span> go-live ·
-              <span style={{ color: '#374151', marginLeft: 4 }}>🧊 {todosGeladeira.length}</span> geladeira
-              {renovacoes.length > 0 && <span style={{ color: '#EF4444', marginLeft: 4 }}>· ⚠️ {renovacoes.length} renovação</span>}
+              <span style={{ color: '#A855F7', fontWeight: 600 }}>{ativos.length}</span> oportunidades ·{' '}
+              <span style={{ color: '#A855F7', fontWeight: 600 }}>{Object.keys(contasAtivas).length}</span> contas ·{' '}
+              <span style={{ color: '#10B981', fontWeight: 600 }}>🏭 {goLive.length}</span> go-live ·{' '}
+              <span style={{ color: '#374151', fontWeight: 600 }}>🧊 {todosGeladeira.length}</span> geladeira
+              {renovacoes.length > 0 && <span style={{ color: '#EF4444', fontWeight: 600 }}> · ⚠️ {renovacoes.length} renovação</span>}
             </div>
           </div>
           {isAdmin && (
@@ -302,7 +337,9 @@ export default function Pipeline() {
         </div>
         <div style={{ display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
           {resps.map(r => (
-            <button key={r} onClick={() => setFilterResp(r)} style={{ background: filterResp === r ? '#7C3AED' : '#130F1E', border: `1px solid ${filterResp === r ? '#7C3AED' : '#2D1F45'}`, borderRadius: 20, padding: '4px 12px', fontSize: 11, color: filterResp === r ? '#fff' : '#6B5A90', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: filterResp === r ? 600 : 400 }}>{r}</button>
+            <button key={r} onClick={() => setFilterResp(r)} style={{ background: filterResp === r ? '#7C3AED' : '#130F1E', border: `1px solid ${filterResp === r ? '#7C3AED' : '#2D1F45'}`, borderRadius: 20, padding: '4px 12px', fontSize: 11, color: filterResp === r ? '#fff' : '#6B5A90', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: filterResp === r ? 600 : 400 }}>
+              {r}
+            </button>
           ))}
         </div>
       </div>
@@ -326,11 +363,12 @@ export default function Pipeline() {
         {aba === 'pipeline' && <>
           {riscos.length > 0 && (
             <div style={{ background: 'rgba(255,107,26,0.06)', border: '1px solid rgba(255,107,26,0.2)', borderRadius: 12, padding: '12px 16px' }}>
-              <div style={{ fontSize: 12, color: '#FF6B1A', fontWeight: 700, marginBottom: 8 }}>⚠️ LEADS EM RISCO ({riscos.length})</div>
+              <div style={{ fontSize: 12, color: '#FF6B1A', fontWeight: 700, marginBottom: 8 }}>⚠️ OPORTUNIDADES EM RISCO ({riscos.length})</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {riscos.map(l => (
                   <div key={l.id} onClick={() => setSelected(l)} style={{ background: '#1A1428', border: '1px solid #FF6B1A44', borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ color: '#F0E8FF', fontWeight: 600 }}>{l.nome}</span>
+                    <span style={{ color: '#F0E8FF', fontWeight: 600 }}>{l.conta || l.nome}</span>
+                    {l.servico && <span style={{ color: '#A855F7', fontSize: 10 }}>📦 {l.servico}</span>}
                     <span style={{ color: '#FF6B1A', fontSize: 11 }}>{l.risco}</span>
                   </div>
                 ))}
@@ -338,7 +376,6 @@ export default function Pipeline() {
             </div>
           )}
 
-          {/* Kanban */}
           <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch' }}>
             {ETAPAS.map(etapa => {
               const cards = byEtapa[etapa] || []
@@ -354,23 +391,39 @@ export default function Pipeline() {
                     {cards.length === 0 && <div style={{ textAlign: 'center', color: '#2D1F45', fontSize: 12, padding: '20px 0' }}>vazio</div>}
                     {cards.map(l => {
                       const { label: agLabel, color: agColor } = agingLabel(l.dias || 0)
-                      const pendLead = acts.filter(a => a.lead?.toLowerCase().includes(l.nome?.toLowerCase()) && !a.ok)
+                      const pendLead = acts.filter(a => a.lead?.toLowerCase().includes((l.conta || l.nome)?.toLowerCase()) && !a.ok)
+                      const contaOps = contasAtivas[l.conta || l.nome] || 1
                       return (
-                        <div key={l.id} className="lead-card" onClick={() => setSelected(l)} style={{ background: 'linear-gradient(135deg,#130F1E,#150F22)', border: `1px solid ${l.risco ? '#FF6B1A44' : '#2D1F45'}`, borderRadius: 10, padding: '11px 13px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                        <div key={l.id} className="lead-card" onClick={() => setSelected(l)} style={{ background: 'linear-gradient(135deg,#130F1E,#150F22)', border: `1px solid ${l.risco ? '#FF6B1A44' : '#2D1F45'}`, borderRadius: 10, padding: '11px 13px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 6 }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: '#F0E8FF', lineHeight: 1.3 }}>{l.nome}</div>
-                            <span style={{ background: `${agColor}22`, border: `1px solid ${agColor}55`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: agColor, whiteSpace: 'nowrap', fontWeight: 600 }}>{agLabel}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: '#F0E8FF', lineHeight: 1.3 }}>{l.conta || l.nome}</div>
+                              {l.servico && <div style={{ fontSize: 11, color: '#A855F7', marginTop: 2 }}>📦 {l.servico}</div>}
+                            </div>
+                            <span style={{ background: `${agColor}22`, border: `1px solid ${agColor}55`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: agColor, whiteSpace: 'nowrap', fontWeight: 600, flexShrink: 0 }}>{agLabel}</span>
                           </div>
                           <div style={{ fontSize: 11, color: '#6B5A90' }}>👤 {l.resp}</div>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 11, color: l.dias > 7 ? '#FF6B1A' : '#6B5A90' }}>🕐 {l.dias}d</span>
-                            {pendLead.length > 0 && <span style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid #7C3AED44', borderRadius: 6, padding: '1px 7px', fontSize: 10, color: '#A855F7' }}>{pendLead.length} pend.</span>}
+                            {pendLead.length > 0 && (
+                              <span style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid #7C3AED44', borderRadius: 6, padding: '1px 7px', fontSize: 10, color: '#A855F7' }}>
+                                {pendLead.length} pend.
+                              </span>
+                            )}
+                            {contaOps > 1 && (
+                              <span style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid #3B82F644', borderRadius: 6, padding: '1px 7px', fontSize: 10, color: '#3B82F6' }}>
+                                {contaOps} op.
+                              </span>
+                            )}
                             {l.risco && <span style={{ fontSize: 11 }}>⚠️</span>}
                             {l.g12 && <span style={{ fontSize: 11 }}>⭐</span>}
                           </div>
-                          {/* ✅ BADGES DE ETAPAS PARALELAS */}
                           {l.paralelo && <ParaleloBadges paralelo={l.paralelo} />}
-                          {l.prox && <div style={{ fontSize: 11, color: '#4D3D6A', borderTop: '1px solid #1E1433', paddingTop: 6 }}>→ {l.prox}</div>}
+                          {l.prox && (
+                            <div style={{ fontSize: 11, color: '#4D3D6A', borderTop: '1px solid #1E1433', paddingTop: 6 }}>
+                              → {l.prox}
+                            </div>
+                          )}
                         </div>
                       )
                     })}
@@ -393,7 +446,8 @@ export default function Pipeline() {
                   return (
                     <div key={l.id} onClick={() => setSelected(l)} style={{ background: '#1A1428', border: `1px solid ${vl.color}44`, borderRadius: 8, padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#F0E8FF' }}>{l.nome}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#F0E8FF' }}>{l.conta || l.nome}</div>
+                        {l.servico && <div style={{ fontSize: 11, color: '#A855F7', marginTop: 1 }}>📦 {l.servico}</div>}
                         <div style={{ fontSize: 11, color: '#6B5A90', marginTop: 2 }}>👤 {l.resp}</div>
                       </div>
                       <span style={{ fontSize: 12, color: vl.color, fontWeight: 600, background: `${vl.color}15`, border: `1px solid ${vl.color}44`, borderRadius: 6, padding: '3px 10px', whiteSpace: 'nowrap' }}>{vl.label}</span>
@@ -409,10 +463,9 @@ export default function Pipeline() {
               <div style={{ fontSize: 12, color: '#6B5A90', fontWeight: 700, marginBottom: 10 }}>📅 SEM DATA DE VENCIMENTO ({semData.length}) — clique para preencher</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {semData.map(l => (
-                  <div key={l.id} onClick={() => setSelected(l)} style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 10, color: '#4D3D6A' }}>📅</span>
-                    {l.nome}
-                    <span style={{ fontSize: 10, color: '#6B5A90' }}>· {l.resp?.split(' ')[0]}</span>
+                  <div key={l.id} onClick={() => setSelected(l)} style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: '#9CA3AF', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <span>{l.conta || l.nome}</span>
+                    {l.servico && <span style={{ fontSize: 10, color: '#6B5A90' }}>📦 {l.servico}</span>}
                   </div>
                 ))}
               </div>
@@ -430,7 +483,8 @@ export default function Pipeline() {
                     <div key={l.id} className="golive-card" onClick={() => setSelected(l)} style={{ background: '#0D0A14', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 12, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
                       <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981', boxShadow: '0 0 6px #10B981', flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: '#E8DCFF' }}>{l.nome}</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#E8DCFF' }}>{l.conta || l.nome}</div>
+                        {l.servico && <div style={{ fontSize: 11, color: '#A855F7', marginTop: 1 }}>📦 {l.servico}</div>}
                         <div style={{ fontSize: 11, color: '#6B5A90', marginTop: 2 }}>👤 {l.resp}</div>
                       </div>
                       <span style={{ fontSize: 11, color: vl.color, fontWeight: 500, whiteSpace: 'nowrap' }}>{vl.label}</span>
@@ -447,7 +501,7 @@ export default function Pipeline() {
           <div style={{ background: 'rgba(55,65,81,0.15)', border: '1px solid #374151', borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 20 }}>🧊</span>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#9CA3AF' }}>{geladeira.length} leads sem contato há mais de 90 dias</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#9CA3AF' }}>{geladeira.length} oportunidades sem contato há mais de 90 dias</div>
               <div style={{ fontSize: 11, color: '#6B5A90', marginTop: 2 }}>Clique para ver o histórico e reativar</div>
             </div>
           </div>
@@ -460,7 +514,7 @@ export default function Pipeline() {
             if (items.length === 0) return null
             return (
               <div key={grupo.label}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#6B5A90', marginBottom: 10 }}>{grupo.label} — {items.length} leads</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#6B5A90', marginBottom: 10 }}>{grupo.label} — {items.length} oportunidades</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {items.map(l => (
                     <div key={l.id} className="gel-card" onClick={() => setSelected(l)} style={{ background: '#0D0A14', border: '1px solid #1F2937', borderRadius: 12, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -469,7 +523,8 @@ export default function Pipeline() {
                         <div style={{ fontSize: 9, color: '#4B5563' }}>dias</div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: '#9CA3AF' }}>{l.nome}</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#9CA3AF' }}>{l.conta || l.nome}</div>
+                        {l.servico && <div style={{ fontSize: 11, color: '#6B5A90', marginTop: 1 }}>📦 {l.servico}</div>}
                         <div style={{ fontSize: 11, color: '#4B5563', marginTop: 3 }}>{l.etapa} · 👤 {l.resp}</div>
                         {l.mov && <div style={{ fontSize: 11, color: '#374151', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Último: {l.mov.slice(0, 80)}</div>}
                       </div>
