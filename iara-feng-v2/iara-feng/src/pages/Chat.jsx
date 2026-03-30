@@ -11,6 +11,7 @@ const CARGOS = {
   'Jardel Rocha': { cargo: 'Coordenador Comercial' },
   'Beni Ertel': { cargo: 'Analista Comercial' },
   'Silvio Vázquez': { cargo: 'Advisor LATAM' },
+  'Alexandre Sivolella': { cargo: 'Consultor de Novos Negócios' },
 }
 
 const SUGESTAO_CONFIG = {
