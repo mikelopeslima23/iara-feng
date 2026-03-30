@@ -55,9 +55,7 @@ function NotifModal({ notifs, onClose, onMarkRead, onMarkAll, userId }) {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {naoLidas.length > 0 && (
-              <button onClick={() => onMarkAll(userId)} style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid #7C3AED44', borderRadius: 6, color: '#A855F7', padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>
-                Marcar todas
-              </button>
+              <button onClick={() => onMarkAll(userId)} style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid #7C3AED44', borderRadius: 6, color: '#A855F7', padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>Marcar todas</button>
             )}
             <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6B5A90', fontSize: 18, cursor: 'pointer' }}>✕</button>
           </div>
@@ -104,12 +102,13 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
   const isAdmin = ADMINS.includes(userName)
 
   let c = `DATA:${hoje} | USUÁRIO:${userName} | ADMIN:${isAdmin}\n`
-  c += `RESUMO:${ativos.length} ativos | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
+  c += `RESUMO:${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
 
   c += `⭐ G12/G15 (leads prioritários — maiores clubes):\n`
   if (g12.length === 0) c += `• Nenhum marcado ainda\n`
   g12.forEach(l => {
-    c += `• ${l.nome}|${l.etapa}|${l.resp}|${l.dias}d|${l.aging}`
+    const label = l.conta && l.servico ? `${l.conta} — ${l.servico}` : l.nome
+    c += `• ${label}|${l.etapa}|${l.resp}|${l.dias}d|${l.aging}`
     if (l.dual) c += `[DUAL:${l.notaDual}]`
     if (l.socio) c += `[SÓCIO FENG]`
     c += `\n  Mov:${l.mov}\n  Próx:${l.prox}(${l.dt})`
@@ -118,12 +117,31 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
     c += '\n'
   })
 
-  c += `\n🏭 GO-LIVE:\n${leads.filter(l => l.op).map(l => `• ${l.nome}|${l.resp}`).join('\n') || '• Nenhum'}\n`
+  c += `\n🏭 GO-LIVE:\n${leads.filter(l => l.op).map(l => `• ${l.conta || l.nome}${l.servico ? ` — ${l.servico}` : ''}|${l.resp}`).join('\n') || '• Nenhum'}\n`
 
-  const outros = leads.filter(l => !l.g12 && !l.op && !l.off && l.aging !== 'Geladeira')
+  // Agrupa oportunidades por conta para contexto
+  const contasAtivas = ativos.reduce((acc, l) => {
+    const conta = l.conta || l.nome
+    if (!acc[conta]) acc[conta] = []
+    acc[conta].push(l)
+    return acc
+  }, {})
+
+  const contasMultiplas = Object.entries(contasAtivas).filter(([, opps]) => opps.length > 1)
+  if (contasMultiplas.length > 0) {
+    c += `\n🏢 CONTAS COM MÚLTIPLAS OPORTUNIDADES:\n`
+    contasMultiplas.forEach(([conta, opps]) => {
+      c += `• ${conta} (${opps.length} oportunidades): ${opps.map(o => o.servico || o.etapa).join(', ')}\n`
+    })
+  }
+
+  const outros = ativos.filter(l => !l.g12)
   if (outros.length) {
-    c += `\n📋 OUTROS ATIVOS:\n`
-    outros.forEach(l => c += `• ${l.nome}|${l.etapa}|${l.resp}|${l.dias}d${l.socio ? '[SÓCIO]' : ''}\n  Mov:${l.mov?.slice(0, 80)}\n`)
+    c += `\n📋 OPORTUNIDADES ATIVAS:\n`
+    outros.forEach(l => {
+      const label = l.conta && l.servico ? `${l.conta} — ${l.servico}` : l.nome
+      c += `• ${label}|${l.etapa}|${l.resp}|${l.dias}d${l.socio ? '[SÓCIO]' : ''}\n  Mov:${l.mov?.slice(0, 80)}\n`
+    })
   }
 
   if (mine.length) {
@@ -188,6 +206,19 @@ OWNERS DOS LEADS (regra fixa):
 - Leads LATAM (fora do Brasil) → owner: Silvio Vázquez (ID: silvio)
 - Outros membros podem ter atividades/registros mas o owner principal segue essa regra
 
+ESTRUTURA DE OPORTUNIDADES (regra fundamental):
+- Cada CONTA (clube/empresa) pode ter N OPORTUNIDADES — uma por serviço
+- Formato do nome: "Conta — Serviço" (ex: "Inter-RS — Sócio Torcedor", "Flamengo — DataLake")
+- Quando alguém perguntar sobre uma conta, liste TODAS as oportunidades dela
+- Jardel ou qualquer membro pode dizer "o Inter tem 4 oportunidades" → IAra lista e permite ajustar
+- Ao criar nova oportunidade: sempre perguntar CONTA e SERVIÇO separadamente
+
+CATÁLOGO DE SERVIÇOS FENG:
+ST Completo | Sócio Torcedor | DataLake | CRM | Mídia Paga | Estratégia | BI | Redes Sociais | Site Institucional | Loyalty | Atendimento | SSO | Gestão Financeira | Ativação Digital | Match Day | Paid Media | App Oficial
+(Serviços podem ser vendidos agrupados ou separados conforme negociação)
+
+ETAPAS DO PIPELINE: Prospecção → Oportunidade → Proposta → Negociação → Operação / Go-Live
+
 COMANDO EXCLUSIVO "IAra fechar Radar" (só Mike Lopes e Bruno Braga):
 - Se ADMIN:false → "Esse comando é exclusivo para o Mike e o Bruno."
 - Se ADMIN:true → confirmar, depois emitir [AÇÃO:GERAR_RADAR]{}[/AÇÃO] e fazer resumo textual.
@@ -203,16 +234,17 @@ MARCADORES (após confirmação do usuário):
 [AÇÃO:CONCLUIR]{"id":"ID_ATIVIDADE"}[/AÇÃO]
 [AÇÃO:CRIAR]{"lead":"NOME","desc":"DESC","dt":"YYYY-MM-DD","resp":"RESP","tipo":"FUP|Reunião|Proposta|Jurídico"}[/AÇÃO]
 [AÇÃO:UPDATE_LEAD]{"nome":"NOME","campo":"etapa|prox|mov","valor":"VALOR"}[/AÇÃO]
+[AÇÃO:CRIAR_OPP]{"conta":"CLUBE","servico":"SERVIÇO","etapa":"Prospecção","resp":"RESP"}[/AÇÃO]
 [AÇÃO:GERAR_RADAR]{}[/AÇÃO]
 
 NOTIFICAÇÕES — quando criar atividade para outro usuário, emita também:
 [NOTIF:{"para":"ID","titulo":"TITULO","descricao":"DESC","lead":"LEAD","tipo":"tarefa|aviso|alerta"}][/NOTIF]
 
-IDs: mike=mike | bruno=bruno | jardel=jardel | silvio=silvio | beni=beni
+IDs: mike=mike | bruno=bruno | jardel=jardel | silvio=silvio | beni=beni | alexandre=alexandre
 
-Exemplo: Mike pede ATA para Jardel sobre Grêmio:
-[AÇÃO:CRIAR]{"lead":"Grêmio","desc":"Registrar ATA da reunião","dt":"2026-03-28","resp":"Jardel Rocha","tipo":"Reunião"}[/AÇÃO]
-[NOTIF:{"para":"jardel","titulo":"ATA da reunião — Grêmio","descricao":"Registrar ATA da reunião realizada hoje","lead":"Grêmio","tipo":"tarefa"}][/NOTIF]
+Exemplo: Jardel diz "Inter tem oportunidade nova de CRM":
+IAra pergunta etapa → confirma → emite:
+[AÇÃO:CRIAR_OPP]{"conta":"Internacional","servico":"CRM","etapa":"Prospecção","resp":"Jardel Rocha"}[/AÇÃO]
 
 SUGESTÕES PROATIVAS (após salvar qualquer ação confirmada — SOMENTE quando relevante):
 
@@ -390,6 +422,23 @@ export default function Chat() {
           const updated = curL.find(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()))
           if (updated) await upsertLead(updated)
           results.push(`✅ ${nome} atualizado`)
+        } else if (act.type === 'CRIAR_OPP') {
+          const { conta, servico, etapa, resp } = act.data
+          const nome = conta && servico ? `${conta} — ${servico}` : (conta || servico || 'Nova oportunidade')
+          const nL = {
+            id: `opp-${Date.now()}`,
+            nome, conta: conta || '', servico: servico || '',
+            etapa: etapa || 'Prospecção',
+            resp: resp || user.nome,
+            dias: 0, aging: 'Hot',
+            mov: `Nova oportunidade criada via IAra`,
+            prox: '', dt: '',
+            op: false, off: false, g12: false,
+            risco: '', vencimento: '', paralelo: ''
+          }
+          curL = [...curL, nL]
+          await upsertLead(nL)
+          results.push(`✅ Oportunidade criada: ${nome}`)
         } else if (act.type === 'GERAR_RADAR') {
           openRadar = true; results.push(`📊 Radar Semanal gerado`)
         }
@@ -455,7 +504,7 @@ export default function Chat() {
   const memCount = memories.length
   const knowCount = knowledge.length
   const unreadCount = notifs.filter(n => !n.lida).length
-  const chips = [['📅 Reunião', 'Registrar reunião:'], ['⚡ FUP feito', 'FUP realizado com'], ['⬆️ Avançar etapa', 'Avançou de etapa:'], ['⚠️ Risco', 'Registrar risco:'], ['📊 Como tá?', 'Como tá o pipeline hoje?'], ['🆕 Novo lead', 'Novo lead:']]
+  const chips = [['📅 Reunião', 'Registrar reunião:'], ['⚡ FUP feito', 'FUP realizado com'], ['⬆️ Avançar etapa', 'Avançou de etapa:'], ['⚠️ Risco', 'Registrar risco:'], ['📊 Como tá?', 'Como tá o pipeline hoje?'], ['🆕 Nova oportunidade', 'Nova oportunidade:']]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#0D0A14', color: '#F0E8FF', fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden' }}>
@@ -496,7 +545,6 @@ export default function Chat() {
             <span style={{ color: '#A855F7', fontWeight: 600 }}>{ativosCount}</span> · <span style={{ color: '#FF6B1A', fontWeight: 600 }}>{pendCount}</span>
           </div>
 
-          {/* SINO */}
           <button className="notif-btn" onClick={() => setShowNotifs(v => !v)} style={{ position: 'relative', width: 36, height: 36, borderRadius: 9, border: `1px solid ${unreadCount > 0 ? '#A855F744' : '#2D1F45'}`, background: unreadCount > 0 ? 'rgba(168,85,247,0.08)' : '#130F1E', color: unreadCount > 0 ? '#A855F7' : '#6B5A90', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, transition: 'all 0.15s', flexShrink: 0 }}>
             🔔
             {unreadCount > 0 && (
