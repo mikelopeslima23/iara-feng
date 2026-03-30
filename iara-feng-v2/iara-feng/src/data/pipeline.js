@@ -2759,4 +2759,12 @@ export const USERS = [
     perfil: 'Executivo de vendas. Perfil técnico. Prefere contexto antes de agir.' },
   { id: 'beni', nome: 'Beni Ertel', iniciais: 'BE', cor: '#EC4899', admin: false,
     perfil: 'Executivo de vendas. Perfil relacionamento. Tom mais leve e colaborativo.' },
+  {
+  id: 'alexandre',
+  nome: 'Alexandre Sivolella',
+  iniciais: 'AS',
+  cor: '#0EA5E9',
+  admin: false,
+  perfil: 'Consultor de Novos Negócios. Foco em prospecção e abertura de contas.'
+},
 ]
