@@ -133,3 +133,33 @@ export async function markAllRead(userId) {
 export async function createNotification(para, titulo, descricao, lead = null, de = null, tipo = 'tarefa') {
   await supabase.from('notifications').insert({ para, titulo, descricao, lead, de, tipo })
 }
+
+export async function getContacts(leadId = null) {
+  let query = supabase.from('contacts').select('*').order('tipo').order('nome')
+  if (leadId) query = query.eq('lead_id', leadId)
+  const { data, error } = await query
+  if (error) { console.error('getContacts:', error); return [] }
+  return data || []
+}
+
+export async function getAllContacts() {
+  const { data, error } = await supabase.from('contacts').select('*').order('conta').order('tipo').order('nome')
+  if (error) { console.error('getAllContacts:', error); return [] }
+  return data || []
+}
+
+export async function getContactsByConta(conta) {
+  const { data, error } = await supabase.from('contacts').select('*').ilike('conta', conta).order('tipo').order('nome')
+  if (error) { console.error('getContactsByConta:', error); return [] }
+  return data || []
+}
+
+export async function upsertContact(contact) {
+  const { error } = await supabase.from('contacts').upsert(contact, { onConflict: 'id' })
+  if (error) console.error('upsertContact:', error)
+}
+
+export async function deleteContact(id) {
+  const { error } = await supabase.from('contacts').delete().eq('id', id)
+  if (error) console.error('deleteContact:', error)
+}
