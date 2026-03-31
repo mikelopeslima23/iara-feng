@@ -37,62 +37,34 @@ function renderMarkdown(text, t) {
   while (i < lines.length) {
     const line = lines[i]
 
-    // Linha vazia
     if (line.trim() === '') {
       elements.push(<div key={`sp-${i}`} style={{ height: 6 }} />)
       i++; continue
     }
 
-    // ## Seção principal — título roxo + borda inferior (Opção C)
     if (line.startsWith('## ')) {
       elements.push(
-        <div key={`h2-${i}`} style={{
-          fontSize: 13,
-          fontWeight: 700,
-          color: t.purple,
-          marginTop: 14,
-          marginBottom: 8,
-          paddingBottom: 5,
-          borderBottom: `1px solid ${t.purple}22`,
-          letterSpacing: '0.02em',
-          lineHeight: 1.4,
-        }}>
+        <div key={`h2-${i}`} style={{ fontSize: 13, fontWeight: 700, color: t.purple, marginTop: 14, marginBottom: 8, paddingBottom: 5, borderBottom: `1px solid ${t.purple}22`, letterSpacing: '0.02em', lineHeight: 1.4 }}>
           {inlineRender(line.slice(3), t)}
         </div>
       )
       i++; continue
     }
 
-    // ### Subseção — label estilo pequeno muted (Opção C: "DESTAQUES", "ATENÇÃO")
     if (line.startsWith('### ')) {
       elements.push(
-        <div key={`h3-${i}`} style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: t.textMuted,
-          marginTop: 12,
-          marginBottom: 4,
-          letterSpacing: '0.06em',
-          textTransform: 'uppercase',
-        }}>
+        <div key={`h3-${i}`} style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, marginTop: 12, marginBottom: 4, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
           {inlineRender(line.slice(4), t)}
         </div>
       )
       i++; continue
     }
 
-    // --- separador
     if (line.trim() === '---') {
-      elements.push(
-        <div key={`hr-${i}`} style={{
-          borderTop: `0.5px solid ${t.border}`,
-          margin: '10px 0',
-        }} />
-      )
+      elements.push(<div key={`hr-${i}`} style={{ borderTop: `0.5px solid ${t.border}`, margin: '10px 0' }} />)
       i++; continue
     }
 
-    // - lista (Opção C: ▸ roxo + texto)
     if (line.startsWith('- ') || line.startsWith('• ')) {
       const listItems = []
       while (i < lines.length && (lines[i].startsWith('- ') || lines[i].startsWith('• '))) {
@@ -104,15 +76,10 @@ function renderMarkdown(text, t) {
         )
         i++
       }
-      elements.push(
-        <div key={`ul-${i}`} style={{ marginTop: 4, marginBottom: 4 }}>
-          {listItems}
-        </div>
-      )
+      elements.push(<div key={`ul-${i}`} style={{ marginTop: 4, marginBottom: 4 }}>{listItems}</div>)
       continue
     }
 
-    // Lista numerada
     if (/^\d+\.\s/.test(line)) {
       const listItems = []
       let num = 1
@@ -125,15 +92,10 @@ function renderMarkdown(text, t) {
         )
         i++; num++
       }
-      elements.push(
-        <div key={`ol-${i}`} style={{ marginTop: 4, marginBottom: 4 }}>
-          {listItems}
-        </div>
-      )
+      elements.push(<div key={`ol-${i}`} style={{ marginTop: 4, marginBottom: 4 }}>{listItems}</div>)
       continue
     }
 
-    // Parágrafo normal
     elements.push(
       <div key={`p-${i}`} style={{ lineHeight: 1.65, marginBottom: 2, color: t.textSub }}>
         {inlineRender(line, t)}
@@ -155,23 +117,11 @@ function inlineRender(text, t) {
     if (m.index > last) parts.push(<span key={`tx-${last}`}>{text.slice(last, m.index)}</span>)
     const raw = m[0]
     if (raw.startsWith('**')) {
-      parts.push(
-        <strong key={`b-${m.index}`} style={{ fontWeight: 600, color: t.text }}>
-          {raw.slice(2, -2)}
-        </strong>
-      )
+      parts.push(<strong key={`b-${m.index}`} style={{ fontWeight: 600, color: t.text }}>{raw.slice(2, -2)}</strong>)
     } else if (raw.startsWith('*')) {
-      parts.push(
-        <em key={`i-${m.index}`} style={{ fontStyle: 'italic', color: t.textMuted }}>
-          {raw.slice(1, -1)}
-        </em>
-      )
+      parts.push(<em key={`i-${m.index}`} style={{ fontStyle: 'italic', color: t.textMuted }}>{raw.slice(1, -1)}</em>)
     } else if (raw.startsWith('`')) {
-      parts.push(
-        <code key={`c-${m.index}`} style={{ background: t.purpleFaint, color: t.purple, padding: '1px 5px', borderRadius: 4, fontSize: '0.88em', fontFamily: 'monospace' }}>
-          {raw.slice(1, -1)}
-        </code>
-      )
+      parts.push(<code key={`c-${m.index}`} style={{ background: t.purpleFaint, color: t.purple, padding: '1px 5px', borderRadius: 4, fontSize: '0.88em', fontFamily: 'monospace' }}>{raw.slice(1, -1)}</code>)
     }
     last = m.index + raw.length
   }
@@ -248,6 +198,7 @@ function NotifModal({ notifs, onClose, onMarkRead, onMarkAll, userId, t }) {
 
 function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
   const hoje = new Date().toLocaleDateString('pt-BR')
+  const hojeISO = new Date().toISOString().split('T')[0]
   const pend = acts.filter(a => !a.ok)
   const mine = pend.filter(a => a.resp?.toLowerCase().includes(userName.split(' ')[0].toLowerCase()))
   const ativos = leads.filter(l => !l.off && !l.op && l.aging !== 'Geladeira' && l.aging !== 'Inativo')
@@ -257,6 +208,45 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
   let c = `DATA:${hoje} | USUÁRIO:${userName} | ADMIN:${isAdmin}\n`
   c += `RESUMO:${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
 
+  // ── Histórico real de atividades concluídas (últimas 2 semanas) ──
+  const concluidas = acts.filter(a => a.ok && a.criado)
+  const porData = concluidas.reduce((acc, a) => {
+    const dt = (a.criado || '').slice(0, 10)
+    if (!dt) return acc
+    if (!acc[dt]) acc[dt] = []
+    acc[dt].push(a)
+    return acc
+  }, {})
+  const datasOrdenadas = Object.keys(porData).sort().reverse().slice(0, 14)
+
+  if (datasOrdenadas.length > 0) {
+    c += `📅 HISTÓRICO DE ATIVIDADES CONCLUÍDAS (últimas 2 semanas):\n`
+    datasOrdenadas.forEach(dt => {
+      const dtFmt = new Date(dt + 'T12:00:00').toLocaleDateString('pt-BR')
+      const isHoje = dt === hojeISO
+      c += `\n${isHoje ? '★ HOJE' : dtFmt} (${porData[dt].length} atividade${porData[dt].length > 1 ? 's' : ''}):\n`
+      porData[dt].forEach(a => {
+        c += `  • [${a.tipo || 'Atividade'}] ${a.lead} — ${a.descricao} | resp: ${a.resp}\n`
+      })
+    })
+    c += '\n'
+  } else {
+    c += `📅 HISTÓRICO: Nenhuma atividade concluída registrada ainda no sistema.\n\n`
+  }
+
+  // ── Atividades pendentes ──
+  if (pend.length > 0) {
+    c += `⏳ ATIVIDADES PENDENTES (${pend.length}):\n`
+    const atrasadas = pend.filter(a => a.dt && new Date(a.dt) < new Date())
+    if (atrasadas.length > 0) {
+      c += `  ⚠️ ATRASADAS (${atrasadas.length}):\n`
+      atrasadas.forEach(a => c += `  • [${a.id}] ${a.lead}: ${a.descricao} | venceu ${a.dt} | ${a.resp}\n`)
+    }
+    pend.filter(a => !a.dt || new Date(a.dt) >= new Date()).slice(0, 20)
+      .forEach(a => c += `  • [${a.id}] ${a.lead}: ${a.descricao} | até ${a.dt} | ${a.resp}\n`)
+    c += '\n'
+  }
+
   c += `⭐ G12/G15:\n`
   if (g12.length === 0) c += `• Nenhum marcado ainda\n`
   g12.forEach(l => {
@@ -265,7 +255,6 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
     if (l.dual) c += `[DUAL:${l.notaDual}]`
     if (l.socio) c += `[SÓCIO FENG]`
     c += `\n  Mov:${l.mov}\n  Próx:${l.prox}(${l.dt})`
-    if (l.contato) c += `|Contato:${l.contato}`
     if (l.risco) c += `\n  ⚠️RISCO:${l.risco}`
     c += '\n'
   })
@@ -278,7 +267,6 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
     acc[conta].push(l)
     return acc
   }, {})
-
   const contasMultiplas = Object.entries(contasAtivas).filter(([, opps]) => opps.length > 1)
   if (contasMultiplas.length > 0) {
     c += `\n🏢 CONTAS COM MÚLTIPLAS OPORTUNIDADES:\n`
@@ -349,21 +337,20 @@ IDENTIDADE: IAra — Intelligence and Action for Revenue Acceleration. Tom: cole
 
 FORMATAÇÃO DE MENSAGENS (Opção C — sempre que estruturar dados):
 Use markdown nas confirmações, relatórios e resumos:
-- ## Título da seção  →  título roxo com linha divisória embaixo
-- ### Subseção  →  label pequeno em caixa alta muted (ex: ### DESTAQUES)
-- **negrito**  →  dados importantes: nomes, valores, datas
-- *itálico*  →  contexto secundário, observações
-- - item  →  lista com ▸ roxo
-- ---  →  separador entre seções distintas
-Exemplo de confirmação bem formatada:
-## 📋 Registrar reunião — Flamengo
-**Etapa:** Proposta
-**Próxima ação:** Enviar proposta
-**Prazo:** 15/04 · **Resp.:** Jardel Rocha
----
-*Posso salvar?*
-
+- ## Título da seção → título roxo com linha divisória embaixo
+- ### Subseção → label pequeno em caixa alta muted
+- **negrito** → dados importantes: nomes, valores, datas
+- *itálico* → contexto secundário, observações
+- - item → lista com ▸ roxo
+- --- → separador entre seções distintas
 Em conversas simples e rápidas: sem formatação, texto direto.
+
+HISTÓRICO DE ATIVIDADES:
+- Você tem acesso ao histórico real de atividades concluídas no contexto (seção 📅 HISTÓRICO)
+- Ao responder perguntas sobre "o que aconteceu hoje/esta semana/quem fez o quê", use APENAS dados do histórico fornecido
+- NUNCA invente ou assuma atividades que não estão no histórico
+- Se não houver dados de um período, informe claramente: "Não há atividades registradas para esse período no sistema."
+- Ao fazer análise de produtividade ou histórico, cite o tipo, lead, descrição e responsável de cada atividade real
 
 OWNERS DOS LEADS (regra fixa):
 - Leads Brasil → owner: Jardel Rocha (ID: jardel)
@@ -546,7 +533,12 @@ export default function Chat() {
           await upsertActivity({ ...found, ok: true })
           results.push(`✅ Concluído: ${found?.descricao || act.data.id}`)
         } else if (act.type === 'CRIAR') {
-          const nA = { id: `act-${Date.now()}`, ok: false, criado: new Date().toISOString().split('T')[0], lead: act.data.lead, descricao: act.data.descricao, dt: act.data.dt, resp: act.data.resp, tipo: act.data.tipo || 'Atividade' }
+          const nA = {
+            id: `act-${Date.now()}`, ok: false,
+            criado: new Date().toISOString().split('T')[0],
+            lead: act.data.lead, descricao: act.data.descricao,
+            dt: act.data.dt, resp: act.data.resp, tipo: act.data.tipo || 'Atividade'
+          }
           curA = [...curA, nA]; await upsertActivity(nA)
           results.push(`✅ Criado: ${act.data.descricao}`)
         } else if (act.type === 'UPDATE_LEAD') {
