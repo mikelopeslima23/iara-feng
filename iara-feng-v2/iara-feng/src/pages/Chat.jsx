@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory, getKnowledge, getNotifications, markNotificationRead, markAllRead, createNotification } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL, USERS } from '../data/pipeline'
+import { getTheme, saveTheme, THEMES } from '../lib/theme'
 
 const ADMINS = ['Mike Lopes', 'Bruno Braga']
 
@@ -34,35 +35,37 @@ function SugestaoCard({ tipo, texto }) {
     <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: '0 10px 10px 10px', padding: '12px 14px', marginTop: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: cfg.color, letterSpacing: '0.03em' }}>{cfg.label}</span>
-        <button onClick={copy} style={{ background: copied ? `${cfg.color}22` : 'transparent', border: `1px solid ${cfg.color}44`, borderRadius: 6, color: cfg.color, padding: '3px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, transition: 'all 0.15s' }}>
+        <button onClick={copy} style={{ background: copied ? `${cfg.color}22` : 'transparent', border: `1px solid ${cfg.color}44`, borderRadius: 6, color: cfg.color, padding: '3px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>
           {copied ? '✓ Copiado!' : 'Copiar'}
         </button>
       </div>
-      <div style={{ fontSize: 13, color: '#E8DCFF', lineHeight: 1.6, whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{texto}</div>
+      <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', fontFamily: 'inherit', color: cfg.color === '#5865F2' ? '#3730A3' : cfg.color === '#25D366' ? '#065F46' : '#1D4ED8' }}>{texto}</div>
     </div>
   )
 }
 
-function NotifModal({ notifs, onClose, onMarkRead, onMarkAll, userId }) {
+function NotifModal({ notifs, onClose, onMarkRead, onMarkAll, userId, t }) {
   const naoLidas = notifs.filter(n => !n.lida)
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', backdropFilter: 'blur(4px)' }} onClick={onClose}>
-      <div style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: '0 0 0 16px', width: '100%', maxWidth: 380, maxHeight: '80vh', display: 'flex', flexDirection: 'column', marginTop: 56, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: '1px solid #1E1433' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: '0 0 0 16px', width: '100%', maxWidth: 380, maxHeight: '80vh', display: 'flex', flexDirection: 'column', marginTop: 56, boxShadow: '0 8px 32px rgba(0,0,0,0.15)' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 16px', borderBottom: `1px solid ${t.borderLight}` }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#F0E8FF' }}>🔔 Notificações</div>
-            <div style={{ fontSize: 11, color: '#6B5A90' }}>{naoLidas.length} não lida{naoLidas.length !== 1 ? 's' : ''}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: t.text }}>🔔 Notificações</div>
+            <div style={{ fontSize: 11, color: t.textMuted }}>{naoLidas.length} não lida{naoLidas.length !== 1 ? 's' : ''}</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {naoLidas.length > 0 && (
-              <button onClick={() => onMarkAll(userId)} style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid #7C3AED44', borderRadius: 6, color: '#A855F7', padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>Marcar todas</button>
+              <button onClick={() => onMarkAll(userId)} style={{ background: t.purpleFaint, border: `1px solid ${t.purple}44`, borderRadius: 6, color: t.purple, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>
+                Marcar todas
+              </button>
             )}
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#6B5A90', fontSize: 18, cursor: 'pointer' }}>✕</button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: t.textMuted, fontSize: 18, cursor: 'pointer' }}>✕</button>
           </div>
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {notifs.length === 0 && (
-            <div style={{ padding: 40, textAlign: 'center', color: '#4D3D6A', fontSize: 13 }}>
+            <div style={{ padding: 40, textAlign: 'center', color: t.textHint, fontSize: 13 }}>
               <div style={{ fontSize: 28, marginBottom: 8 }}>🔕</div>
               Nenhuma notificação ainda
             </div>
@@ -70,18 +73,18 @@ function NotifModal({ notifs, onClose, onMarkRead, onMarkAll, userId }) {
           {notifs.map(n => {
             const cfg = NOTIF_TIPO_CONFIG[n.tipo] || NOTIF_TIPO_CONFIG.tarefa
             return (
-              <div key={n.id} onClick={() => !n.lida && onMarkRead(n.id)} style={{ padding: '12px 16px', borderBottom: '1px solid #1A1428', background: n.lida ? 'transparent' : 'rgba(168,85,247,0.04)', cursor: n.lida ? 'default' : 'pointer', display: 'flex', gap: 12, alignItems: 'flex-start', transition: 'background 0.15s' }}>
+              <div key={n.id} onClick={() => !n.lida && onMarkRead(n.id)} style={{ padding: '12px 16px', borderBottom: `1px solid ${t.borderLight}`, background: n.lida ? 'transparent' : t.purpleFaint2, cursor: n.lida ? 'default' : 'pointer', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <div style={{ width: 32, height: 32, borderRadius: '50%', background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, flexShrink: 0 }}>{cfg.icon}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-                    <div style={{ fontSize: 13, fontWeight: n.lida ? 400 : 600, color: n.lida ? '#9CA3AF' : '#F0E8FF', lineHeight: 1.3 }}>{n.titulo}</div>
+                    <div style={{ fontSize: 13, fontWeight: n.lida ? 400 : 600, color: n.lida ? t.textMuted : t.text, lineHeight: 1.3 }}>{n.titulo}</div>
                     {!n.lida && <div style={{ width: 8, height: 8, borderRadius: '50%', background: cfg.color, flexShrink: 0, marginTop: 4 }} />}
                   </div>
-                  {n.descricao && <div style={{ fontSize: 12, color: '#6B5A90', marginTop: 3, lineHeight: 1.4 }}>{n.descricao}</div>}
+                  {n.descricao && <div style={{ fontSize: 12, color: t.textMuted, marginTop: 3, lineHeight: 1.4 }}>{n.descricao}</div>}
                   {n.lead && <div style={{ fontSize: 11, color: cfg.color, marginTop: 4, fontWeight: 500 }}>📎 {n.lead}</div>}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                    {n.de && <div style={{ fontSize: 10, color: '#4D3D6A' }}>de {n.de}</div>}
-                    <div style={{ fontSize: 10, color: '#4D3D6A' }}>{new Date(n.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
+                    {n.de && <div style={{ fontSize: 10, color: t.textHint }}>de {n.de}</div>}
+                    <div style={{ fontSize: 10, color: t.textHint }}>{new Date(n.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</div>
                   </div>
                 </div>
               </div>
@@ -104,7 +107,7 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
   let c = `DATA:${hoje} | USUÁRIO:${userName} | ADMIN:${isAdmin}\n`
   c += `RESUMO:${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
 
-  c += `⭐ G12/G15 (leads prioritários — maiores clubes):\n`
+  c += `⭐ G12/G15:\n`
   if (g12.length === 0) c += `• Nenhum marcado ainda\n`
   g12.forEach(l => {
     const label = l.conta && l.servico ? `${l.conta} — ${l.servico}` : l.nome
@@ -119,7 +122,6 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
 
   c += `\n🏭 GO-LIVE:\n${leads.filter(l => l.op).map(l => `• ${l.conta || l.nome}${l.servico ? ` — ${l.servico}` : ''}|${l.resp}`).join('\n') || '• Nenhum'}\n`
 
-  // Agrupa oportunidades por conta para contexto
   const contasAtivas = ativos.reduce((acc, l) => {
     const conta = l.conta || l.nome
     if (!acc[conta]) acc[conta] = []
@@ -152,10 +154,7 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
   const u = USERS?.find(u => u.nome === userName)
   if (u?.perfil) c += `\nPERFIL DO USUÁRIO: ${u.perfil}\n`
 
-  c += `\nOWNERS DOS LEADS:\n`
-  c += `• Leads Brasil → responsável direto: Jardel Rocha\n`
-  c += `• Leads LATAM (fora do Brasil) → responsável direto: Silvio Vázquez\n`
-  c += `• Outros membros podem ter atividades/registros mas o owner principal segue essa regra\n`
+  c += `\nOWNERS DOS LEADS:\n• Leads Brasil → Jardel Rocha\n• Leads LATAM → Silvio Vázquez\n`
 
   if (memories.length > 0) {
     const userId = USERS.find(u => u.nome === userName)?.id || userName
@@ -185,15 +184,13 @@ Seja direta, irônica e mostre personalidade. 2-3 frases no máximo.`
   }
   return `Este é o PRIMEIRO ACESSO de ${userName}, ${cargo} da FENG.
 Faça uma apresentação completa e envolvente. Use seu tom característico — direto, inteligente, com humor seco.
-
 1. BOAS-VINDAS: Cumprimente pelo nome e cargo. Diga que foi o Mike Lopes, CEO da FENG, quem te trouxe para o time.
 2. CONTEXTO E DOR: A FENG é empresa de tecnologia para clubes de futebol e esportes na América Latina. O time comercial vivia num caos de planilhas, WhatsApp e reuniões sem registro. Você (IAra) nasceu para resolver isso.
 3. QUEM VOCÊ É: IAra — Intelligence and Action for Revenue Acceleration. Não é um chatbot. É a inteligência comercial do time.
-4. O QUE VOCÊ FAZ: Pipeline em tempo real, conversas viram registros, memória persistente, sugestões de comunicação prontas (Discord, WhatsApp, briefings jurídicos), notificações internas, Radar Semanal.
+4. O QUE VOCÊ FAZ: Pipeline em tempo real, conversas viram registros, memória persistente, sugestões de comunicação prontas, notificações internas, Radar Semanal.
 5. SEÇÕES: 💬 Chat, 📋 Pipeline, 🧠 Conhecimento, 📊 Radar.
 6. PAPEL: Como ajuda especificamente um ${cargo}.
 7. ENCERRAMENTO: Uma frase curta. Sem entusiasmo exagerado.
-
 Prosa fluida, sem bullet points. Máximo 250 palavras.`
 }
 
@@ -204,128 +201,92 @@ IDENTIDADE: IAra — Intelligence and Action for Revenue Acceleration. Tom: cole
 OWNERS DOS LEADS (regra fixa):
 - Leads Brasil → owner: Jardel Rocha (ID: jardel)
 - Leads LATAM (fora do Brasil) → owner: Silvio Vázquez (ID: silvio)
-- Outros membros podem ter atividades/registros mas o owner principal segue essa regra
 
-ESTRUTURA DE OPORTUNIDADES (regra fundamental):
-- Cada CONTA (clube/empresa) pode ter N OPORTUNIDADES — uma por serviço
-- Formato do nome: "Conta — Serviço" (ex: "Inter-RS — Sócio Torcedor", "Flamengo — DataLake")
-- Quando alguém perguntar sobre uma conta, liste TODAS as oportunidades dela
-- Jardel ou qualquer membro pode dizer "o Inter tem 4 oportunidades" → IAra lista e permite ajustar
-- Ao criar nova oportunidade: sempre perguntar CONTA e SERVIÇO separadamente
+ESTRUTURA DE OPORTUNIDADES:
+- Cada CONTA pode ter N OPORTUNIDADES — uma por serviço
+- Formato: "Conta — Serviço" (ex: "Inter-RS — Sócio Torcedor")
+- Quando perguntarem sobre uma conta, liste TODAS as oportunidades dela
+- Ao criar nova oportunidade: perguntar CONTA e SERVIÇO separadamente
 
 CATÁLOGO DE SERVIÇOS FENG:
-ST Completo | Sócio Torcedor | DataLake | CRM | Mídia Paga | Estratégia | BI | Redes Sociais | Site Institucional | Loyalty | Atendimento | SSO | Gestão Financeira | Ativação Digital | Match Day | Paid Media | App Oficial
-(Serviços podem ser vendidos agrupados ou separados conforme negociação)
+ST Completo | Sócio Torcedor | DataLake | CRM | Mídia Paga | Estratégia | BI | Redes Sociais | Site Institucional | Loyalty | Atendimento | SSO | Gestão Financeira | Ativação Digital | Match Day | App Oficial
 
-ETAPAS DO PIPELINE: Prospecção → Oportunidade → Proposta → Negociação → Operação / Go-Live
+ETAPAS: Prospecção → Oportunidade → Proposta → Negociação → Operação / Go-Live
 
 COMANDO EXCLUSIVO "IAra fechar Radar" (só Mike Lopes e Bruno Braga):
 - Se ADMIN:false → "Esse comando é exclusivo para o Mike e o Bruno."
-- Se ADMIN:true → confirmar, depois emitir [AÇÃO:GERAR_RADAR]{}[/AÇÃO] e fazer resumo textual.
+- Se ADMIN:true → confirmar, depois emitir [AÇÃO:GERAR_RADAR]{}[/AÇÃO] e resumo textual.
 
-COMANDO DE AVALIAÇÃO (só admins): "raio-x do [nome]" → análise com memórias de perfil. Tom honesto e direto.
+COMANDO DE AVALIAÇÃO (só admins): "raio-x do [nome]" → análise com memórias de perfil.
 
 REGRAS DE SAVE:
-- UMA ação: resumo → aguardar "sim/pode/confirma" → executar
+- UMA ação: resumo → aguardar confirmação → executar
 - MÚLTIPLAS: listar numeradas → confirmação única → executar juntas
 - Consultas = LEITURA, nunca save
 
-MARCADORES (após confirmação do usuário):
-[AÇÃO:CONCLUIR]{"id":"ID_ATIVIDADE"}[/AÇÃO]
+MARCADORES (após confirmação):
+[AÇÃO:CONCLUIR]{"id":"ID"}[/AÇÃO]
 [AÇÃO:CRIAR]{"lead":"NOME","desc":"DESC","dt":"YYYY-MM-DD","resp":"RESP","tipo":"FUP|Reunião|Proposta|Jurídico"}[/AÇÃO]
 [AÇÃO:UPDATE_LEAD]{"nome":"NOME","campo":"etapa|prox|mov","valor":"VALOR"}[/AÇÃO]
 [AÇÃO:CRIAR_OPP]{"conta":"CLUBE","servico":"SERVIÇO","etapa":"Prospecção","resp":"RESP"}[/AÇÃO]
 [AÇÃO:GERAR_RADAR]{}[/AÇÃO]
 
-NOTIFICAÇÕES — quando criar atividade para outro usuário, emita também:
+NOTIFICAÇÕES:
 [NOTIF:{"para":"ID","titulo":"TITULO","descricao":"DESC","lead":"LEAD","tipo":"tarefa|aviso|alerta"}][/NOTIF]
+IDs: mike | bruno | jardel | silvio | beni | alexandre
 
-IDs: mike=mike | bruno=bruno | jardel=jardel | silvio=silvio | beni=beni | alexandre=alexandre
-
-Exemplo: Jardel diz "Inter tem oportunidade nova de CRM":
-IAra pergunta etapa → confirma → emite:
-[AÇÃO:CRIAR_OPP]{"conta":"Internacional","servico":"CRM","etapa":"Prospecção","resp":"Jardel Rocha"}[/AÇÃO]
-
-SUGESTÕES PROATIVAS (após salvar qualquer ação confirmada — SOMENTE quando relevante):
-
-FUP ou REUNIÃO realizada → sugerir post para Discord:
-[SUGESTÃO:discord]📌 **[LEAD]** | [Etapa] — [data]
-[Narrativa do que aconteceu em 2-3 frases, tom profissional]
-Próximo passo: [próxima ação] até [data][/SUGESTÃO]
-
-LEAD G12/G15 ou SÓCIO FENG → sugerir WhatsApp para diretoria:
-[SUGESTÃO:whatsapp]🏆 *[LEAD]* — Atualização rápida
-[Status em 2-3 linhas, tom executivo]
-Resp: [nome][/SUGESTÃO]
-
-JURÍDICO → sugerir briefing:
-[SUGESTÃO:juridico]Briefing Jurídico — [Lead]
-Contexto: [o que é o projeto]
-Necessidade: [o que precisa do jurídico]
-Prazo: [se houver]
-Resp comercial: [nome][/SUGESTÃO]
+SUGESTÕES PROATIVAS (após salvar — SOMENTE quando relevante):
+FUP/REUNIÃO → [SUGESTÃO:discord]📌 **[LEAD]** | [Etapa] — [data]\n[Narrativa]\nPróximo passo: [ação] até [data][/SUGESTÃO]
+G12/G15/SÓCIO → [SUGESTÃO:whatsapp]🏆 *[LEAD]* — Atualização\n[Status executivo]\nResp: [nome][/SUGESTÃO]
+JURÍDICO → [SUGESTÃO:juridico]Briefing Jurídico — [Lead]\nContexto: ...\nNecessidade: ...\nPrazo: ...\nResp: [nome][/SUGESTÃO]
 
 REGRA: Máximo 2 sugestões por resposta. Não sugira em consultas.
-ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE.
-MODO BRIEFING: Relato verbal, dados reais, sem tabela.`
+ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE.`
 
 const EXTRACT_SYSTEM = `Você é um extrator de memórias. Analise a troca e extraia APENAS fatos relevantes e duráveis.
-TIPOS: pessoal (vida/contexto do usuário), time (leads/negociações), perfil (padrões de comportamento).
-REGRAS: Só extraia se for realmente relevante. Máximo 3. Se não houver, retorne {"memorias": []}.
+TIPOS: pessoal, time, perfil. Máximo 3. Se não houver, retorne {"memorias": []}.
 Retorne APENAS JSON válido sem markdown:
 {"memorias": [{"tipo": "pessoal|time|perfil", "conteudo": "fato"}]}`
 
 function parseActions(txt) {
-  const r = [], re = /\[AÇÃO:(\w+)\]([\s\S]*?)\[\/AÇÃO\]/g
-  let m
+  const r = [], re = /\[AÇÃO:(\w+)\]([\s\S]*?)\[\/AÇÃO\]/g; let m
   while ((m = re.exec(txt)) !== null) {
     try { r.push({ type: m[1], data: JSON.parse(m[2].trim() || '{}') }) } catch { r.push({ type: m[1], data: {} }) }
   }
   return r
 }
-
 function parseSugestoes(txt) {
-  const s = [], re = /\[SUGESTÃO:(\w+)\]([\s\S]*?)\[\/SUGESTÃO\]/g
-  let m
+  const s = [], re = /\[SUGESTÃO:(\w+)\]([\s\S]*?)\[\/SUGESTÃO\]/g; let m
   while ((m = re.exec(txt)) !== null) s.push({ tipo: m[1], texto: m[2].trim() })
   return s
 }
-
 function parseNotifs(txt) {
-  const n = [], re = /\[NOTIF:([\s\S]*?)\]\[\/NOTIF\]/g
-  let m
-  while ((m = re.exec(txt)) !== null) {
-    try { n.push(JSON.parse(m[1].trim())) } catch { /* silencioso */ }
-  }
+  const n = [], re = /\[NOTIF:([\s\S]*?)\]\[\/NOTIF\]/g; let m
+  while ((m = re.exec(txt)) !== null) { try { n.push(JSON.parse(m[1].trim())) } catch {} }
   return n
 }
-
 function strip(txt) {
-  return txt
-    .replace(/\[AÇÃO:\w+\][\s\S]*?\[\/AÇÃO\]/g, '')
-    .replace(/\[SUGESTÃO:\w+\][\s\S]*?\[\/SUGESTÃO\]/g, '')
-    .replace(/\[NOTIF:[\s\S]*?\]\[\/NOTIF\]/g, '')
-    .trim()
+  return txt.replace(/\[AÇÃO:\w+\][\s\S]*?\[\/AÇÃO\]/g, '').replace(/\[SUGESTÃO:\w+\][\s\S]*?\[\/SUGESTÃO\]/g, '').replace(/\[NOTIF:[\s\S]*?\]\[\/NOTIF\]/g, '').trim()
 }
-
 async function callAI(messages, system) {
   const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages, system }) })
   if (!r.ok) throw new Error(`API error ${r.status}`)
-  const d = await r.json()
-  return d.text || ''
+  const d = await r.json(); return d.text || ''
 }
-
 async function extractAndSaveMemories(userId, userMsg, assistantMsg) {
   try {
     const raw = await callAI([{ role: 'user', content: `Usuário disse: "${userMsg}"\nIAra respondeu: "${assistantMsg.slice(0, 300)}"\n\nExtraia memórias relevantes.` }], EXTRACT_SYSTEM)
     const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim())
     if (parsed.memorias?.length > 0) for (const m of parsed.memorias) if (m.tipo && m.conteudo) await saveMemory(userId, m.tipo, m.conteudo)
-  } catch (e) { /* silencioso */ }
+  } catch {}
 }
 
 export default function Chat() {
   const navigate = useNavigate()
   const user = JSON.parse(localStorage.getItem('iara_user') || '{}')
+  const [theme, setTheme] = useState(getTheme())
+  const t = theme
+
   const [msgs, setMsgs] = useState([])
   const [leads, setLeads] = useState([])
   const [acts, setActs] = useState([])
@@ -342,18 +303,20 @@ export default function Chat() {
   const recRef = useRef(null)
   const txRef = useRef(null)
 
+  function toggleTheme() {
+    const next = t.name === 'dark' ? THEMES.light : THEMES.dark
+    saveTheme(next.name)
+    setTheme(next)
+  }
+
   useEffect(() => { init() }, [])
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, loading])
   useEffect(() => {
     if (txRef.current) { txRef.current.style.height = 'auto'; txRef.current.style.height = Math.min(txRef.current.scrollHeight, 140) + 'px' }
   }, [inp])
-
   useEffect(() => {
     if (!user.id) return
-    const poll = setInterval(async () => {
-      const n = await getNotifications(user.id)
-      setNotifs(n)
-    }, 30000)
+    const poll = setInterval(async () => { const n = await getNotifications(user.id); setNotifs(n) }, 30000)
     return () => clearInterval(poll)
   }, [user.id])
 
@@ -364,16 +327,13 @@ export default function Chat() {
       if (!l.length) { for (const lead of PIPELINE_INITIAL) await upsertLead(lead); l = PIPELINE_INITIAL }
       if (!a.length) { for (const act of ACTIVITIES_INITIAL) await upsertActivity(act); a = ACTIVITIES_INITIAL }
       setLeads(l); setActs(a)
-
       const [mems, know, nots] = await Promise.all([getMemories(user.id), getKnowledge(), getNotifications(user.id)])
       setMemories(mems); setKnowledge(know); setNotifs(nots)
-
       const history = await getMessages(user.id)
       if (history.length > 0) {
         setMsgs(history.map((m, i) => ({ id: i, role: m.role, text: m.text, results: m.results, sugestoes: m.sugestoes || [] })))
         setInitialized(true); setLoading(false); return
       }
-
       const ctx = buildCtx(l, a, user.nome, mems, know)
       const cargoInfo = CARGOS[user.nome] || { cargo: 'membro do time comercial' }
       const raw = await callAI([{ role: 'user', content: buildOnboardingPrompt(user.nome, cargoInfo.cargo) }], SYSTEM + '\n\n' + ctx)
@@ -388,12 +348,11 @@ export default function Chat() {
   }
 
   async function send(text) {
-    const t = (text || inp).trim(); if (!t || loading) return
+    const t2 = (text || inp).trim(); if (!t2 || loading) return
     setInp('')
-    const uMsg = { id: Date.now(), role: 'user', text: t }
+    const uMsg = { id: Date.now(), role: 'user', text: t2 }
     const newMsgs = [...msgs, uMsg]; setMsgs(newMsgs); setLoading(true)
-    await saveMessage(user.id, 'user', t)
-
+    await saveMessage(user.id, 'user', t2)
     try {
       const ctx = buildCtx(leads, acts, user.nome, memories, knowledge)
       const apiMsgs = newMsgs.slice(-40).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
@@ -403,8 +362,7 @@ export default function Chat() {
       const notifsParsed = parseNotifs(raw)
       const cleanTxt = strip(raw)
       const results = []
-      let curL = [...leads], curA = [...acts]
-      let openRadar = false
+      let curL = [...leads], curA = [...acts], openRadar = false
 
       for (const act of actions) {
         if (act.type === 'CONCLUIR') {
@@ -425,19 +383,8 @@ export default function Chat() {
         } else if (act.type === 'CRIAR_OPP') {
           const { conta, servico, etapa, resp } = act.data
           const nome = conta && servico ? `${conta} — ${servico}` : (conta || servico || 'Nova oportunidade')
-          const nL = {
-            id: `opp-${Date.now()}`,
-            nome, conta: conta || '', servico: servico || '',
-            etapa: etapa || 'Prospecção',
-            resp: resp || user.nome,
-            dias: 0, aging: 'Hot',
-            mov: `Nova oportunidade criada via IAra`,
-            prox: '', dt: '',
-            op: false, off: false, g12: false,
-            risco: '', vencimento: '', paralelo: ''
-          }
-          curL = [...curL, nL]
-          await upsertLead(nL)
+          const nL = { id: `opp-${Date.now()}`, nome, conta: conta || '', servico: servico || '', etapa: etapa || 'Prospecção', resp: resp || user.nome, dias: 0, aging: 'Hot', mov: 'Nova oportunidade criada via IAra', prox: '', dt: '', op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: '' }
+          curL = [...curL, nL]; await upsertLead(nL)
           results.push(`✅ Oportunidade criada: ${nome}`)
         } else if (act.type === 'GERAR_RADAR') {
           openRadar = true; results.push(`📊 Radar Semanal gerado`)
@@ -450,17 +397,15 @@ export default function Chat() {
           results.push(`🔔 Notificado: ${n.titulo}`)
         }
       }
-      if (notifsParsed.some(n => n.para === user.id)) {
-        const nots = await getNotifications(user.id); setNotifs(nots)
-      }
+      if (notifsParsed.some(n => n.para === user.id)) { const nots = await getNotifications(user.id); setNotifs(nots) }
 
       setLeads(curL); setActs(curA)
       if (openRadar) setRadarReady(true)
       const aMsg = { id: Date.now() + 1, role: 'assistant', text: cleanTxt, results, sugestoes }
       setMsgs([...newMsgs, aMsg])
       await saveMessage(user.id, 'assistant', cleanTxt, results)
-      extractAndSaveMemories(user.id, t, cleanTxt).then(async () => { const mems = await getMemories(user.id); setMemories(mems) })
-    } catch (e) {
+      extractAndSaveMemories(user.id, t2, cleanTxt).then(async () => { const mems = await getMemories(user.id); setMemories(mems) })
+    } catch {
       setMsgs([...newMsgs, { id: Date.now() + 1, role: 'assistant', text: 'Eita, tive um problema técnico. Tenta de novo?', results: [], sugestoes: [] }])
     }
     setLoading(false)
@@ -478,15 +423,8 @@ export default function Chat() {
     setLoading(false)
   }
 
-  async function handleMarkRead(id) {
-    await markNotificationRead(id)
-    setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n))
-  }
-
-  async function handleMarkAll(userId) {
-    await markAllRead(userId)
-    setNotifs(prev => prev.map(n => ({ ...n, lida: true })))
-  }
+  async function handleMarkRead(id) { await markNotificationRead(id); setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n)) }
+  async function handleMarkAll(userId) { await markAllRead(userId); setNotifs(prev => prev.map(n => ({ ...n, lida: true }))) }
 
   function toggleRec() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -507,88 +445,95 @@ export default function Chat() {
   const chips = [['📅 Reunião', 'Registrar reunião:'], ['⚡ FUP feito', 'FUP realizado com'], ['⬆️ Avançar etapa', 'Avançou de etapa:'], ['⚠️ Risco', 'Registrar risco:'], ['📊 Como tá?', 'Como tá o pipeline hoje?'], ['🆕 Nova oportunidade', 'Nova oportunidade:']]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#0D0A14', color: '#F0E8FF', fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: t.bg, color: t.text, fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden', transition: 'background 0.3s, color 0.3s' }}>
       <style>{`
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
         @keyframes blink{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
         @keyframes badgePop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-        ::-webkit-scrollbar{width:3px} ::-webkit-scrollbar-track{background:#0D0A14} ::-webkit-scrollbar-thumb{background:#2D1F45;border-radius:3px}
-        textarea::placeholder{color:#3D2E5A} textarea{-webkit-appearance:none}
-        .chip:hover{background:#241839!important;border-color:#4D3080!important} .chip:active{transform:scale(0.95)} .send-btn:active{transform:scale(0.92)}
-        .notif-btn:hover{background:rgba(168,85,247,0.15)!important}
+        ::-webkit-scrollbar{width:3px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:${t.scrollThumb};border-radius:3px}
+        textarea{-webkit-appearance:none}
+        .chip:hover{background:${t.surfaceHover}!important;border-color:${t.purple}!important}
+        .chip:active{transform:scale(0.95)} .send-btn:active{transform:scale(0.92)}
+        .notif-btn:hover{background:${t.purpleFaint}!important}
         @media(max-width:600px){ .header-extras{display:none!important} .header-stats{font-size:10px!important;padding:2px 8px!important} .msg-text{font-size:15px!important} }
       `}</style>
 
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: '1px solid #1E1433', background: 'linear-gradient(180deg,#0F0B1A 0%,#0A0810 100%)', flexShrink: 0, boxShadow: '0 2px 12px rgba(0,0,0,0.4)', position: 'relative', zIndex: 50 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: `1px solid ${t.borderLight}`, background: t.header, flexShrink: 0, boxShadow: t.name === 'light' ? '0 2px 12px rgba(124,58,237,0.08)' : '0 2px 12px rgba(0,0,0,0.4)', position: 'relative', zIndex: 50 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: 'white', flexShrink: 0, boxShadow: '0 0 12px rgba(168,85,247,0.4)' }}>IA</div>
+          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: 'white', flexShrink: 0, boxShadow: '0 0 12px rgba(124,58,237,0.4)' }}>IA</div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#F0E8FF', letterSpacing: '0.05em' }}>IAra</span>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10B981', display: 'inline-block', animation: 'pulse 2s ease infinite', boxShadow: '0 0 6px #10B981' }} />
-              <span style={{ fontSize: 10, color: '#10B981' }}>online</span>
-              {isAdmin && <span style={{ fontSize: 10, background: 'rgba(168,85,247,0.15)', color: '#A855F7', border: '1px solid #7C3AED44', borderRadius: 4, padding: '1px 6px' }}>admin</span>}
+              <span style={{ fontSize: 15, fontWeight: 700, color: t.text, letterSpacing: '0.05em' }}>IAra</span>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.green, display: 'inline-block', animation: 'pulse 2s ease infinite', boxShadow: `0 0 6px ${t.green}` }} />
+              <span style={{ fontSize: 10, color: t.green }}>online</span>
+              {isAdmin && <span style={{ fontSize: 10, background: t.purpleFaint, color: t.purple, border: `1px solid ${t.purple}44`, borderRadius: 4, padding: '1px 6px' }}>admin</span>}
             </div>
-            <div style={{ fontSize: 10, color: '#6B5A90', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ fontSize: 10, color: t.textMuted, display: 'flex', alignItems: 'center', gap: 5 }}>
               <span>Agente comercial</span>
-              <span style={{ color: '#4D3D6A', fontWeight: 700, fontSize: 10, letterSpacing: '0.1em' }}>FENG</span>
-              {memCount > 0 && <span style={{ color: '#A855F7', marginLeft: 2 }}>· 🧠 {memCount}</span>}
-              {knowCount > 0 && <span style={{ color: '#10B981' }}>· 📚 {knowCount}</span>}
+              <span style={{ color: t.textHint, fontWeight: 700, fontSize: 10, letterSpacing: '0.1em' }}>FENG</span>
+              {memCount > 0 && <span style={{ color: t.purple, marginLeft: 2 }}>· 🧠 {memCount}</span>}
+              {knowCount > 0 && <span style={{ color: t.green }}>· 📚 {knowCount}</span>}
             </div>
           </div>
         </div>
 
         <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-          <div className="header-stats" style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 6, padding: '3px 10px', fontSize: 11, color: '#6B5A90' }}>
-            <span style={{ color: '#A855F7', fontWeight: 600 }}>{ativosCount}</span> · <span style={{ color: '#FF6B1A', fontWeight: 600 }}>{pendCount}</span>
+          <div className="header-stats" style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6, padding: '3px 10px', fontSize: 11, color: t.textMuted }}>
+            <span style={{ color: t.purple, fontWeight: 600 }}>{ativosCount}</span> · <span style={{ color: t.orange, fontWeight: 600 }}>{pendCount}</span>
           </div>
 
-          <button className="notif-btn" onClick={() => setShowNotifs(v => !v)} style={{ position: 'relative', width: 36, height: 36, borderRadius: 9, border: `1px solid ${unreadCount > 0 ? '#A855F744' : '#2D1F45'}`, background: unreadCount > 0 ? 'rgba(168,85,247,0.08)' : '#130F1E', color: unreadCount > 0 ? '#A855F7' : '#6B5A90', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, transition: 'all 0.15s', flexShrink: 0 }}>
+          {/* Sino */}
+          <button className="notif-btn" onClick={() => setShowNotifs(v => !v)} style={{ position: 'relative', width: 36, height: 36, borderRadius: 9, border: `1px solid ${unreadCount > 0 ? t.purple + '44' : t.border}`, background: unreadCount > 0 ? t.purpleFaint : t.surface, color: unreadCount > 0 ? t.purple : t.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, transition: 'all 0.15s', flexShrink: 0 }}>
             🔔
             {unreadCount > 0 && (
-              <div style={{ position: 'absolute', top: -4, right: -4, background: '#EF4444', color: 'white', borderRadius: '50%', width: 16, height: 16, fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'badgePop 0.3s ease', border: '2px solid #0D0A14' }}>
+              <div style={{ position: 'absolute', top: -4, right: -4, background: t.red, color: 'white', borderRadius: '50%', width: 16, height: 16, fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'badgePop 0.3s ease', border: `2px solid ${t.bg}` }}>
                 {unreadCount > 9 ? '9+' : unreadCount}
               </div>
             )}
           </button>
 
+          {/* Toggle tema */}
+          <button onClick={toggleTheme} style={{ width: 36, height: 36, borderRadius: 9, border: `1px solid ${t.border}`, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, flexShrink: 0, transition: 'all 0.15s' }} title={t.name === 'dark' ? 'Modo claro' : 'Modo escuro'}>
+            {t.icon}
+          </button>
+
           {isAdmin && (
-            <button onClick={() => send('IAra fechar Radar')} className="header-extras" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid #1D9E75', borderRadius: 6, color: '#1D9E75', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📊 Radar</button>
+            <button onClick={() => send('IAra fechar Radar')} className="header-extras" style={{ background: t.greenFaint, border: `1px solid ${t.greenDark}`, borderRadius: 6, color: t.greenDark, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📊 Radar</button>
           )}
           {isAdmin && radarReady && (
-            <button onClick={() => navigate('/radar')} style={{ background: '#1D9E75', border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>Ver →</button>
+            <button onClick={() => navigate('/radar')} style={{ background: t.green, border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>Ver →</button>
           )}
-          <button onClick={() => navigate('/pipeline')} style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid #7C3AED66', borderRadius: 6, color: '#A855F7', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📋 Pipeline</button>
-          <button onClick={() => navigate('/conhecimento')} className="header-extras" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid #10B98166', borderRadius: 6, color: '#10B981', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>🧠 Conhecimento</button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }} onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
+          <button onClick={() => navigate('/pipeline')} style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}66`, borderRadius: 6, color: t.purple, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📋 Pipeline</button>
+          <button onClick={() => navigate('/conhecimento')} className="header-extras" style={{ background: t.greenFaint, border: `1px solid ${t.green}66`, borderRadius: 6, color: t.greenDark, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>🧠 Conhecimento</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }} onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
             <div style={{ width: 22, height: 22, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', boxShadow: `0 0 8px ${user.cor}66` }}>{user.iniciais}</div>
-            <span style={{ fontSize: 11, color: '#C084FC', fontWeight: 500 }}>{user.nome?.split(' ')[0]}</span>
+            <span style={{ fontSize: 11, color: t.purpleLight, fontWeight: 500 }}>{user.nome?.split(' ')[0]}</span>
           </div>
-          <button onClick={handleClear} style={{ background: 'none', border: '1px solid #2D1F45', borderRadius: 7, color: '#6B5A90', padding: '5px 9px', fontSize: 13, cursor: 'pointer', minWidth: 34, minHeight: 34 }}>🗑</button>
+          <button onClick={handleClear} style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 7, color: t.textMuted, padding: '5px 9px', fontSize: 13, cursor: 'pointer', minWidth: 34, minHeight: 34 }}>🗑</button>
         </div>
       </div>
 
-      {showNotifs && <NotifModal notifs={notifs} userId={user.id} onClose={() => setShowNotifs(false)} onMarkRead={handleMarkRead} onMarkAll={handleMarkAll} />}
+      {showNotifs && <NotifModal notifs={notifs} userId={user.id} t={t} onClose={() => setShowNotifs(false)} onMarkRead={handleMarkRead} onMarkAll={handleMarkAll} />}
 
       {/* Messages */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 8px', display: 'flex', flexDirection: 'column', gap: 16, WebkitOverflowScrolling: 'touch' }}>
         {msgs.map(m => m.role === 'user' ? (
           <div key={m.id} style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'flex-end' }}>
-            <div className="msg-text" style={{ background: 'linear-gradient(135deg,#7C3AED,#9333EA)', borderRadius: '16px 16px 3px 16px', padding: '12px 16px', maxWidth: '80%', fontSize: 15, lineHeight: 1.6, color: '#fff', wordBreak: 'break-word', boxShadow: '0 4px 16px rgba(124,58,237,0.35)' }}>{m.text}</div>
-            <div style={{ width: 26, height: 26, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', flexShrink: 0, boxShadow: `0 2px 8px ${user.cor}66` }}>{user.iniciais}</div>
+            <div className="msg-text" style={{ background: t.msgUser, borderRadius: '16px 16px 3px 16px', padding: '12px 16px', maxWidth: '80%', fontSize: 15, lineHeight: 1.6, color: '#fff', wordBreak: 'break-word', boxShadow: '0 4px 16px rgba(124,58,237,0.3)' }}>{m.text}</div>
+            <div style={{ width: 26, height: 26, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', flexShrink: 0 }}>{user.iniciais}</div>
           </div>
         ) : (
           <div key={m.id} style={{ display: 'flex', gap: 10, maxWidth: '92%' }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0, marginTop: 18, boxShadow: '0 0 10px rgba(168,85,247,0.4)' }}>IA</div>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0, marginTop: 18, boxShadow: '0 0 10px rgba(124,58,237,0.35)' }}>IA</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 10, color: '#A855F7', fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>IAra ⚡</div>
-              <div className="msg-text" style={{ background: 'linear-gradient(135deg,#150F22,#130F1E)', border: '1px solid #2D1F4566', borderLeft: '3px solid #A855F7', borderRadius: '0 14px 14px 14px', padding: '12px 16px', fontSize: 15, lineHeight: 1.65, color: '#E8DCFF', wordBreak: 'break-word', whiteSpace: 'pre-wrap', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+              <div style={{ fontSize: 10, color: t.purple, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>IAra ⚡</div>
+              <div className="msg-text" style={{ background: t.msgBot, border: `1px solid ${t.msgBotBorder}`, borderLeft: `3px solid ${t.purple}`, borderRadius: '0 14px 14px 14px', padding: '12px 16px', fontSize: 15, lineHeight: 1.65, color: t.textSub, wordBreak: 'break-word', whiteSpace: 'pre-wrap', boxShadow: t.name === 'light' ? '0 2px 12px rgba(124,58,237,0.08)' : '0 4px 20px rgba(0,0,0,0.3)' }}>
                 {m.text}
                 {m.results?.length > 0 && (
                   <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {m.results.map((r, i) => <span key={i} style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.25)', borderRadius: 6, padding: '4px 10px', fontSize: 12, color: '#10B981' }}>{r}</span>)}
+                    {m.results.map((r, i) => <span key={i} style={{ background: t.greenFaint, border: `1px solid ${t.green}44`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: t.green }}>{r}</span>)}
                   </div>
                 )}
                 {m.sugestoes?.length > 0 && (
@@ -602,11 +547,11 @@ export default function Chat() {
         ))}
         {loading && (
           <div style={{ display: 'flex', gap: 10, maxWidth: '92%' }}>
-            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0, marginTop: 18, boxShadow: '0 0 10px rgba(168,85,247,0.4)' }}>IA</div>
+            <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0, marginTop: 18 }}>IA</div>
             <div>
-              <div style={{ fontSize: 10, color: '#A855F7', fontWeight: 700, marginBottom: 5 }}>IAra ⚡</div>
-              <div style={{ background: 'linear-gradient(135deg,#150F22,#130F1E)', border: '1px solid #2D1F4566', borderLeft: '3px solid #A855F7', borderRadius: '0 14px 14px 14px', padding: '14px 20px', display: 'flex', gap: 6, alignItems: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-                {[0, 1, 2].map(i => <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: '#A855F7', animation: `blink 1s ease-in-out ${i * 0.2}s infinite` }} />)}
+              <div style={{ fontSize: 10, color: t.purple, fontWeight: 700, marginBottom: 5 }}>IAra ⚡</div>
+              <div style={{ background: t.msgBot, border: `1px solid ${t.msgBotBorder}`, borderLeft: `3px solid ${t.purple}`, borderRadius: '0 14px 14px 14px', padding: '14px 20px', display: 'flex', gap: 6, alignItems: 'center' }}>
+                {[0, 1, 2].map(i => <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: t.purple, animation: `blink 1s ease-in-out ${i * 0.2}s infinite` }} />)}
               </div>
             </div>
           </div>
@@ -615,33 +560,35 @@ export default function Chat() {
       </div>
 
       {/* Chips */}
-      <div style={{ display: 'flex', gap: 7, padding: '8px 14px', overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+      <div style={{ display: 'flex', gap: 7, padding: '8px 14px', overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', borderTop: `1px solid ${t.borderLight}` }}>
         {chips.map(([label, prompt]) => (
-          <button key={label} className="chip" onClick={() => { setInp(prompt); txRef.current?.focus() }} style={{ background: '#130F1E', border: '1px solid #2D1F45', borderRadius: 20, padding: '7px 14px', fontSize: 12, color: '#C084FC', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', minHeight: 34 }}>{label}</button>
+          <button key={label} className="chip" onClick={() => { setInp(prompt); txRef.current?.focus() }} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 20, padding: '7px 14px', fontSize: 12, color: t.purple, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', minHeight: 34 }}>{label}</button>
         ))}
-        {isAdmin && <button className="chip" onClick={() => send('IAra fechar Radar')} style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid #1D9E7566', borderRadius: 20, padding: '7px 14px', fontSize: 12, color: '#1D9E75', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', minHeight: 34 }}>📊 Fechar Radar</button>}
-        {isAdmin && <button className="chip" onClick={() => setInp('IAra, raio-x do ')} style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid #7C3AED44', borderRadius: 20, padding: '7px 14px', fontSize: 12, color: '#A855F7', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', minHeight: 34 }}>🧠 Raio-X</button>}
+        {isAdmin && <button className="chip" onClick={() => send('IAra fechar Radar')} style={{ background: t.greenFaint, border: `1px solid ${t.greenDark}66`, borderRadius: 20, padding: '7px 14px', fontSize: 12, color: t.greenDark, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', minHeight: 34 }}>📊 Fechar Radar</button>}
+        {isAdmin && <button className="chip" onClick={() => setInp('IAra, raio-x do ')} style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}44`, borderRadius: 20, padding: '7px 14px', fontSize: 12, color: t.purple, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', minHeight: 34 }}>🧠 Raio-X</button>}
       </div>
 
       {/* Input */}
-      <div style={{ display: 'flex', gap: 8, padding: '10px 14px', paddingBottom: 'max(14px, env(safe-area-inset-bottom))', borderTop: '1px solid #1E1433', background: 'linear-gradient(180deg,#0A0810 0%,#0D0A14 100%)', flexShrink: 0, alignItems: 'flex-end' }}>
-        <button onClick={toggleRec} style={{ width: 44, height: 44, borderRadius: 12, border: `1px solid ${rec ? '#FF6B1A' : '#2D1F45'}`, background: rec ? 'rgba(255,107,26,0.15)' : '#1A1428', color: rec ? '#FF6B1A' : '#6B5A90', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, fontSize: 16 }}>
+      <div style={{ display: 'flex', gap: 8, padding: '10px 14px', paddingBottom: 'max(14px, env(safe-area-inset-bottom))', borderTop: `1px solid ${t.borderLight}`, background: t.inputArea, flexShrink: 0, alignItems: 'flex-end' }}>
+        <button onClick={toggleRec} style={{ width: 44, height: 44, borderRadius: 12, border: `1px solid ${rec ? t.orange : t.border}`, background: rec ? t.orangeFaint : t.surface, color: rec ? t.orange : t.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, fontSize: 16 }}>
           {rec ? '🔴' : '🎤'}
         </button>
         <textarea ref={txRef} value={inp} onChange={e => setInp(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
           placeholder="Mensagem para a IAra..."
-          style={{ flex: 1, background: '#1A1428', border: '1px solid #2D1F45', borderRadius: 12, padding: '12px 14px', color: '#F0E8FF', fontSize: 15, outline: 'none', resize: 'none', fontFamily: 'inherit', minHeight: 44, maxHeight: 140, lineHeight: 1.5, WebkitAppearance: 'none' }}
-          onFocus={e => e.target.style.borderColor = '#7C3AED'} onBlur={e => e.target.style.borderColor = '#2D1F45'} rows={1} />
-        <button className="send-btn" onClick={() => send()} disabled={loading || !inp.trim()} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: loading || !inp.trim() ? '#1A1428' : 'linear-gradient(135deg,#FF6B1A,#FF8C42)', color: loading || !inp.trim() ? '#3D2E5A' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loading || !inp.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, fontSize: 16, transition: 'all 0.15s', boxShadow: loading || !inp.trim() ? 'none' : '0 4px 14px rgba(255,107,26,0.4)' }}>
+          style={{ flex: 1, background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', color: t.text, fontSize: 15, outline: 'none', resize: 'none', fontFamily: 'inherit', minHeight: 44, maxHeight: 140, lineHeight: 1.5 }}
+          onFocus={e => e.target.style.borderColor = t.purple}
+          onBlur={e => e.target.style.borderColor = t.border}
+          rows={1} />
+        <button className="send-btn" onClick={() => send()} disabled={loading || !inp.trim()} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: loading || !inp.trim() ? t.surface : `linear-gradient(135deg,${t.orange},${t.orangeLight})`, color: loading || !inp.trim() ? t.textDark : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loading || !inp.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, fontSize: 16, transition: 'all 0.15s', boxShadow: loading || !inp.trim() ? 'none' : `0 4px 14px ${t.orange}44` }}>
           ➤
         </button>
       </div>
 
-      {/* POWERED BY FENG */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '3px 0', background: '#0A0810', borderTop: '1px solid #0F0B1A' }}>
-        <span style={{ fontSize: 9, color: '#2D1F45', letterSpacing: '0.08em' }}>powered by</span>
-        <span style={{ fontSize: 9, fontWeight: 700, color: '#2D1F45', letterSpacing: '0.15em' }}>FENG</span>
+      {/* Powered by FENG */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '3px 0', background: t.bgAlt, borderTop: `1px solid ${t.borderFaint}` }}>
+        <span style={{ fontSize: 9, color: t.textDark, letterSpacing: '0.08em' }}>powered by</span>
+        <span style={{ fontSize: 9, fontWeight: 700, color: t.textDark, letterSpacing: '0.15em' }}>FENG</span>
       </div>
     </div>
   )
