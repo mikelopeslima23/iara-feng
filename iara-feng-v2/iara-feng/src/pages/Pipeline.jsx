@@ -41,6 +41,20 @@ function vencimentoLabel(dias) {
   return { label: `Vence em ${dias}d`, color: '#10B981' }
 }
 
+function formatDate(str) {
+  if (!str) return ''
+  try { return new Date(str + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) }
+  catch { return str }
+}
+
+function tipoColor(tipo) {
+  const map = {
+    'Reunião': '#A855F7', 'FUP': '#3B82F6', 'Proposta': '#F59E0B',
+    'Jurídico': '#EF4444', 'Fazer Contato': '#10B981',
+  }
+  return map[tipo] || '#6B5A90'
+}
+
 function ParaleloBadges({ paralelo }) {
   if (!paralelo) return null
   return (
@@ -48,11 +62,7 @@ function ParaleloBadges({ paralelo }) {
       {paralelo.split(',').map(t => t.trim()).filter(Boolean).map(tag => {
         const opt = PARALELO_OPTIONS.find(o => o.label === tag)
         const color = opt?.color || '#6B5A90'
-        return (
-          <span key={tag} style={{ fontSize: 10, fontWeight: 600, color, background: `${color}18`, border: `1px solid ${color}44`, borderRadius: 4, padding: '1px 6px' }}>
-            {tag}
-          </span>
-        )
+        return <span key={tag} style={{ fontSize: 10, fontWeight: 600, color, background: `${color}18`, border: `1px solid ${color}44`, borderRadius: 4, padding: '1px 6px' }}>{tag}</span>
       })}
     </div>
   )
@@ -65,7 +75,6 @@ function CardIndicators({ lead, acts, contactsMap, t }) {
   const contaKey = (lead.conta || lead.nome || '').toLowerCase()
   const contatos = contactsMap[contaKey] || []
 
-  // Atividades atrasadas
   const atrasadas = acts.filter(a => {
     if (a.ok) return false
     if (!a.lead?.toLowerCase().includes(contaKey)) return false
@@ -74,37 +83,21 @@ function CardIndicators({ lead, acts, contactsMap, t }) {
     return dt < hoje
   })
   if (atrasadas.length > 0) {
-    indicators.push({
-      icon: '⏰',
-      label: `${atrasadas.length} atrasada${atrasadas.length > 1 ? 's' : ''}`,
-      color: '#EF4444',
-    })
+    indicators.push({ icon: '⏰', label: `${atrasadas.length} atrasada${atrasadas.length > 1 ? 's' : ''}`, color: '#EF4444' })
   }
-
-  // Sem contato cadastrado
   if (!contatos.some(c => c.tipo === 'contato')) {
     indicators.push({ icon: '👤', label: 'Sem contato', color: '#F59E0B' })
   }
-
-  // Sem advisor (informativo, tom mais suave)
   if (!contatos.some(c => c.tipo === 'advisor')) {
     indicators.push({ icon: '🤝', label: 'Sem advisor', color: t.textHint })
   }
-
   if (indicators.length === 0) return null
 
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
       {indicators.map((ind, i) => (
-        <span key={i} title={ind.label} style={{
-          fontSize: 10, color: ind.color,
-          background: `${ind.color}14`,
-          border: `1px solid ${ind.color}30`,
-          borderRadius: 4, padding: '1px 6px',
-          display: 'flex', alignItems: 'center', gap: 3,
-        }}>
-          <span style={{ fontSize: 10 }}>{ind.icon}</span>
-          <span style={{ fontSize: 9 }}>{ind.label}</span>
+        <span key={i} title={ind.label} style={{ fontSize: 10, color: ind.color, background: `${ind.color}14`, border: `1px solid ${ind.color}30`, borderRadius: 4, padding: '1px 6px', display: 'flex', alignItems: 'center', gap: 3 }}>
+          <span>{ind.icon}</span><span style={{ fontSize: 9 }}>{ind.label}</span>
         </span>
       ))}
     </div>
@@ -121,35 +114,21 @@ function ContactMiniCard({ c, isAdmin, t, onEdit, onDelete }) {
       <div style={{ width: 34, height: 34, borderRadius: '50%', background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{cfg.icon}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{c.nome}</div>
-        <div style={{ fontSize: 11, color: t.textMuted, marginTop: 1 }}>
-          {[c.cargo, c.email, c.telefone].filter(Boolean).join(' · ')}
-        </div>
+        <div style={{ fontSize: 11, color: t.textMuted, marginTop: 1 }}>{[c.cargo, c.email, c.telefone].filter(Boolean).join(' · ')}</div>
       </div>
       <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-        {c.telefone && (
-          <a href={`https://wa.me/${c.telefone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer"
-            style={{ background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.3)', borderRadius: 6, color: '#25D366', padding: '4px 8px', fontSize: 12, textDecoration: 'none' }}>📱</a>
-        )}
-        {c.email && (
-          <a href={`mailto:${c.email}`}
-            style={{ background: t.purpleFaint, border: `1px solid ${t.purple}33`, borderRadius: 6, color: t.purple, padding: '4px 8px', fontSize: 12, textDecoration: 'none' }}>✉️</a>
-        )}
+        {c.telefone && <a href={`https://wa.me/${c.telefone.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ background: 'rgba(37,211,102,0.1)', border: '1px solid rgba(37,211,102,0.3)', borderRadius: 6, color: '#25D366', padding: '4px 8px', fontSize: 12, textDecoration: 'none' }}>📱</a>}
+        {c.email && <a href={`mailto:${c.email}`} style={{ background: t.purpleFaint, border: `1px solid ${t.purple}33`, borderRadius: 6, color: t.purple, padding: '4px 8px', fontSize: 12, textDecoration: 'none' }}>✉️</a>}
         <button onClick={onEdit} style={{ background: t.purpleFaint, border: `1px solid ${t.purple}33`, borderRadius: 6, color: t.purple, padding: '4px 8px', fontSize: 12, cursor: 'pointer' }}>✏️</button>
-        {isAdmin && (
-          <button onClick={onDelete} style={{ background: t.redFaint, border: `1px solid ${t.red}33`, borderRadius: 6, color: t.red, padding: '4px 8px', fontSize: 12, cursor: 'pointer' }}>🗑</button>
-        )}
+        {isAdmin && <button onClick={onDelete} style={{ background: t.redFaint, border: `1px solid ${t.red}33`, borderRadius: 6, color: t.red, padding: '4px 8px', fontSize: 12, cursor: 'pointer' }}>🗑</button>}
       </div>
     </div>
   )
 }
 
 function ContactModalInline({ contact, defaultConta, defaultLeadId, t, onSave, onClose }) {
-  const [form, setForm] = useState(contact || {
-    nome: '', email: '', telefone: '', cargo: '', tipo: 'contato', obs: '',
-    conta: defaultConta, lead_id: defaultLeadId,
-  })
+  const [form, setForm] = useState(contact || { nome: '', email: '', telefone: '', cargo: '', tipo: 'contato', obs: '', conta: defaultConta, lead_id: defaultLeadId })
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
-
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 16, backdropFilter: 'blur(4px)' }} onClick={onClose}>
       <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, padding: 24, width: '100%', maxWidth: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
@@ -157,57 +136,52 @@ function ContactModalInline({ contact, defaultConta, defaultLeadId, t, onSave, o
           <div style={{ fontSize: 15, fontWeight: 700, color: t.text }}>{contact?.id ? '✏️ Editar' : '+ Novo Contato'}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: t.textMuted, fontSize: 18, cursor: 'pointer' }}>✕</button>
         </div>
-
-        {/* Tipo */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
           {[['contato', '👤 Contato'], ['advisor', '🤝 Advisor']].map(([key, label]) => (
-            <button key={key} onClick={() => set('tipo', key)} style={{
-              flex: 1, padding: '7px', borderRadius: 8,
-              border: `1px solid ${form.tipo === key ? (key === 'advisor' ? t.orange : t.purple) : t.border}`,
-              background: form.tipo === key ? (key === 'advisor' ? t.orangeFaint : t.purpleFaint) : t.surfaceInput,
-              color: form.tipo === key ? (key === 'advisor' ? t.orange : t.purple) : t.textMuted,
-              fontSize: 12, cursor: 'pointer', fontWeight: form.tipo === key ? 700 : 400,
-            }}>{label}</button>
+            <button key={key} onClick={() => set('tipo', key)} style={{ flex: 1, padding: '7px', borderRadius: 8, border: `1px solid ${form.tipo === key ? (key === 'advisor' ? t.orange : t.purple) : t.border}`, background: form.tipo === key ? (key === 'advisor' ? t.orangeFaint : t.purpleFaint) : t.surfaceInput, color: form.tipo === key ? (key === 'advisor' ? t.orange : t.purple) : t.textMuted, fontSize: 12, cursor: 'pointer', fontWeight: form.tipo === key ? 700 : 400 }}>{label}</button>
           ))}
         </div>
-
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <input value={form.nome} onChange={e => set('nome', e.target.value)} placeholder="Nome *"
-            style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
-          <input value={form.cargo || ''} onChange={e => set('cargo', e.target.value)} placeholder="Cargo / Função"
-            style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
-          <input value={form.telefone || ''} onChange={e => set('telefone', e.target.value)} placeholder="Telefone / WhatsApp"
-            style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
-          <input type="email" value={form.email || ''} onChange={e => set('email', e.target.value)} placeholder="E-mail"
-            style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
-          <textarea value={form.obs || ''} onChange={e => set('obs', e.target.value)} rows={2} placeholder="Observações..."
-            style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.text, fontSize: 13, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+          <input value={form.nome} onChange={e => set('nome', e.target.value)} placeholder="Nome *" style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
+          <input value={form.cargo || ''} onChange={e => set('cargo', e.target.value)} placeholder="Cargo / Função" style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
+          <input value={form.telefone || ''} onChange={e => set('telefone', e.target.value)} placeholder="Telefone / WhatsApp" style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
+          <input type="email" value={form.email || ''} onChange={e => set('email', e.target.value)} placeholder="E-mail" style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
+          <textarea value={form.obs || ''} onChange={e => set('obs', e.target.value)} rows={2} placeholder="Observações..." style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.text, fontSize: 13, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
         </div>
-
         <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
           <button onClick={onClose} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, borderRadius: 9, color: t.textMuted, padding: '9px', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
-          <button onClick={() => form.nome.trim() && onSave(form)} disabled={!form.nome.trim()}
-            style={{ flex: 2, background: !form.nome.trim() ? t.surface : 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 9, color: !form.nome.trim() ? t.textMuted : 'white', padding: '9px', fontSize: 13, fontWeight: 600, cursor: !form.nome.trim() ? 'not-allowed' : 'pointer' }}>
-            Salvar
-          </button>
+          <button onClick={() => form.nome.trim() && onSave(form)} disabled={!form.nome.trim()} style={{ flex: 2, background: !form.nome.trim() ? t.surface : 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 9, color: !form.nome.trim() ? t.textMuted : 'white', padding: '9px', fontSize: 13, fontWeight: 600, cursor: !form.nome.trim() ? 'not-allowed' : 'pointer' }}>Salvar</button>
         </div>
       </div>
     </div>
   )
 }
 
+// ─── MODAL COM TIMELINE ───────────────────────────────────────────────────────
 function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
   const user = JSON.parse(localStorage.getItem('iara_user') || '{}')
   const isAdmin = ['Mike Lopes', 'Bruno Braga'].includes(user.nome)
-  const [abaModal, setAbaModal] = useState('detalhes')
+  const [abaModal, setAbaModal] = useState('timeline')
   const [form, setForm] = useState({ ...lead })
   const [contacts, setContacts] = useState([])
   const [loadingContacts, setLoadingContacts] = useState(false)
   const [editContact, setEditContact] = useState(null)
 
-  const pendentes = acts.filter(a =>
-    a.lead?.toLowerCase().includes((lead.conta || lead.nome || '').toLowerCase()) && !a.ok
-  )
+  const contaKey = (lead.conta || lead.nome || '').toLowerCase()
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+
+  // Todas as atividades do lead
+  const allActs = acts
+    .filter(a => a.lead?.toLowerCase().includes(contaKey))
+    .sort((a, b) => {
+      if (!a.ok && b.ok) return -1
+      if (a.ok && !b.ok) return 1
+      return (b.criado || b.dt || '').localeCompare(a.criado || a.dt || '')
+    })
+  const pendentes = allActs.filter(a => !a.ok)
+  const concluidas = allActs.filter(a => a.ok)
+  const atrasadas = pendentes.filter(a => a.dt && new Date(a.dt) < hoje)
+
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
   const diasVenc = diasParaVencer(form.vencimento)
   const vencLabel = vencimentoLabel(diasVenc)
@@ -241,40 +215,65 @@ function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
   }
 
   const advisors = contacts.filter(c => c.tipo === 'advisor')
-  const contatos = contacts.filter(c => c.tipo === 'contato')
+  const contatosList = contacts.filter(c => c.tipo === 'contato')
+  const hasContato = contatosList.length > 0
+  const hasAdvisor = advisors.length > 0
+  const totalAlertas = atrasadas.length + (!hasContato ? 1 : 0)
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16, backdropFilter: 'blur(4px)' }} onClick={onClose}>
-      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, width: '100%', maxWidth: 500, maxHeight: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, width: '100%', maxWidth: 520, maxHeight: '92vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
 
-        {/* Header do modal */}
+        {/* Header */}
         <div style={{ padding: '18px 24px 0', flexShrink: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-            <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 17, fontWeight: 700, color: t.text }}>{lead.conta || lead.nome}</div>
               {lead.servico && <div style={{ fontSize: 13, color: t.purple, fontWeight: 600, marginTop: 2 }}>📦 {lead.servico}</div>}
-              <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>
-                {lead.etapa} · {lead.resp} {lead.op ? '· 🏭 Go-Live' : `· ${lead.dias}d sem atualização`}
+              <div style={{ fontSize: 11, color: t.textMuted, marginTop: 3, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                <span>{lead.etapa}</span>
+                <span>·</span>
+                <span>👤 {lead.resp}</span>
+                <span>·</span>
+                <span style={{ color: lead.dias > 7 ? t.orange : t.textMuted }}>🕐 {lead.dias}d sem atualização</span>
+                {lead.op && <span style={{ color: t.green }}>· 🏭 Go-Live</span>}
               </div>
-              {lead.risco && <div style={{ fontSize: 12, color: t.orange, marginTop: 3 }}>⚠️ {lead.risco}</div>}
+              {lead.risco && (
+                <div style={{ fontSize: 12, color: t.orange, marginTop: 6, background: `${t.orange}10`, border: `1px solid ${t.orange}33`, borderRadius: 6, padding: '3px 8px', display: 'inline-block' }}>⚠️ {lead.risco}</div>
+              )}
             </div>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', color: t.textMuted, fontSize: 20, cursor: 'pointer', marginTop: -4 }}>✕</button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: t.textMuted, fontSize: 20, cursor: 'pointer', marginTop: -4, flexShrink: 0 }}>✕</button>
           </div>
 
-          {/* Abas do modal */}
+          {/* Alertas de pendência */}
+          {(totalAlertas > 0 || !hasAdvisor) && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+              {atrasadas.length > 0 && (
+                <span style={{ fontSize: 11, color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6, padding: '3px 8px', fontWeight: 600 }}>
+                  ⏰ {atrasadas.length} atrasada{atrasadas.length > 1 ? 's' : ''}
+                </span>
+              )}
+              {!hasContato && (
+                <span style={{ fontSize: 11, color: '#F59E0B', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 6, padding: '3px 8px', fontWeight: 600 }}>
+                  👤 Sem contato cadastrado
+                </span>
+              )}
+              {!hasAdvisor && (
+                <span style={{ fontSize: 11, color: t.textHint, background: `${t.textHint}10`, border: `1px solid ${t.textHint}25`, borderRadius: 6, padding: '3px 8px' }}>
+                  🤝 Sem advisor
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Abas */}
           <div style={{ display: 'flex', borderBottom: `1px solid ${t.borderLight}` }}>
             {[
-              { id: 'detalhes', label: '📋 Detalhes' },
+              { id: 'timeline', label: `📅 Timeline${allActs.length > 0 ? ` (${allActs.length})` : ''}` },
               { id: 'contatos', label: `👥 Contatos${contacts.length > 0 ? ` (${contacts.length})` : ''}` },
+              { id: 'detalhes', label: '✏️ Editar' },
             ].map(tab => (
-              <button key={tab.id} onClick={() => setAbaModal(tab.id)} style={{
-                background: 'none', border: 'none',
-                borderBottom: abaModal === tab.id ? `2px solid ${t.purple}` : '2px solid transparent',
-                color: abaModal === tab.id ? t.purple : t.textMuted,
-                padding: '8px 16px', fontSize: 13, cursor: 'pointer',
-                fontWeight: abaModal === tab.id ? 600 : 400,
-                transition: 'all 0.15s', marginBottom: -1,
-              }}>{tab.label}</button>
+              <button key={tab.id} onClick={() => setAbaModal(tab.id)} style={{ background: 'none', border: 'none', borderBottom: abaModal === tab.id ? `2px solid ${t.purple}` : '2px solid transparent', color: abaModal === tab.id ? t.purple : t.textMuted, padding: '8px 14px', fontSize: 12, cursor: 'pointer', fontWeight: abaModal === tab.id ? 600 : 400, transition: 'all 0.15s', marginBottom: -1 }}>{tab.label}</button>
             ))}
           </div>
         </div>
@@ -282,36 +281,157 @@ function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
         {/* Body */}
         <div style={{ overflowY: 'auto', flex: 1, padding: '16px 24px' }}>
 
-          {/* ── ABA DETALHES ── */}
+          {/* ══ TIMELINE ══ */}
+          {abaModal === 'timeline' && <>
+            {lead.off && (
+              <button onClick={() => onReativar(form)} style={{ width: '100%', background: 'linear-gradient(135deg,#10B981,#059669)', border: 'none', borderRadius: 10, color: 'white', padding: '10px', fontSize: 13, fontWeight: 700, cursor: 'pointer', marginBottom: 14 }}>
+                ⚡ Reativar Oportunidade
+              </button>
+            )}
+
+            {/* Pendentes em destaque */}
+            {pendentes.length > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, marginBottom: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  Pendentes ({pendentes.length})
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {pendentes.map(a => {
+                    const isAtrasada = a.dt && new Date(a.dt) < hoje
+                    const cor = tipoColor(a.tipo)
+                    return (
+                      <div key={a.id} style={{ background: t.bg, border: `1px solid ${isAtrasada ? '#EF444433' : t.border}`, borderLeft: `3px solid ${isAtrasada ? '#EF4444' : cor}`, borderRadius: '0 10px 10px 0', padding: '10px 14px' }}>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: cor, background: `${cor}15`, border: `1px solid ${cor}33`, borderRadius: 4, padding: '1px 6px' }}>{a.tipo || 'Atividade'}</span>
+                          {isAtrasada && <span style={{ fontSize: 10, color: '#EF4444', fontWeight: 700 }}>⏰ ATRASADA</span>}
+                        </div>
+                        <div style={{ fontSize: 13, color: t.text, lineHeight: 1.4 }}>{a.descricao}</div>
+                        <div style={{ fontSize: 11, color: t.textMuted, marginTop: 4 }}>
+                          👤 {a.resp}
+                          {a.dt && <span style={{ color: isAtrasada ? '#EF4444' : t.textHint, marginLeft: 6 }}>· Prazo: {formatDate(a.dt)}</span>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Linha do tempo — concluídas */}
+            {concluidas.length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: t.textMuted, marginBottom: 12, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                  Histórico ({concluidas.length})
+                </div>
+                <div style={{ position: 'relative' }}>
+                  <div style={{ position: 'absolute', left: 11, top: 8, bottom: 8, width: 1, background: t.border }} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {concluidas.map((a, idx) => {
+                      const cor = tipoColor(a.tipo)
+                      return (
+                        <div key={a.id} style={{ display: 'flex', gap: 14, paddingBottom: idx < concluidas.length - 1 ? 16 : 0 }}>
+                          <div style={{ flexShrink: 0 }}>
+                            <div style={{ width: 10, height: 10, borderRadius: '50%', background: cor, border: `2px solid ${t.surface}`,
+marginTop: 6, zIndex: 1, boxShadow: `0 0 0 2px ${cor}33` }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0, paddingBottom: idx < concluidas.length - 1 ? 2 : 0 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 3 }}>
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: cor, background: `${cor}15`, border: `1px solid ${cor}33`, borderRadius: 4, padding: '1px 6px' }}>{a.tipo || 'Atividade'}</span>
+                                  <span style={{ fontSize: 11, color: t.green, fontWeight: 600 }}>✓ Concluída</span>
+                                </div>
+                                <div style={{ fontSize: 13, color: t.text, lineHeight: 1.4 }}>{a.descricao}</div>
+                                <div style={{ fontSize: 11, color: t.textMuted, marginTop: 3 }}>👤 {a.resp}</div>
+                              </div>
+                              <div style={{ fontSize: 10, color: t.textHint, whiteSpace: 'nowrap', flexShrink: 0, marginTop: 2 }}>
+                                {formatDate(a.criado || a.dt)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {allActs.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', color: t.textMuted }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>Nenhuma atividade registrada</div>
+                <div style={{ fontSize: 12 }}>Use o Chat para registrar reuniões, FUPs e atualizações</div>
+              </div>
+            )}
+
+            {/* Último movimento */}
+            {lead.mov && (
+              <div style={{ marginTop: 20, padding: '12px 14px', background: t.bg, border: `1px solid ${t.border}`, borderRadius: 10 }}>
+                <div style={{ fontSize: 10, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Último movimento registrado</div>
+                <div style={{ fontSize: 13, color: t.textSub, lineHeight: 1.5 }}>{lead.mov}</div>
+                {lead.prox && (
+                  <div style={{ fontSize: 12, color: t.purple, marginTop: 6, fontWeight: 500 }}>→ Próxima ação: {lead.prox}{lead.dt ? ` · ${lead.dt}` : ''}</div>
+                )}
+              </div>
+            )}
+          </>}
+
+          {/* ══ CONTATOS ══ */}
+          {abaModal === 'contatos' && <>
+            {advisors.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: t.orange, marginBottom: 10, letterSpacing: '0.05em' }}>🤝 ADVISORS — quem nos aproximou</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {advisors.map(c => <ContactMiniCard key={c.id} c={c} isAdmin={isAdmin} t={t} onEdit={() => setEditContact(c)} onDelete={() => handleDeleteContact(c.id)} />)}
+                </div>
+              </div>
+            )}
+            {contatosList.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: t.purple, marginBottom: 10, letterSpacing: '0.05em' }}>👤 CONTATOS — stakeholders do clube</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {contatosList.map(c => <ContactMiniCard key={c.id} c={c} isAdmin={isAdmin} t={t} onEdit={() => setEditContact(c)} onDelete={() => handleDeleteContact(c.id)} />)}
+                </div>
+              </div>
+            )}
+            {loadingContacts && <div style={{ textAlign: 'center', color: t.textMuted, padding: 20, fontSize: 13 }}>Carregando...</div>}
+            {!loadingContacts && contacts.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '30px 20px', color: t.textMuted }}>
+                <div style={{ fontSize: 32, marginBottom: 8 }}>👥</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>Nenhum contato ainda</div>
+                <div style={{ fontSize: 12 }}>Adicione stakeholders e advisors desta oportunidade</div>
+              </div>
+            )}
+            <button onClick={() => setEditContact({})} style={{ width: '100%', background: t.purpleFaint, border: `1px dashed ${t.purple}66`, borderRadius: 10, color: t.purple, padding: '10px', fontSize: 13, cursor: 'pointer', fontWeight: 600, marginTop: 8 }}>
+              + Adicionar Contato / Advisor
+            </button>
+          </>}
+
+          {/* ══ EDITAR ══ */}
           {abaModal === 'detalhes' && <>
             {lead.off && (
               <button onClick={() => onReativar(form)} style={{ width: '100%', background: 'linear-gradient(135deg,#10B981,#059669)', border: 'none', borderRadius: 10, color: 'white', padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginBottom: 16 }}>
                 ⚡ Reativar Oportunidade
               </button>
             )}
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>CONTA</div>
                 <input value={form.conta || ''} onChange={e => set('conta', e.target.value)}
-                  placeholder="Ex: Internacional, Flamengo..."
                   style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }} />
               </div>
-
               <div>
-                <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>SERVIÇO / PRODUTO</div>
+                <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>SERVIÇO</div>
                 <input value={form.servico || ''} onChange={e => {
                   set('servico', e.target.value)
                   const c = form.conta || lead.conta || ''
                   if (c && e.target.value) set('nome', `${c} — ${e.target.value}`)
-                }}
-                  placeholder="Ex: Sócio Torcedor, DataLake, CRM..."
-                  style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.purple}55`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }} />
+                }} style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.purple}55`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }} />
                 {form.conta && form.servico && (
                   <div style={{ fontSize: 11, color: t.textHint, marginTop: 4 }}>Oportunidade: {form.conta} — {form.servico}</div>
                 )}
               </div>
-
               {!lead.op && (
                 <div>
                   <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>ETAPA PRINCIPAL</div>
@@ -321,7 +441,6 @@ function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
                   </select>
                 </div>
               )}
-
               {!lead.op && (
                 <div>
                   <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 8, fontWeight: 600 }}>ETAPAS PARALELAS</div>
@@ -332,27 +451,20 @@ function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
                       return (
                         <button key={opt.label} onClick={() => {
                           const cur = (form.paralelo || '').split(',').map(t => t.trim()).filter(Boolean)
-                          const next = ativo ? cur.filter(t => t !== opt.label) : [...cur, opt.label]
-                          set('paralelo', next.join(', '))
-                        }} style={{
-                          background: ativo ? `${opt.color}20` : t.surfaceInput,
-                          border: `1px solid ${ativo ? opt.color : t.border}`,
-                          borderRadius: 8, padding: '6px 14px', fontSize: 12,
-                          color: ativo ? opt.color : t.textMuted,
-                          cursor: 'pointer', fontWeight: ativo ? 600 : 400, transition: 'all 0.15s',
-                        }}>{ativo ? '✓ ' : ''}{opt.label}</button>
+                          set('paralelo', ativo ? cur.filter(t => t !== opt.label).join(', ') : [...cur, opt.label].join(', '))
+                        }} style={{ background: ativo ? `${opt.color}20` : t.surfaceInput, border: `1px solid ${ativo ? opt.color : t.border}`, borderRadius: 8, padding: '6px 14px', fontSize: 12, color: ativo ? opt.color : t.textMuted, cursor: 'pointer', fontWeight: ativo ? 600 : 400 }}>
+                          {ativo ? '✓ ' : ''}{opt.label}
+                        </button>
                       )
                     })}
                   </div>
                 </div>
               )}
-
               <div>
                 <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>RESPONSÁVEL</div>
                 <input value={form.resp || ''} onChange={e => set('resp', e.target.value)}
                   style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }} />
               </div>
-
               {lead.op && (
                 <div>
                   <div style={{ fontSize: 11, color: t.green, marginBottom: 5, fontWeight: 600 }}>📅 VENCIMENTO DO CONTRATO</div>
@@ -362,19 +474,16 @@ function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
                   {!form.vencimento && <div style={{ fontSize: 11, color: t.textHint, marginTop: 4 }}>Preencha para alertas de renovação</div>}
                 </div>
               )}
-
               <div>
                 <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>ÚLTIMO MOVIMENTO</div>
                 <textarea value={form.mov || ''} onChange={e => set('mov', e.target.value)} rows={3}
                   style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
               </div>
-
               <div>
                 <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>PRÓXIMA AÇÃO</div>
                 <input value={form.prox || ''} onChange={e => set('prox', e.target.value)}
                   style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }} />
               </div>
-
               {!lead.op && (
                 <div>
                   <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>RISCO</div>
@@ -383,72 +492,7 @@ function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
                     style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.orange}33`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }} />
                 </div>
               )}
-
-              {pendentes.length > 0 && (
-                <div>
-                  <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 8, fontWeight: 600 }}>ATIVIDADES PENDENTES</div>
-                  {pendentes.map(a => (
-                    <div key={a.id} style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', fontSize: 12, color: t.purple, marginBottom: 6 }}>
-                      <span style={{ color: t.orange }}>{a.tipo}</span> · {a.descricao} · até {a.dt}
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-          </>}
-
-          {/* ── ABA CONTATOS ── */}
-          {abaModal === 'contatos' && <>
-            {advisors.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: t.orange, marginBottom: 10, letterSpacing: '0.05em' }}>
-                  🤝 ADVISORS — quem nos aproximou
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {advisors.map(c => (
-                    <ContactMiniCard key={c.id} c={c} isAdmin={isAdmin} t={t}
-                      onEdit={() => setEditContact(c)}
-                      onDelete={() => handleDeleteContact(c.id)} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {contatos.length > 0 && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: t.purple, marginBottom: 10, letterSpacing: '0.05em' }}>
-                  👤 CONTATOS — stakeholders do clube
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {contatos.map(c => (
-                    <ContactMiniCard key={c.id} c={c} isAdmin={isAdmin} t={t}
-                      onEdit={() => setEditContact(c)}
-                      onDelete={() => handleDeleteContact(c.id)} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {loadingContacts && (
-              <div style={{ textAlign: 'center', color: t.textMuted, padding: 20, fontSize: 13 }}>Carregando...</div>
-            )}
-
-            {!loadingContacts && contacts.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '30px 20px', color: t.textMuted }}>
-                <div style={{ fontSize: 32, marginBottom: 8 }}>👥</div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 4 }}>Nenhum contato ainda</div>
-                <div style={{ fontSize: 12 }}>Adicione stakeholders e advisors desta oportunidade</div>
-              </div>
-            )}
-
-            <button onClick={() => setEditContact({})} style={{
-              width: '100%', background: t.purpleFaint,
-              border: `1px dashed ${t.purple}66`, borderRadius: 10,
-              color: t.purple, padding: '10px', fontSize: 13,
-              cursor: 'pointer', fontWeight: 600, marginTop: 8, transition: 'all 0.15s',
-            }}>
-              + Adicionar Contato / Advisor
-            </button>
           </>}
         </div>
 
@@ -457,10 +501,8 @@ function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
           {abaModal === 'detalhes' ? (
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={onClose} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={() => onSave({
-                ...form,
-                nome: form.conta && form.servico ? `${form.conta} — ${form.servico}` : (form.nome || form.conta || ''),
-              })} style={{ flex: 2, background: 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 10, color: 'white', padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.3)' }}>
+              <button onClick={() => onSave({ ...form, nome: form.conta && form.servico ? `${form.conta} — ${form.servico}` : (form.nome || form.conta || '') })}
+                style={{ flex: 2, background: 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 10, color: 'white', padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.3)' }}>
                 Salvar
               </button>
             </div>
@@ -482,6 +524,7 @@ function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
     </div>
   )
 }
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function Pipeline() {
   const navigate = useNavigate()
@@ -518,7 +561,6 @@ export default function Pipeline() {
       const changed = lAged.filter((nl, i) => nl.off !== l[i]?.off)
       if (changed.length > 0) for (const lead of changed) await upsertLead(lead)
 
-      // Carrega contatos agrupados por conta para os indicadores
       const { getAllContacts } = await import('../lib/supabase')
       const allCts = await getAllContacts()
       const map = allCts.reduce((acc, c) => {
@@ -572,11 +614,8 @@ export default function Pipeline() {
   const geladeira = filterResp === 'Todos' ? todosGeladeira : todosGeladeira.filter(l => l.resp?.includes(filterResp))
   const byEtapa = ETAPAS.reduce((acc, e) => { acc[e] = ativos.filter(l => l.etapa === e); return acc }, {})
   const riscos = ativos.filter(l => l.risco)
-
   const contasAtivas = ativos.reduce((acc, l) => {
-    const conta = l.conta || l.nome
-    acc[conta] = (acc[conta] || 0) + 1
-    return acc
+    const conta = l.conta || l.nome; acc[conta] = (acc[conta] || 0) + 1; return acc
   }, {})
 
   if (loading) return (
@@ -630,7 +669,7 @@ export default function Pipeline() {
         </div>
       </div>
 
-      {/* Abas */}
+      {/* Abas principais */}
       <div style={{ display: 'flex', borderBottom: `1px solid ${t.borderLight}`, background: t.bgAlt, padding: '0 20px' }}>
         {[
           { id: 'pipeline', label: `📋 Pipeline (${ativos.length})`, color: t.purple },
@@ -645,7 +684,7 @@ export default function Pipeline() {
 
       <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-        {/* ══ ABA PIPELINE ══ */}
+        {/* ══ PIPELINE ══ */}
         {aba === 'pipeline' && <>
           {riscos.length > 0 && (
             <div style={{ background: `${t.orange}0F`, border: `1px solid ${t.orange}33`, borderRadius: 12, padding: '12px 16px' }}>
@@ -674,9 +713,7 @@ export default function Pipeline() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: t.bgAlt, border: `1px solid ${t.border}`, borderTop: 'none', borderRadius: '0 0 12px 12px', padding: 10, minHeight: 80 }}>
-                    {cards.length === 0 && (
-                      <div style={{ textAlign: 'center', color: t.border, fontSize: 12, padding: '20px 0' }}>vazio</div>
-                    )}
+                    {cards.length === 0 && <div style={{ textAlign: 'center', color: t.border, fontSize: 12, padding: '20px 0' }}>vazio</div>}
                     {cards.map(l => {
                       const { label: agLabel, color: agColor } = agingLabel(l.dias || 0)
                       const pendLead = acts.filter(a => a.lead?.toLowerCase().includes((l.conta || l.nome || '').toLowerCase()) && !a.ok)
@@ -693,21 +730,14 @@ export default function Pipeline() {
                           <div style={{ fontSize: 11, color: t.textMuted }}>👤 {l.resp}</div>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: 11, color: l.dias > 7 ? t.orange : t.textMuted }}>🕐 {l.dias}d</span>
-                            {pendLead.length > 0 && (
-                              <span style={{ background: t.purpleFaint, border: `1px solid ${t.purple}44`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: t.purple }}>{pendLead.length} pend.</span>
-                            )}
-                            {contaOps > 1 && (
-                              <span style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '1px 7px', fontSize: 10, color: '#3B82F6' }}>{contaOps} op.</span>
-                            )}
+                            {pendLead.length > 0 && <span style={{ background: t.purpleFaint, border: `1px solid ${t.purple}44`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: t.purple }}>{pendLead.length} pend.</span>}
+                            {contaOps > 1 && <span style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '1px 7px', fontSize: 10, color: '#3B82F6' }}>{contaOps} op.</span>}
                             {l.risco && <span style={{ fontSize: 11 }}>⚠️</span>}
                             {l.g12 && <span style={{ fontSize: 11 }}>⭐</span>}
                           </div>
-                          {/* INDICADORES DE PENDÊNCIA */}
                           <CardIndicators lead={l} acts={acts} contactsMap={contactsMap} t={t} />
                           {l.paralelo && <ParaleloBadges paralelo={l.paralelo} />}
-                          {l.prox && (
-                            <div style={{ fontSize: 11, color: t.textHint, borderTop: `1px solid ${t.borderLight}`, paddingTop: 6 }}>→ {l.prox}</div>
-                          )}
+                          {l.prox && <div style={{ fontSize: 11, color: t.textHint, borderTop: `1px solid ${t.borderLight}`, paddingTop: 6 }}>→ {l.prox}</div>}
                         </div>
                       )
                     })}
@@ -718,7 +748,7 @@ export default function Pipeline() {
           </div>
         </>}
 
-        {/* ══ ABA GO-LIVE ══ */}
+        {/* ══ GO-LIVE ══ */}
         {aba === 'golive' && <>
           {renovacoes.length > 0 && (
             <div style={{ background: `${t.red}0A`, border: `1px solid ${t.red}33`, borderRadius: 12, padding: '14px 16px' }}>
@@ -740,7 +770,6 @@ export default function Pipeline() {
               </div>
             </div>
           )}
-
           {semData.length > 0 && (
             <div style={{ background: t.purpleFaint2, border: `1px solid ${t.border}`, borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ fontSize: 12, color: t.textMuted, fontWeight: 700, marginBottom: 10 }}>📅 SEM DATA DE VENCIMENTO ({semData.length}) — clique para preencher</div>
@@ -754,7 +783,6 @@ export default function Pipeline() {
               </div>
             </div>
           )}
-
           {goLive.filter(l => l.vencimento && diasParaVencer(l.vencimento) > 90).length > 0 && (
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: t.green, marginBottom: 10 }}>✅ CONTRATOS OK</div>
@@ -778,7 +806,7 @@ export default function Pipeline() {
           )}
         </>}
 
-        {/* ══ ABA GELADEIRA ══ */}
+        {/* ══ GELADEIRA ══ */}
         {aba === 'geladeira' && <>
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 20 }}>🧊</span>
@@ -834,3 +862,4 @@ export default function Pipeline() {
     </div>
   )
 }
+                                         
