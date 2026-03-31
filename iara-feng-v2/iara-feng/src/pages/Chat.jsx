@@ -27,7 +27,7 @@ const NOTIF_TIPO_CONFIG = {
   alerta: { color: '#EF4444', bg: 'rgba(239,68,68,0.1)', icon: '🔴' },
 }
 
-// ─── MARKDOWN RENDERER ────────────────────────────────────────────────────────
+// ─── RENDERER OPÇÃO C ─────────────────────────────────────────────────────────
 function renderMarkdown(text, t) {
   if (!text) return null
   const lines = text.split('\n')
@@ -37,69 +37,105 @@ function renderMarkdown(text, t) {
   while (i < lines.length) {
     const line = lines[i]
 
-    // Blank line
-    if (line.trim() === '') { elements.push(<div key={i} style={{ height: 8 }} />); i++; continue }
-
-    // ## Heading 2
-    if (line.startsWith('## ')) {
-      elements.push(
-        <div key={i} style={{ fontSize: 13, fontWeight: 700, color: t.purple, marginTop: 14, marginBottom: 4, letterSpacing: '0.03em', borderBottom: `1px solid ${t.purple}22`, paddingBottom: 4 }}>
-          {inlineRender(line.slice(3), t)}
-        </div>
-      ); i++; continue
-    }
-
-    // ### Heading 3
-    if (line.startsWith('### ')) {
-      elements.push(
-        <div key={i} style={{ fontSize: 13, fontWeight: 700, color: t.text, marginTop: 10, marginBottom: 2 }}>
-          {inlineRender(line.slice(4), t)}
-        </div>
-      ); i++; continue
-    }
-
-    // --- horizontal rule
-    if (line.trim() === '---') {
-      elements.push(<hr key={i} style={{ border: 'none', borderTop: `1px solid ${t.border}`, margin: '10px 0' }} />)
+    // Linha vazia
+    if (line.trim() === '') {
+      elements.push(<div key={`sp-${i}`} style={{ height: 6 }} />)
       i++; continue
     }
 
-    // - list item
+    // ## Seção principal — título roxo + borda inferior (Opção C)
+    if (line.startsWith('## ')) {
+      elements.push(
+        <div key={`h2-${i}`} style={{
+          fontSize: 13,
+          fontWeight: 700,
+          color: t.purple,
+          marginTop: 14,
+          marginBottom: 8,
+          paddingBottom: 5,
+          borderBottom: `1px solid ${t.purple}22`,
+          letterSpacing: '0.02em',
+          lineHeight: 1.4,
+        }}>
+          {inlineRender(line.slice(3), t)}
+        </div>
+      )
+      i++; continue
+    }
+
+    // ### Subseção — label estilo pequeno muted (Opção C: "DESTAQUES", "ATENÇÃO")
+    if (line.startsWith('### ')) {
+      elements.push(
+        <div key={`h3-${i}`} style={{
+          fontSize: 11,
+          fontWeight: 700,
+          color: t.textMuted,
+          marginTop: 12,
+          marginBottom: 4,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+        }}>
+          {inlineRender(line.slice(4), t)}
+        </div>
+      )
+      i++; continue
+    }
+
+    // --- separador
+    if (line.trim() === '---') {
+      elements.push(
+        <div key={`hr-${i}`} style={{
+          borderTop: `0.5px solid ${t.border}`,
+          margin: '10px 0',
+        }} />
+      )
+      i++; continue
+    }
+
+    // - lista (Opção C: ▸ roxo + texto)
     if (line.startsWith('- ') || line.startsWith('• ')) {
       const listItems = []
       while (i < lines.length && (lines[i].startsWith('- ') || lines[i].startsWith('• '))) {
         listItems.push(
-          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 3 }}>
-            <span style={{ color: t.purple, marginTop: 1, flexShrink: 0, fontSize: 12 }}>▸</span>
-            <span>{inlineRender(lines[i].slice(2), t)}</span>
+          <div key={`li-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 4 }}>
+            <span style={{ color: t.purple, fontSize: 11, marginTop: 3, flexShrink: 0 }}>▸</span>
+            <span style={{ lineHeight: 1.6 }}>{inlineRender(lines[i].slice(2), t)}</span>
           </div>
         )
         i++
       }
-      elements.push(<div key={`list-${i}`} style={{ marginTop: 4, marginBottom: 4 }}>{listItems}</div>)
+      elements.push(
+        <div key={`ul-${i}`} style={{ marginTop: 4, marginBottom: 4 }}>
+          {listItems}
+        </div>
+      )
       continue
     }
 
-    // numbered list
+    // Lista numerada
     if (/^\d+\.\s/.test(line)) {
       const listItems = []
       let num = 1
       while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
         listItems.push(
-          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 3 }}>
-            <span style={{ color: t.purple, fontWeight: 700, flexShrink: 0, minWidth: 16, fontSize: 12 }}>{num}.</span>
-            <span>{inlineRender(lines[i].replace(/^\d+\.\s/, ''), t)}</span>
+          <div key={`oli-${i}`} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 4 }}>
+            <span style={{ color: t.purple, fontWeight: 700, fontSize: 11, marginTop: 3, flexShrink: 0, minWidth: 14 }}>{num}.</span>
+            <span style={{ lineHeight: 1.6 }}>{inlineRender(lines[i].replace(/^\d+\.\s/, ''), t)}</span>
           </div>
         )
         i++; num++
       }
-      elements.push(<div key={`nlist-${i}`} style={{ marginTop: 4, marginBottom: 4 }}>{listItems}</div>)
+      elements.push(
+        <div key={`ol-${i}`} style={{ marginTop: 4, marginBottom: 4 }}>
+          {listItems}
+        </div>
+      )
       continue
     }
 
-    // regular paragraph
+    // Parágrafo normal
     elements.push(
-      <div key={i} style={{ lineHeight: 1.65, marginBottom: 2 }}>
+      <div key={`p-${i}`} style={{ lineHeight: 1.65, marginBottom: 2, color: t.textSub }}>
         {inlineRender(line, t)}
       </div>
     )
@@ -110,25 +146,37 @@ function renderMarkdown(text, t) {
 }
 
 function inlineRender(text, t) {
-  // Splits by **bold**, *italic*, `code`
+  if (!text) return null
   const parts = []
   const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g
   let last = 0, m
 
   while ((m = regex.exec(text)) !== null) {
-    if (m.index > last) parts.push(<span key={last}>{text.slice(last, m.index)}</span>)
+    if (m.index > last) parts.push(<span key={`tx-${last}`}>{text.slice(last, m.index)}</span>)
     const raw = m[0]
     if (raw.startsWith('**')) {
-      parts.push(<strong key={m.index} style={{ fontWeight: 700, color: t.text }}>{raw.slice(2, -2)}</strong>)
+      parts.push(
+        <strong key={`b-${m.index}`} style={{ fontWeight: 600, color: t.text }}>
+          {raw.slice(2, -2)}
+        </strong>
+      )
     } else if (raw.startsWith('*')) {
-      parts.push(<em key={m.index} style={{ fontStyle: 'italic', color: t.textSub }}>{raw.slice(1, -1)}</em>)
+      parts.push(
+        <em key={`i-${m.index}`} style={{ fontStyle: 'italic', color: t.textMuted }}>
+          {raw.slice(1, -1)}
+        </em>
+      )
     } else if (raw.startsWith('`')) {
-      parts.push(<code key={m.index} style={{ background: t.purpleFaint, color: t.purple, padding: '1px 5px', borderRadius: 4, fontSize: '0.9em', fontFamily: 'monospace' }}>{raw.slice(1, -1)}</code>)
+      parts.push(
+        <code key={`c-${m.index}`} style={{ background: t.purpleFaint, color: t.purple, padding: '1px 5px', borderRadius: 4, fontSize: '0.88em', fontFamily: 'monospace' }}>
+          {raw.slice(1, -1)}
+        </code>
+      )
     }
     last = m.index + raw.length
   }
-  if (last < text.length) parts.push(<span key={last}>{text.slice(last)}</span>)
-  return parts.length ? parts : text
+  if (last < text.length) parts.push(<span key={`tx-${last}`}>{text.slice(last)}</span>)
+  return parts.length > 0 ? parts : text
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -255,7 +303,6 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
 
   const u = USERS?.find(u => u.nome === userName)
   if (u?.perfil) c += `\nPERFIL DO USUÁRIO: ${u.perfil}\n`
-
   c += `\nOWNERS DOS LEADS:\n• Leads Brasil → Jardel Rocha\n• Leads LATAM → Silvio Vázquez\n`
 
   if (memories.length > 0) {
@@ -300,21 +347,23 @@ const SYSTEM = `Você é a IAra, agente de inteligência comercial da FENG — e
 
 IDENTIDADE: IAra — Intelligence and Action for Revenue Acceleration. Tom: colega descontraída, direta, bem-humorada. Português informal. NUNCA diz "Como posso te ajudar?". NUNCA repete a mesma frase.
 
-FORMATAÇÃO DE MENSAGENS:
-- Use markdown para confirmaçoes, relatórios e resumos estruturados
-- ## para seções principais, ### para subseções
-- **negrito** para dados importantes (valores, nomes, datas)
-- *itálico* para observações e contexto secundário
-- Listas com - para múltiplos itens
-- --- para separar seções distintas
-- Em conversas simples: sem formatação, texto direto
-- Exemplo de confirmação bem formatada:
-  ## Confirmar registro
-  **Lead:** Flamengo — Sócio Torcedor
-  **Etapa:** Proposta
-  *Próxima ação até 15/04*
-  ---
-  Posso salvar?
+FORMATAÇÃO DE MENSAGENS (Opção C — sempre que estruturar dados):
+Use markdown nas confirmações, relatórios e resumos:
+- ## Título da seção  →  título roxo com linha divisória embaixo
+- ### Subseção  →  label pequeno em caixa alta muted (ex: ### DESTAQUES)
+- **negrito**  →  dados importantes: nomes, valores, datas
+- *itálico*  →  contexto secundário, observações
+- - item  →  lista com ▸ roxo
+- ---  →  separador entre seções distintas
+Exemplo de confirmação bem formatada:
+## 📋 Registrar reunião — Flamengo
+**Etapa:** Proposta
+**Próxima ação:** Enviar proposta
+**Prazo:** 15/04 · **Resp.:** Jardel Rocha
+---
+*Posso salvar?*
+
+Em conversas simples e rápidas: sem formatação, texto direto.
 
 OWNERS DOS LEADS (regra fixa):
 - Leads Brasil → owner: Jardel Rocha (ID: jardel)
@@ -334,13 +383,13 @@ ETAPAS: Prospecção → Oportunidade → Proposta → Negociação → Operaç�
 
 COMANDO EXCLUSIVO "IAra fechar Radar" (só Mike Lopes e Bruno Braga):
 - Se ADMIN:false → "Esse comando é exclusivo para o Mike e o Bruno."
-- Se ADMIN:true → confirmar, depois emitir [AÇÃO:GERAR_RADAR]{}[/AÇÃO] e resumo textual.
+- Se ADMIN:true → confirmar com formatação C, depois emitir [AÇÃO:GERAR_RADAR]{}[/AÇÃO]
 
-COMANDO DE AVALIAÇÃO (só admins): "raio-x do [nome]" → análise com memórias de perfil.
+COMANDO DE AVALIAÇÃO (só admins): "raio-x do [nome]" → análise formatada com ## seções.
 
 REGRAS DE SAVE:
-- UMA ação: resumo formatado → aguardar confirmação → executar
-- MÚLTIPLAS: listar numeradas com formatação → confirmação única → executar juntas
+- UMA ação: resumo formatado (## título + lista) → aguardar confirmação → executar
+- MÚLTIPLAS: listar com ## e itens numerados → confirmação única → executar juntas
 - Consultas = LEITURA, nunca save
 
 MARCADORES (após confirmação):
@@ -386,7 +435,11 @@ function parseNotifs(txt) {
   return n
 }
 function strip(txt) {
-  return txt.replace(/\[AÇÃO:\w+\][\s\S]*?\[\/AÇÃO\]/g, '').replace(/\[SUGESTÃO:\w+\][\s\S]*?\[\/SUGESTÃO\]/g, '').replace(/\[NOTIF:[\s\S]*?\]\[\/NOTIF\]/g, '').trim()
+  return txt
+    .replace(/\[AÇÃO:\w+\][\s\S]*?\[\/AÇÃO\]/g, '')
+    .replace(/\[SUGESTÃO:\w+\][\s\S]*?\[\/SUGESTÃO\]/g, '')
+    .replace(/\[NOTIF:[\s\S]*?\]\[\/NOTIF\]/g, '')
+    .trim()
 }
 async function callAI(messages, system) {
   const r = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages, system }) })
@@ -431,7 +484,10 @@ export default function Chat() {
   useEffect(() => { init() }, [])
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs, loading])
   useEffect(() => {
-    if (txRef.current) { txRef.current.style.height = 'auto'; txRef.current.style.height = Math.min(txRef.current.scrollHeight, 140) + 'px' }
+    if (txRef.current) {
+      txRef.current.style.height = 'auto'
+      txRef.current.style.height = Math.min(txRef.current.scrollHeight, 140) + 'px'
+    }
   }, [inp])
   useEffect(() => {
     if (!user.id) return
@@ -502,7 +558,12 @@ export default function Chat() {
         } else if (act.type === 'CRIAR_OPP') {
           const { conta, servico, etapa, resp } = act.data
           const nome = conta && servico ? `${conta} — ${servico}` : (conta || servico || 'Nova oportunidade')
-          const nL = { id: `opp-${Date.now()}`, nome, conta: conta || '', servico: servico || '', etapa: etapa || 'Prospecção', resp: resp || user.nome, dias: 0, aging: 'Hot', mov: 'Nova oportunidade criada via IAra', prox: '', dt: '', op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: '' }
+          const nL = {
+            id: `opp-${Date.now()}`, nome, conta: conta || '', servico: servico || '',
+            etapa: etapa || 'Prospecção', resp: resp || user.nome, dias: 0, aging: 'Hot',
+            mov: 'Nova oportunidade criada via IAra', prox: '', dt: '',
+            op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: ''
+          }
           curL = [...curL, nL]; await upsertLead(nL)
           results.push(`✅ Oportunidade criada: ${nome}`)
         } else if (act.type === 'CRIAR_CONTATO') {
@@ -531,14 +592,18 @@ export default function Chat() {
           results.push(`🔔 Notificado: ${n.titulo}`)
         }
       }
-      if (notifsParsed.some(n => n.para === user.id)) { const nots = await getNotifications(user.id); setNotifs(nots) }
+      if (notifsParsed.some(n => n.para === user.id)) {
+        const nots = await getNotifications(user.id); setNotifs(nots)
+      }
 
       setLeads(curL); setActs(curA)
       if (openRadar) setRadarReady(true)
       const aMsg = { id: Date.now() + 1, role: 'assistant', text: cleanTxt, results, sugestoes }
       setMsgs([...newMsgs, aMsg])
       await saveMessage(user.id, 'assistant', cleanTxt, results)
-      extractAndSaveMemories(user.id, t2, cleanTxt).then(async () => { const mems = await getMemories(user.id); setMemories(mems) })
+      extractAndSaveMemories(user.id, t2, cleanTxt).then(async () => {
+        const mems = await getMemories(user.id); setMemories(mems)
+      })
     } catch {
       setMsgs([...newMsgs, { id: Date.now() + 1, role: 'assistant', text: 'Eita, tive um problema técnico. Tenta de novo?', results: [], sugestoes: [] }])
     }
@@ -553,12 +618,20 @@ export default function Chat() {
       const txt = strip(raw)
       setMsgs([{ id: Date.now(), role: 'assistant', text: txt, results: [], sugestoes: [] }])
       await saveMessage(user.id, 'assistant', txt)
-    } catch { setMsgs([{ id: Date.now(), role: 'assistant', text: `E aí ${user.nome?.split(' ')[0]}! IAra de volta.`, results: [], sugestoes: [] }]) }
+    } catch {
+      setMsgs([{ id: Date.now(), role: 'assistant', text: `E aí ${user.nome?.split(' ')[0]}! IAra de volta.`, results: [], sugestoes: [] }])
+    }
     setLoading(false)
   }
 
-  async function handleMarkRead(id) { await markNotificationRead(id); setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n)) }
-  async function handleMarkAll(userId) { await markAllRead(userId); setNotifs(prev => prev.map(n => ({ ...n, lida: true }))) }
+  async function handleMarkRead(id) {
+    await markNotificationRead(id)
+    setNotifs(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n))
+  }
+  async function handleMarkAll(userId) {
+    await markAllRead(userId)
+    setNotifs(prev => prev.map(n => ({ ...n, lida: true })))
+  }
 
   function toggleRec() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -576,7 +649,14 @@ export default function Chat() {
   const memCount = memories.length
   const knowCount = knowledge.length
   const unreadCount = notifs.filter(n => !n.lida).length
-  const chips = [['📅 Reunião', 'Registrar reunião:'], ['⚡ FUP feito', 'FUP realizado com'], ['⬆️ Avançar etapa', 'Avançou de etapa:'], ['⚠️ Risco', 'Registrar risco:'], ['📊 Como tá?', 'Como tá o pipeline hoje?'], ['🆕 Nova oportunidade', 'Nova oportunidade:']]
+  const chips = [
+    ['📅 Reunião', 'Registrar reunião:'],
+    ['⚡ FUP feito', 'FUP realizado com'],
+    ['⬆️ Avançar etapa', 'Avançou de etapa:'],
+    ['⚠️ Risco', 'Registrar risco:'],
+    ['📊 Como tá?', 'Como tá o pipeline hoje?'],
+    ['🆕 Nova oportunidade', 'Nova oportunidade:'],
+  ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: t.bg, color: t.text, fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden', transition: 'background 0.3s' }}>
@@ -590,7 +670,7 @@ export default function Chat() {
         .chip:hover{background:${t.surfaceHover}!important;border-color:${t.purple}!important}
         .chip:active{transform:scale(0.95)} .send-btn:active{transform:scale(0.92)}
         .notif-btn:hover{background:${t.purpleFaint}!important}
-        @media(max-width:600px){ .header-extras{display:none!important} .header-stats{font-size:10px!important;padding:2px 8px!important} .msg-text{font-size:15px!important} }
+        @media(max-width:600px){.header-extras{display:none!important}.header-stats{font-size:10px!important;padding:2px 8px!important}.msg-text{font-size:15px!important}}
       `}</style>
 
       {/* Header */}
@@ -621,7 +701,7 @@ export default function Chat() {
             🔔
             {unreadCount > 0 && <div style={{ position: 'absolute', top: -4, right: -4, background: t.red, color: 'white', borderRadius: '50%', width: 16, height: 16, fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'badgePop 0.3s ease', border: `2px solid ${t.bg}` }}>{unreadCount > 9 ? '9+' : unreadCount}</div>}
           </button>
-          <button onClick={toggleTheme} style={{ width: 36, height: 36, borderRadius: 9, border: `1px solid ${t.border}`, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, flexShrink: 0 }}>{t.icon}</button>
+          <button onClick={toggleTheme} style={{ width: 36, height: 36, borderRadius: 9, border: `1px solid ${t.border}`, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, flexShrink: 0, transition: 'all 0.15s' }}>{t.icon}</button>
           {isAdmin && <button onClick={() => send('IAra fechar Radar')} className="header-extras" style={{ background: t.greenFaint, border: `1px solid ${t.greenDark}`, borderRadius: 6, color: t.greenDark, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📊 Radar</button>}
           {isAdmin && radarReady && <button onClick={() => navigate('/radar')} style={{ background: t.green, border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>Ver →</button>}
           <button onClick={() => navigate('/pipeline')} style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}66`, borderRadius: 6, color: t.purple, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📋 Pipeline</button>
@@ -653,7 +733,9 @@ export default function Chat() {
                 {renderMarkdown(m.text, t)}
                 {m.results?.length > 0 && (
                   <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    {m.results.map((r, i) => <span key={i} style={{ background: t.greenFaint, border: `1px solid ${t.green}44`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: t.green }}>{r}</span>)}
+                    {m.results.map((r, i) => (
+                      <span key={i} style={{ background: t.greenFaint, border: `1px solid ${t.green}44`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: t.green }}>{r}</span>
+                    ))}
                   </div>
                 )}
                 {m.sugestoes?.length > 0 && (
@@ -680,7 +762,7 @@ export default function Chat() {
       </div>
 
       {/* Chips */}
-      <div style={{ display: 'flex', gap: 7, padding: '8px 14px', overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none', borderTop: `1px solid ${t.borderLight}` }}>
+      <div style={{ display: 'flex', gap: 7, padding: '8px 14px', overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none', borderTop: `1px solid ${t.borderLight}`, WebkitOverflowScrolling: 'touch' }}>
         {chips.map(([label, prompt]) => (
           <button key={label} className="chip" onClick={() => { setInp(prompt); txRef.current?.focus() }} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 20, padding: '7px 14px', fontSize: 12, color: t.purple, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', minHeight: 34 }}>{label}</button>
         ))}
@@ -696,7 +778,7 @@ export default function Chat() {
         <textarea ref={txRef} value={inp} onChange={e => setInp(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
           placeholder="Mensagem para a IAra..."
-          style={{ flex: 1, background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', color: t.text, fontSize: 15, outline: 'none', resize: 'none', fontFamily: 'inherit', minHeight: 44, maxHeight: 140, lineHeight: 1.5 }}
+          style={{ flex: 1, background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', color: t.text, fontSize: 15, outline: 'none', resize: 'none', fontFamily: 'inherit', minHeight: 44, maxHeight: 140, lineHeight: 1.5, WebkitAppearance: 'none' }}
           onFocus={e => e.target.style.borderColor = t.purple}
           onBlur={e => e.target.style.borderColor = t.border}
           rows={1} />
