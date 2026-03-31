@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory, getKnowledge, getNotifications, markNotificationRead, markAllRead, createNotification } from '../lib/supabase'
+import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory, getKnowledge, getNotifications, markNotificationRead, markAllRead, createNotification, upsertContact } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL, USERS } from '../data/pipeline'
 import { getTheme, saveTheme, THEMES } from '../lib/theme'
 
@@ -27,7 +27,112 @@ const NOTIF_TIPO_CONFIG = {
   alerta: { color: '#EF4444', bg: 'rgba(239,68,68,0.1)', icon: '🔴' },
 }
 
-function SugestaoCard({ tipo, texto }) {
+// ─── MARKDOWN RENDERER ────────────────────────────────────────────────────────
+function renderMarkdown(text, t) {
+  if (!text) return null
+  const lines = text.split('\n')
+  const elements = []
+  let i = 0
+
+  while (i < lines.length) {
+    const line = lines[i]
+
+    // Blank line
+    if (line.trim() === '') { elements.push(<div key={i} style={{ height: 8 }} />); i++; continue }
+
+    // ## Heading 2
+    if (line.startsWith('## ')) {
+      elements.push(
+        <div key={i} style={{ fontSize: 13, fontWeight: 700, color: t.purple, marginTop: 14, marginBottom: 4, letterSpacing: '0.03em', borderBottom: `1px solid ${t.purple}22`, paddingBottom: 4 }}>
+          {inlineRender(line.slice(3), t)}
+        </div>
+      ); i++; continue
+    }
+
+    // ### Heading 3
+    if (line.startsWith('### ')) {
+      elements.push(
+        <div key={i} style={{ fontSize: 13, fontWeight: 700, color: t.text, marginTop: 10, marginBottom: 2 }}>
+          {inlineRender(line.slice(4), t)}
+        </div>
+      ); i++; continue
+    }
+
+    // --- horizontal rule
+    if (line.trim() === '---') {
+      elements.push(<hr key={i} style={{ border: 'none', borderTop: `1px solid ${t.border}`, margin: '10px 0' }} />)
+      i++; continue
+    }
+
+    // - list item
+    if (line.startsWith('- ') || line.startsWith('• ')) {
+      const listItems = []
+      while (i < lines.length && (lines[i].startsWith('- ') || lines[i].startsWith('• '))) {
+        listItems.push(
+          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 3 }}>
+            <span style={{ color: t.purple, marginTop: 1, flexShrink: 0, fontSize: 12 }}>▸</span>
+            <span>{inlineRender(lines[i].slice(2), t)}</span>
+          </div>
+        )
+        i++
+      }
+      elements.push(<div key={`list-${i}`} style={{ marginTop: 4, marginBottom: 4 }}>{listItems}</div>)
+      continue
+    }
+
+    // numbered list
+    if (/^\d+\.\s/.test(line)) {
+      const listItems = []
+      let num = 1
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
+        listItems.push(
+          <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 3 }}>
+            <span style={{ color: t.purple, fontWeight: 700, flexShrink: 0, minWidth: 16, fontSize: 12 }}>{num}.</span>
+            <span>{inlineRender(lines[i].replace(/^\d+\.\s/, ''), t)}</span>
+          </div>
+        )
+        i++; num++
+      }
+      elements.push(<div key={`nlist-${i}`} style={{ marginTop: 4, marginBottom: 4 }}>{listItems}</div>)
+      continue
+    }
+
+    // regular paragraph
+    elements.push(
+      <div key={i} style={{ lineHeight: 1.65, marginBottom: 2 }}>
+        {inlineRender(line, t)}
+      </div>
+    )
+    i++
+  }
+
+  return <>{elements}</>
+}
+
+function inlineRender(text, t) {
+  // Splits by **bold**, *italic*, `code`
+  const parts = []
+  const regex = /(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g
+  let last = 0, m
+
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > last) parts.push(<span key={last}>{text.slice(last, m.index)}</span>)
+    const raw = m[0]
+    if (raw.startsWith('**')) {
+      parts.push(<strong key={m.index} style={{ fontWeight: 700, color: t.text }}>{raw.slice(2, -2)}</strong>)
+    } else if (raw.startsWith('*')) {
+      parts.push(<em key={m.index} style={{ fontStyle: 'italic', color: t.textSub }}>{raw.slice(1, -1)}</em>)
+    } else if (raw.startsWith('`')) {
+      parts.push(<code key={m.index} style={{ background: t.purpleFaint, color: t.purple, padding: '1px 5px', borderRadius: 4, fontSize: '0.9em', fontFamily: 'monospace' }}>{raw.slice(1, -1)}</code>)
+    }
+    last = m.index + raw.length
+  }
+  if (last < text.length) parts.push(<span key={last}>{text.slice(last)}</span>)
+  return parts.length ? parts : text
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SugestaoCard({ tipo, texto, t }) {
   const [copied, setCopied] = useState(false)
   const cfg = SUGESTAO_CONFIG[tipo] || SUGESTAO_CONFIG.discord
   function copy() { navigator.clipboard.writeText(texto); setCopied(true); setTimeout(() => setCopied(false), 2000) }
@@ -39,7 +144,7 @@ function SugestaoCard({ tipo, texto }) {
           {copied ? '✓ Copiado!' : 'Copiar'}
         </button>
       </div>
-      <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', fontFamily: 'inherit', color: cfg.color === '#5865F2' ? '#3730A3' : cfg.color === '#25D366' ? '#065F46' : '#1D4ED8' }}>{texto}</div>
+      <div style={{ fontSize: 13, lineHeight: 1.6, whiteSpace: 'pre-wrap', fontFamily: 'inherit', color: t.textSub }}>{texto}</div>
     </div>
   )
 }
@@ -56,9 +161,7 @@ function NotifModal({ notifs, onClose, onMarkRead, onMarkAll, userId, t }) {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {naoLidas.length > 0 && (
-              <button onClick={() => onMarkAll(userId)} style={{ background: t.purpleFaint, border: `1px solid ${t.purple}44`, borderRadius: 6, color: t.purple, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>
-                Marcar todas
-              </button>
+              <button onClick={() => onMarkAll(userId)} style={{ background: t.purpleFaint, border: `1px solid ${t.purple}44`, borderRadius: 6, color: t.purple, padding: '4px 10px', fontSize: 11, cursor: 'pointer' }}>Marcar todas</button>
             )}
             <button onClick={onClose} style={{ background: 'none', border: 'none', color: t.textMuted, fontSize: 18, cursor: 'pointer' }}>✕</button>
           </div>
@@ -66,8 +169,7 @@ function NotifModal({ notifs, onClose, onMarkRead, onMarkAll, userId, t }) {
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {notifs.length === 0 && (
             <div style={{ padding: 40, textAlign: 'center', color: t.textHint, fontSize: 13 }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>🔕</div>
-              Nenhuma notificação ainda
+              <div style={{ fontSize: 28, marginBottom: 8 }}>🔕</div>Nenhuma notificação ainda
             </div>
           )}
           {notifs.map(n => {
@@ -198,6 +300,22 @@ const SYSTEM = `Você é a IAra, agente de inteligência comercial da FENG — e
 
 IDENTIDADE: IAra — Intelligence and Action for Revenue Acceleration. Tom: colega descontraída, direta, bem-humorada. Português informal. NUNCA diz "Como posso te ajudar?". NUNCA repete a mesma frase.
 
+FORMATAÇÃO DE MENSAGENS:
+- Use markdown para confirmaçoes, relatórios e resumos estruturados
+- ## para seções principais, ### para subseções
+- **negrito** para dados importantes (valores, nomes, datas)
+- *itálico* para observações e contexto secundário
+- Listas com - para múltiplos itens
+- --- para separar seções distintas
+- Em conversas simples: sem formatação, texto direto
+- Exemplo de confirmação bem formatada:
+  ## Confirmar registro
+  **Lead:** Flamengo — Sócio Torcedor
+  **Etapa:** Proposta
+  *Próxima ação até 15/04*
+  ---
+  Posso salvar?
+
 OWNERS DOS LEADS (regra fixa):
 - Leads Brasil → owner: Jardel Rocha (ID: jardel)
 - Leads LATAM (fora do Brasil) → owner: Silvio Vázquez (ID: silvio)
@@ -207,6 +325,7 @@ ESTRUTURA DE OPORTUNIDADES:
 - Formato: "Conta — Serviço" (ex: "Inter-RS — Sócio Torcedor")
 - Quando perguntarem sobre uma conta, liste TODAS as oportunidades dela
 - Ao criar nova oportunidade: perguntar CONTA e SERVIÇO separadamente
+- Ao criar lead/oportunidade: perguntar se há contatos ou advisors para registrar
 
 CATÁLOGO DE SERVIÇOS FENG:
 ST Completo | Sócio Torcedor | DataLake | CRM | Mídia Paga | Estratégia | BI | Redes Sociais | Site Institucional | Loyalty | Atendimento | SSO | Gestão Financeira | Ativação Digital | Match Day | App Oficial
@@ -220,8 +339,8 @@ COMANDO EXCLUSIVO "IAra fechar Radar" (só Mike Lopes e Bruno Braga):
 COMANDO DE AVALIAÇÃO (só admins): "raio-x do [nome]" → análise com memórias de perfil.
 
 REGRAS DE SAVE:
-- UMA ação: resumo → aguardar confirmação → executar
-- MÚLTIPLAS: listar numeradas → confirmação única → executar juntas
+- UMA ação: resumo formatado → aguardar confirmação → executar
+- MÚLTIPLAS: listar numeradas com formatação → confirmação única → executar juntas
 - Consultas = LEITURA, nunca save
 
 MARCADORES (após confirmação):
@@ -229,6 +348,7 @@ MARCADORES (após confirmação):
 [AÇÃO:CRIAR]{"lead":"NOME","desc":"DESC","dt":"YYYY-MM-DD","resp":"RESP","tipo":"FUP|Reunião|Proposta|Jurídico"}[/AÇÃO]
 [AÇÃO:UPDATE_LEAD]{"nome":"NOME","campo":"etapa|prox|mov","valor":"VALOR"}[/AÇÃO]
 [AÇÃO:CRIAR_OPP]{"conta":"CLUBE","servico":"SERVIÇO","etapa":"Prospecção","resp":"RESP"}[/AÇÃO]
+[AÇÃO:CRIAR_CONTATO]{"lead_id":"ID","conta":"CONTA","nome":"NOME","email":"EMAIL","telefone":"TEL","cargo":"CARGO","tipo":"contato|advisor","obs":"OBS"}[/AÇÃO]
 [AÇÃO:GERAR_RADAR]{}[/AÇÃO]
 
 NOTIFICAÇÕES:
@@ -305,8 +425,7 @@ export default function Chat() {
 
   function toggleTheme() {
     const next = t.name === 'dark' ? THEMES.light : THEMES.dark
-    saveTheme(next.name)
-    setTheme(next)
+    saveTheme(next.name); setTheme(next)
   }
 
   useEffect(() => { init() }, [])
@@ -386,6 +505,21 @@ export default function Chat() {
           const nL = { id: `opp-${Date.now()}`, nome, conta: conta || '', servico: servico || '', etapa: etapa || 'Prospecção', resp: resp || user.nome, dias: 0, aging: 'Hot', mov: 'Nova oportunidade criada via IAra', prox: '', dt: '', op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: '' }
           curL = [...curL, nL]; await upsertLead(nL)
           results.push(`✅ Oportunidade criada: ${nome}`)
+        } else if (act.type === 'CRIAR_CONTATO') {
+          const contato = {
+            id: `ct-${Date.now()}`,
+            lead_id: act.data.lead_id || '',
+            conta: act.data.conta || '',
+            nome: act.data.nome || 'Contato',
+            email: act.data.email || '',
+            telefone: act.data.telefone || '',
+            cargo: act.data.cargo || '',
+            tipo: act.data.tipo || 'contato',
+            obs: act.data.obs || '',
+            criado_por: user.nome,
+          }
+          await upsertContact(contato)
+          results.push(`✅ ${contato.tipo === 'advisor' ? '🤝 Advisor' : '👤 Contato'} salvo: ${contato.nome}`)
         } else if (act.type === 'GERAR_RADAR') {
           openRadar = true; results.push(`📊 Radar Semanal gerado`)
         }
@@ -445,7 +579,7 @@ export default function Chat() {
   const chips = [['📅 Reunião', 'Registrar reunião:'], ['⚡ FUP feito', 'FUP realizado com'], ['⬆️ Avançar etapa', 'Avançou de etapa:'], ['⚠️ Risco', 'Registrar risco:'], ['📊 Como tá?', 'Como tá o pipeline hoje?'], ['🆕 Nova oportunidade', 'Nova oportunidade:']]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: t.bg, color: t.text, fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden', transition: 'background 0.3s, color 0.3s' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: t.bg, color: t.text, fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden', transition: 'background 0.3s' }}>
       <style>{`
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
         @keyframes blink{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
@@ -472,7 +606,7 @@ export default function Chat() {
             </div>
             <div style={{ fontSize: 10, color: t.textMuted, display: 'flex', alignItems: 'center', gap: 5 }}>
               <span>Agente comercial</span>
-              <span style={{ color: t.textHint, fontWeight: 700, fontSize: 10, letterSpacing: '0.1em' }}>FENG</span>
+              <span style={{ color: t.textHint, fontWeight: 700, letterSpacing: '0.1em' }}>FENG</span>
               {memCount > 0 && <span style={{ color: t.purple, marginLeft: 2 }}>· 🧠 {memCount}</span>}
               {knowCount > 0 && <span style={{ color: t.green }}>· 📚 {knowCount}</span>}
             </div>
@@ -483,29 +617,15 @@ export default function Chat() {
           <div className="header-stats" style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6, padding: '3px 10px', fontSize: 11, color: t.textMuted }}>
             <span style={{ color: t.purple, fontWeight: 600 }}>{ativosCount}</span> · <span style={{ color: t.orange, fontWeight: 600 }}>{pendCount}</span>
           </div>
-
-          {/* Sino */}
           <button className="notif-btn" onClick={() => setShowNotifs(v => !v)} style={{ position: 'relative', width: 36, height: 36, borderRadius: 9, border: `1px solid ${unreadCount > 0 ? t.purple + '44' : t.border}`, background: unreadCount > 0 ? t.purpleFaint : t.surface, color: unreadCount > 0 ? t.purple : t.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, transition: 'all 0.15s', flexShrink: 0 }}>
             🔔
-            {unreadCount > 0 && (
-              <div style={{ position: 'absolute', top: -4, right: -4, background: t.red, color: 'white', borderRadius: '50%', width: 16, height: 16, fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'badgePop 0.3s ease', border: `2px solid ${t.bg}` }}>
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </div>
-            )}
+            {unreadCount > 0 && <div style={{ position: 'absolute', top: -4, right: -4, background: t.red, color: 'white', borderRadius: '50%', width: 16, height: 16, fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'badgePop 0.3s ease', border: `2px solid ${t.bg}` }}>{unreadCount > 9 ? '9+' : unreadCount}</div>}
           </button>
-
-          {/* Toggle tema */}
-          <button onClick={toggleTheme} style={{ width: 36, height: 36, borderRadius: 9, border: `1px solid ${t.border}`, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, flexShrink: 0, transition: 'all 0.15s' }} title={t.name === 'dark' ? 'Modo claro' : 'Modo escuro'}>
-            {t.icon}
-          </button>
-
-          {isAdmin && (
-            <button onClick={() => send('IAra fechar Radar')} className="header-extras" style={{ background: t.greenFaint, border: `1px solid ${t.greenDark}`, borderRadius: 6, color: t.greenDark, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📊 Radar</button>
-          )}
-          {isAdmin && radarReady && (
-            <button onClick={() => navigate('/radar')} style={{ background: t.green, border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>Ver →</button>
-          )}
+          <button onClick={toggleTheme} style={{ width: 36, height: 36, borderRadius: 9, border: `1px solid ${t.border}`, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, flexShrink: 0 }}>{t.icon}</button>
+          {isAdmin && <button onClick={() => send('IAra fechar Radar')} className="header-extras" style={{ background: t.greenFaint, border: `1px solid ${t.greenDark}`, borderRadius: 6, color: t.greenDark, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📊 Radar</button>}
+          {isAdmin && radarReady && <button onClick={() => navigate('/radar')} style={{ background: t.green, border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>Ver →</button>}
           <button onClick={() => navigate('/pipeline')} style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}66`, borderRadius: 6, color: t.purple, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📋 Pipeline</button>
+          <button onClick={() => navigate('/contatos')} className="header-extras" style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}66`, borderRadius: 6, color: t.purple, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>👥 Contatos</button>
           <button onClick={() => navigate('/conhecimento')} className="header-extras" style={{ background: t.greenFaint, border: `1px solid ${t.green}66`, borderRadius: 6, color: t.greenDark, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>🧠 Conhecimento</button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }} onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
             <div style={{ width: 22, height: 22, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', boxShadow: `0 0 8px ${user.cor}66` }}>{user.iniciais}</div>
@@ -529,8 +649,8 @@ export default function Chat() {
             <div style={{ width: 28, height: 28, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0, marginTop: 18, boxShadow: '0 0 10px rgba(124,58,237,0.35)' }}>IA</div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 10, color: t.purple, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>IAra ⚡</div>
-              <div className="msg-text" style={{ background: t.msgBot, border: `1px solid ${t.msgBotBorder}`, borderLeft: `3px solid ${t.purple}`, borderRadius: '0 14px 14px 14px', padding: '12px 16px', fontSize: 15, lineHeight: 1.65, color: t.textSub, wordBreak: 'break-word', whiteSpace: 'pre-wrap', boxShadow: t.name === 'light' ? '0 2px 12px rgba(124,58,237,0.08)' : '0 4px 20px rgba(0,0,0,0.3)' }}>
-                {m.text}
+              <div className="msg-text" style={{ background: t.msgBot, border: `1px solid ${t.msgBotBorder}`, borderLeft: `3px solid ${t.purple}`, borderRadius: '0 14px 14px 14px', padding: '12px 16px', fontSize: 15, lineHeight: 1.65, color: t.textSub, wordBreak: 'break-word', boxShadow: t.name === 'light' ? '0 2px 12px rgba(124,58,237,0.08)' : '0 4px 20px rgba(0,0,0,0.3)' }}>
+                {renderMarkdown(m.text, t)}
                 {m.results?.length > 0 && (
                   <div style={{ marginTop: 10, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                     {m.results.map((r, i) => <span key={i} style={{ background: t.greenFaint, border: `1px solid ${t.green}44`, borderRadius: 6, padding: '4px 10px', fontSize: 12, color: t.green }}>{r}</span>)}
@@ -538,7 +658,7 @@ export default function Chat() {
                 )}
                 {m.sugestoes?.length > 0 && (
                   <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {m.sugestoes.map((s, i) => <SugestaoCard key={i} tipo={s.tipo} texto={s.texto} />)}
+                    {m.sugestoes.map((s, i) => <SugestaoCard key={i} tipo={s.tipo} texto={s.texto} t={t} />)}
                   </div>
                 )}
               </div>
@@ -560,7 +680,7 @@ export default function Chat() {
       </div>
 
       {/* Chips */}
-      <div style={{ display: 'flex', gap: 7, padding: '8px 14px', overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch', borderTop: `1px solid ${t.borderLight}` }}>
+      <div style={{ display: 'flex', gap: 7, padding: '8px 14px', overflowX: 'auto', flexShrink: 0, scrollbarWidth: 'none', borderTop: `1px solid ${t.borderLight}` }}>
         {chips.map(([label, prompt]) => (
           <button key={label} className="chip" onClick={() => { setInp(prompt); txRef.current?.focus() }} style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 20, padding: '7px 14px', fontSize: 12, color: t.purple, cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0, transition: 'all 0.15s', minHeight: 34 }}>{label}</button>
         ))}
@@ -580,12 +700,9 @@ export default function Chat() {
           onFocus={e => e.target.style.borderColor = t.purple}
           onBlur={e => e.target.style.borderColor = t.border}
           rows={1} />
-        <button className="send-btn" onClick={() => send()} disabled={loading || !inp.trim()} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: loading || !inp.trim() ? t.surface : `linear-gradient(135deg,${t.orange},${t.orangeLight})`, color: loading || !inp.trim() ? t.textDark : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loading || !inp.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, fontSize: 16, transition: 'all 0.15s', boxShadow: loading || !inp.trim() ? 'none' : `0 4px 14px ${t.orange}44` }}>
-          ➤
-        </button>
+        <button className="send-btn" onClick={() => send()} disabled={loading || !inp.trim()} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: loading || !inp.trim() ? t.surface : `linear-gradient(135deg,${t.orange},${t.orangeLight})`, color: loading || !inp.trim() ? t.textDark : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loading || !inp.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, fontSize: 16, transition: 'all 0.15s', boxShadow: loading || !inp.trim() ? 'none' : `0 4px 14px ${t.orange}44` }}>➤</button>
       </div>
 
-      {/* Powered by FENG */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '3px 0', background: t.bgAlt, borderTop: `1px solid ${t.borderFaint}` }}>
         <span style={{ fontSize: 9, color: t.textDark, letterSpacing: '0.08em' }}>powered by</span>
         <span style={{ fontSize: 9, fontWeight: 700, color: t.textDark, letterSpacing: '0.15em' }}>FENG</span>
