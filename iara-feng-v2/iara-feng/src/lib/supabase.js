@@ -175,3 +175,15 @@ export async function upsertDocument(doc) {
 export async function deleteDocument(id) {
   await supabase.from('opp_documents').delete().eq('id', id)
 }
+export async function logAudit({ evento, conta, servico, lead_nome, detalhe, de, para, feito_por }) {
+  await supabase.from('audit_log').insert({
+    evento, conta: conta || '', servico: servico || '',
+    lead_nome: lead_nome || '', detalhe: detalhe || '',
+    de: de || '', para: para || '', feito_por: feito_por || ''
+  })
+}
+export async function getAuditLog(limit = 40) {
+  const { data } = await supabase.from('audit_log')
+    .select('*').order('criado_em', { ascending: false }).limit(limit)
+  return data || []
+}
