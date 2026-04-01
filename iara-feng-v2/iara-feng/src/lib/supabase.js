@@ -163,3 +163,15 @@ export async function deleteContact(id) {
   const { error } = await supabase.from('contacts').delete().eq('id', id)
   if (error) console.error('deleteContact:', error)
 }
+export async function getDocumentsByConta(conta) {
+  const { data } = await supabase.from('opp_documents').select('*')
+    .ilike('conta', conta).order('criado_em', { ascending: false })
+  return data || []
+}
+export async function upsertDocument(doc) {
+  const { data } = await supabase.from('opp_documents').upsert(doc).select().single()
+  return data
+}
+export async function deleteDocument(id) {
+  await supabase.from('opp_documents').delete().eq('id', id)
+}
