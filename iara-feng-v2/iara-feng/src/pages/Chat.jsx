@@ -138,20 +138,35 @@ function PropostaModal({ data, onClose }) {
   const prazo = data.prazo || '12 meses'
   const cenarios = data.cenarios || []
   const temCenarios = cenarios.length > 1
+  const [downloading, setDownloading] = useState(false)
 
-  function handlePrint() {
-    const el = document.getElementById('proposta-print')
-    const win = window.open('', '_blank')
-    win.document.write(`
-      <html><head><title>Proposta ${data.conta} — ${data.servico}</title>
-      <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        body{margin:0;font-family:'Inter',sans-serif;font-size:13px;color:#1a1a1a;background:#fff}
-        ${el.querySelector('style')?.textContent || ''}
-      </style></head><body>${el.innerHTML}</body></html>
-    `)
-    win.document.close()
-    setTimeout(() => { win.print(); win.close() }, 400)
+  async function handleDownload() {
+    setDownloading(true)
+    try {
+      // Carrega html2pdf dinamicamente se ainda não estiver disponível
+      if (!window.html2pdf) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script')
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
+          s.onload = resolve; s.onerror = reject
+          document.head.appendChild(s)
+        })
+      }
+      const el = document.getElementById('proposta-print')
+      const nomeArquivo = `Proposta_FENG_${(data.conta || 'Cliente').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`
+      await window.html2pdf().set({
+        margin: [10, 12, 10, 12],
+        filename: nomeArquivo,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css'] },
+      }).from(el).save()
+    } catch (e) {
+      console.error('Erro ao gerar PDF:', e)
+      alert('Erro ao gerar PDF. Tente novamente.')
+    }
+    setDownloading(false)
   }
 
   return (
@@ -161,7 +176,9 @@ function PropostaModal({ data, onClose }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', background: '#7C3AED', color: '#fff' }}>
           <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.04em' }}>📄 Proposta Onepage — Preview</span>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={handlePrint} style={{ background: '#fff', color: '#7C3AED', border: 'none', borderRadius: 8, padding: '6px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 Imprimir / Salvar PDF</button>
+            <button onClick={handleDownload} disabled={downloading} style={{ background: downloading ? 'rgba(255,255,255,0.5)' : '#fff', color: '#7C3AED', border: 'none', borderRadius: 8, padding: '6px 16px', fontSize: 12, fontWeight: 700, cursor: downloading ? 'not-allowed' : 'pointer', minWidth: 140, transition: 'all 0.15s' }}>
+              {downloading ? '⏳ Gerando PDF...' : '⬇️ Baixar PDF'}
+            </button>
             <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 14, cursor: 'pointer' }}>✕</button>
           </div>
         </div>
@@ -668,6 +685,62 @@ async function callAI(messages, system) {
   if (!r.ok) throw new Error(`API error ${r.status}`)
   const d = await r.json(); return d.text || ''
 }
+
+// ─── BRIEFING DETECTOR (frontend — não depende do modelo emitir o marcador) ──
+function detectBriefing(text) {
+  const t = text.toLowerCase()
+  const hasBriefing = t.includes('briefing') || t.includes('cenário 1') || t.includes('cenario 1') || t.includes('cenário 2') || t.includes('cenario 2')
+  const hasValor = /r\$\s*[\d.,]+/.test(t) || t.includes('valor mensal') || t.includes('mensalidade') || t.includes('fee')
+  const hasCliente = t.includes('maracanã') || t.includes('escopo') || t.includes('alocação') || t.includes('alocacao')
+  return hasBriefing || (hasValor && hasCliente)
+}
+
+function extractPropostaFromBriefing(text) {
+  // Conta
+  const contaMatch = text.match(/(?:Maracanã|maracanã|MARACANÃ|Proposta[^|]+\|\s*)([A-ZÀ-Ú][^\n|]+)/i)
+  let conta = 'Maracanã'
+  if (text.toLowerCase().includes('maracanã')) conta = 'Maracanã'
+
+  // Serviço — pega o que vem após "Proposta" ou título
+  const tituloMatch = text.match(/Proposta[^—\n]*[—–-]\s*([^\n|]+)/i)
+  const servico = tituloMatch ? tituloMatch[1].trim().replace(/^\|.*/, '').trim() : 'Redes Sociais — Alocação Presencial'
+
+  // Escopo
+  const escopoMatch = text.match(/Escopo[^:]*:?\s*[\n\r]([^\n]+(?:\n(?!Cenário|Valor|Importante)[^\n]+)*)/i)
+  const escopo = escopoMatch ? escopoMatch[1].replace(/\n/g, ' ').trim() : ''
+
+  // Reunião
+  const reuniaoMatch = text.match(/(?:reunião|meeting)[^,\n]*,?\s*([\d]{1,2}\/[\d]{1,2}(?:\/[\d]{2,4})?)[^,\n]*(?:,|\s)?\s*(?:às\s*)?([\d]{1,2}h[\d]{0,2})?/i)
+  const reuniao = reuniaoMatch ? `${reuniaoMatch[1]}${reuniaoMatch[2] ? ' às ' + reuniaoMatch[2] : ''}` : ''
+
+  // Cenários — busca padrões "Cenário N" + valor
+  const cenarios = []
+  const cenRegex = /Cenário\s*(\d+)[^\n]*\n([^\n]+)\nValor[^\n]*:\s*(R\$\s*[\d.,]+)/gi
+  let m
+  while ((m = cenRegex.exec(text)) !== null) {
+    cenarios.push({ label: `Cenário ${m[1]} — ${m[2].trim()}`, valor: m[3].trim() })
+  }
+  // Fallback: busca linhas com "Valor mensal: R$"
+  if (cenarios.length === 0) {
+    const valorLines = [...text.matchAll(/Valor\s+mensal:\s*(R\$\s*[\d.,]+)/gi)]
+    const labelLines = [...text.matchAll(/Cenário\s*\d+[^\n]*/gi)]
+    valorLines.forEach((v, i) => {
+      cenarios.push({ label: labelLines[i]?.[0]?.trim() || `Cenário ${i + 1}`, valor: v[1].trim() })
+    })
+  }
+  // Fallback single fee
+  if (cenarios.length === 0) {
+    const feeMatch = text.match(/(?:mensalidade|fee)[^R$\n]*R\$\s*([\d.,]+)/i)
+    if (feeMatch) cenarios.push({ label: 'Mensalidade (FEE)', valor: `R$ ${feeMatch[1]}` })
+  }
+
+  // Prazo
+  const prazoMatch = text.match(/(\d+)\s*anos?/i)
+  const prazo = prazoMatch ? `${prazoMatch[1]} anos` : '12 meses'
+
+  return { conta, servico, contatos: '', escopo, cenarios, prazo, validade: '10 dias úteis', reuniao }
+}
+// ─────────────────────────────────────────────────────────────────────────────
 async function extractAndSaveMemories(userId, userMsg, assistantMsg) {
   try {
     const raw = await callAI([{ role: 'user', content: `Usuário disse: "${userMsg}"\nIAra respondeu: "${assistantMsg.slice(0, 300)}"\n\nExtraia memórias relevantes.` }], EXTRACT_SYSTEM)
@@ -766,6 +839,12 @@ export default function Chat() {
       const results = []
       let curL = [...leads], curA = [...acts], openRadar = false
       let auditUpdated = false
+
+      // ── Frontend briefing detection: inject PropostaCard if model missed it ──
+      if (detectBriefing(t2) && !sugestoes.find(s => s.tipo === 'proposta')) {
+        const propostoData = extractPropostaFromBriefing(t2)
+        sugestoes.push({ tipo: 'proposta', texto: JSON.stringify(propostoData) })
+      }
 
       for (const act of actions) {
         if (act.type === 'CONCLUIR') {
