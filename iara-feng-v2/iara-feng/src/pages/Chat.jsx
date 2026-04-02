@@ -621,9 +621,9 @@ ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE.
 
 BRIEFING COMERCIAL:
 Quando o usuário colar um briefing (texto com cliente, escopo, valor/fee, data de reunião ou cenários de preço), detecta automaticamente. Fluxo:
-1. Mostre com ## "Briefing detectado — [Conta]" e liste com numeração as ações que serão criadas (oportunidade + atividade de reunião se houver data).
-2. SIMULTANEAMENTE emita [SUGESTÃO:proposta] com os dados extraídos do briefing (assim o usuário pode gerar a proposta onepage a qualquer momento).
-3. Aguarde confirmação do usuário para executar os marcadores [AÇÃO].
+1. Mostre com ## "Briefing detectado — [Conta]" e liste com numeração as ações que serão criadas (oportunidade + atividade de reunião se houver data). Já inclua [SUGESTÃO:proposta] com os dados extraídos NESSA PRIMEIRA RESPOSTA.
+2. Aguarde confirmação do usuário para executar os marcadores [AÇÃO].
+3. Após executar as ações (resposta pós-confirmação): OBRIGATORIAMENTE emita [SUGESTÃO:proposta] novamente com os mesmos dados. Isso é OBRIGATÓRIO — não é opcional, não é contextual. Se não emitir, o usuário perde acesso ao gerador de proposta.
 
 Formato do [SUGESTÃO:proposta] — JSON compacto em linha única dentro da tag:
 [SUGESTÃO:proposta]{"conta":"CONTA","servico":"SERVIÇO","contatos":"CONTATOS","escopo":"ESCOPO","cenarios":[{"label":"DESC","valor":"VALOR"}],"prazo":"PRAZO","validade":"10 dias úteis","reuniao":"DATA/HORA"}[/SUGESTÃO]
@@ -784,7 +784,7 @@ export default function Chat() {
           const nA = {
             id: `act-${Date.now()}`, ok: false,
             criado: new Date().toISOString().split('T')[0],
-            lead: act.data.lead, descricao: act.data.descricao,
+            lead: act.data.lead, descricao: act.data.descricao || act.data.desc || '',
             dt: act.data.dt, resp: act.data.resp, tipo: act.data.tipo || 'Atividade'
           }
           curA = [...curA, nA]; await upsertActivity(nA)
