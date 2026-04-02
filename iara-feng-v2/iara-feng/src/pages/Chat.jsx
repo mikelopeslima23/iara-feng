@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory, getKnowledge, getNotifications, markNotificationRead, markAllRead, createNotification, upsertContact } from '../lib/supabase'
+import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory, getKnowledge, getNotifications, markNotificationRead, markAllRead, createNotification, upsertContact, logAudit, getAuditLog } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL, USERS } from '../data/pipeline'
 import { getTheme, saveTheme, THEMES } from '../lib/theme'
 
@@ -196,7 +196,26 @@ function NotifModal({ notifs, onClose, onMarkRead, onMarkAll, userId, t }) {
   )
 }
 
-function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
+// ─── AUDIT LOG LABELS ────────────────────────────────────────────────────────
+const AUDIT_LABELS = {
+  oportunidade_criada:   { icon: '🆕', label: 'Nova oportunidade' },
+  etapa_avancada:        { icon: '⬆️', label: 'Etapa avançada' },
+  lead_atualizado:       { icon: '✏️', label: 'Lead atualizado' },
+  oportunidade_reativada:{ icon: '⚡', label: 'Reativada da Geladeira' },
+  atividade_criada:      { icon: '📌', label: 'Atividade criada' },
+  atividade_concluida:   { icon: '✅', label: 'Atividade concluída' },
+  contato_adicionado:    { icon: '👤', label: 'Contato adicionado' },
+  documento_adicionado:  { icon: '📎', label: 'Documento adicionado' },
+}
+
+function formatAuditDate(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildCtx(leads, acts, userName, memories = [], knowledge = [], auditLog = []) {
   const hoje = new Date().toLocaleDateString('pt-BR')
   const hojeISO = new Date().toISOString().split('T')[0]
   const pend = acts.filter(a => !a.ok)
@@ -208,24 +227,49 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
   let c = `DATA:${hoje} | USUÁRIO:${userName} | ADMIN:${isAdmin}\n`
   c += `RESUMO:${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
 
-  // ── Histórico real de atividades concluídas (últimas 2 semanas) ──
+  // ── Audit Log — movimentos recentes ──────────────────────────────────────
+  if (auditLog.length > 0) {
+    c += `📋 MOVIMENTOS RECENTES DO PIPELINE (últimos registros):\n`
+    const porData = auditLog.reduce((acc, e) => {
+      const dt = (e.criado_em || '').slice(0, 10)
+      if (!acc[dt]) acc[dt] = []
+      acc[dt].push(e)
+      return acc
+    }, {})
+    const datas = Object.keys(porData).sort().reverse().slice(0, 7)
+    datas.forEach(dt => {
+      const dtFmt = new Date(dt + 'T12:00:00').toLocaleDateString('pt-BR')
+      const isHoje = dt === hojeISO
+      c += `\n${isHoje ? '★ HOJE' : dtFmt}:\n`
+      porData[dt].forEach(e => {
+        const info = AUDIT_LABELS[e.evento] || { icon: '📝', label: e.evento }
+        const conta = e.conta ? (e.servico ? `${e.conta} — ${e.servico}` : e.conta) : e.lead_nome
+        c += `  ${info.icon} [${info.label}] ${conta}${e.detalhe ? ` — ${e.detalhe}` : ''}${e.de && e.para ? ` (${e.de} → ${e.para})` : ''} | por ${e.feito_por}\n`
+      })
+    })
+    c += '\n'
+  } else {
+    c += `📋 MOVIMENTOS: Nenhum movimento registrado ainda.\n\n`
+  }
+
+  // ── Histórico real de atividades concluídas (últimas 2 semanas) ──────────
   const concluidas = acts.filter(a => a.ok && a.criado)
-  const porData = concluidas.reduce((acc, a) => {
+  const porDataActs = concluidas.reduce((acc, a) => {
     const dt = (a.criado || '').slice(0, 10)
     if (!dt) return acc
     if (!acc[dt]) acc[dt] = []
     acc[dt].push(a)
     return acc
   }, {})
-  const datasOrdenadas = Object.keys(porData).sort().reverse().slice(0, 14)
+  const datasOrdenadas = Object.keys(porDataActs).sort().reverse().slice(0, 14)
 
   if (datasOrdenadas.length > 0) {
     c += `📅 HISTÓRICO DE ATIVIDADES CONCLUÍDAS (últimas 2 semanas):\n`
     datasOrdenadas.forEach(dt => {
       const dtFmt = new Date(dt + 'T12:00:00').toLocaleDateString('pt-BR')
       const isHoje = dt === hojeISO
-      c += `\n${isHoje ? '★ HOJE' : dtFmt} (${porData[dt].length} atividade${porData[dt].length > 1 ? 's' : ''}):\n`
-      porData[dt].forEach(a => {
+      c += `\n${isHoje ? '★ HOJE' : dtFmt} (${porDataActs[dt].length} atividade${porDataActs[dt].length > 1 ? 's' : ''}):\n`
+      porDataActs[dt].forEach(a => {
         c += `  • [${a.tipo || 'Atividade'}] ${a.lead} — ${a.descricao} | resp: ${a.resp}\n`
       })
     })
@@ -234,7 +278,7 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = []) {
     c += `📅 HISTÓRICO: Nenhuma atividade concluída registrada ainda no sistema.\n\n`
   }
 
-  // ── Atividades pendentes ──
+  // ── Atividades pendentes ──────────────────────────────────────────────────
   if (pend.length > 0) {
     c += `⏳ ATIVIDADES PENDENTES (${pend.length}):\n`
     const atrasadas = pend.filter(a => a.dt && new Date(a.dt) < new Date())
@@ -345,12 +389,13 @@ Use markdown nas confirmações, relatórios e resumos:
 - --- → separador entre seções distintas
 Em conversas simples e rápidas: sem formatação, texto direto.
 
-HISTÓRICO DE ATIVIDADES:
-- Você tem acesso ao histórico real de atividades concluídas no contexto (seção 📅 HISTÓRICO)
-- Ao responder perguntas sobre "o que aconteceu hoje/esta semana/quem fez o quê", use APENAS dados do histórico fornecido
-- NUNCA invente ou assuma atividades que não estão no histórico
-- Se não houver dados de um período, informe claramente: "Não há atividades registradas para esse período no sistema."
-- Ao fazer análise de produtividade ou histórico, cite o tipo, lead, descrição e responsável de cada atividade real
+HISTÓRICO DE MOVIMENTOS:
+- Você tem acesso ao audit log completo na seção 📋 MOVIMENTOS RECENTES
+- Ele registra: criação de oportunidades, avanços de etapa, contatos adicionados, documentos, atividades criadas e concluídas, reativações da Geladeira
+- Ao responder "o que aconteceu hoje/essa semana/quem fez o quê no pipeline", use APENAS dados do audit log + histórico de atividades fornecidos
+- NUNCA invente eventos que não estão nos dados
+- Se não houver dados de um período: "Não há movimentos registrados para esse período."
+- Ao citar movimentos, mencione: evento, conta/oportunidade, detalhe e quem fez
 
 OWNERS DOS LEADS (regra fixa):
 - Leads Brasil → owner: Jardel Rocha (ID: jardel)
@@ -366,7 +411,7 @@ ESTRUTURA DE OPORTUNIDADES:
 CATÁLOGO DE SERVIÇOS FENG:
 ST Completo | Sócio Torcedor | DataLake | CRM | Mídia Paga | Estratégia | BI | Redes Sociais | Site Institucional | Loyalty | Atendimento | SSO | Gestão Financeira | Ativação Digital | Match Day | App Oficial
 
-ETAPAS: Prospecção → Oportunidade → Proposta → Negociação → Operação / Go-Live
+ETAPAS: Prospecção → Oportunidade → Proposta → Negociação → Jurídico → Operação / Go-Live
 
 COMANDO EXCLUSIVO "IAra fechar Radar" (só Mike Lopes e Bruno Braga):
 - Se ADMIN:false → "Esse comando é exclusivo para o Mike e o Bruno."
@@ -382,7 +427,7 @@ REGRAS DE SAVE:
 MARCADORES (após confirmação):
 [AÇÃO:CONCLUIR]{"id":"ID"}[/AÇÃO]
 [AÇÃO:CRIAR]{"lead":"NOME","desc":"DESC","dt":"YYYY-MM-DD","resp":"RESP","tipo":"FUP|Reunião|Proposta|Jurídico"}[/AÇÃO]
-[AÇÃO:UPDATE_LEAD]{"nome":"NOME","campo":"etapa|prox|mov","valor":"VALOR"}[/AÇÃO]
+[AÇÃO:UPDATE_LEAD]{"nome":"NOME","campo":"etapa|prox|mov","valor":"VALOR","etapa_anterior":"ETAPA_ANTERIOR"}[/AÇÃO]
 [AÇÃO:CRIAR_OPP]{"conta":"CLUBE","servico":"SERVIÇO","etapa":"Prospecção","resp":"RESP"}[/AÇÃO]
 [AÇÃO:CRIAR_CONTATO]{"lead_id":"ID","conta":"CONTA","nome":"NOME","email":"EMAIL","telefone":"TEL","cargo":"CARGO","tipo":"contato|advisor","obs":"OBS"}[/AÇÃO]
 [AÇÃO:GERAR_RADAR]{}[/AÇÃO]
@@ -453,6 +498,7 @@ export default function Chat() {
   const [memories, setMemories] = useState([])
   const [knowledge, setKnowledge] = useState([])
   const [notifs, setNotifs] = useState([])
+  const [auditLog, setAuditLog] = useState([])
   const [showNotifs, setShowNotifs] = useState(false)
   const [inp, setInp] = useState('')
   const [loading, setLoading] = useState(false)
@@ -482,6 +528,10 @@ export default function Chat() {
     return () => clearInterval(poll)
   }, [user.id])
 
+  async function refreshAuditLog() {
+    try { const log = await getAuditLog(40); setAuditLog(log) } catch {}
+  }
+
   async function init() {
     setLoading(true)
     try {
@@ -489,14 +539,14 @@ export default function Chat() {
       if (!l.length) { for (const lead of PIPELINE_INITIAL) await upsertLead(lead); l = PIPELINE_INITIAL }
       if (!a.length) { for (const act of ACTIVITIES_INITIAL) await upsertActivity(act); a = ACTIVITIES_INITIAL }
       setLeads(l); setActs(a)
-      const [mems, know, nots] = await Promise.all([getMemories(user.id), getKnowledge(), getNotifications(user.id)])
-      setMemories(mems); setKnowledge(know); setNotifs(nots)
+      const [mems, know, nots, log] = await Promise.all([getMemories(user.id), getKnowledge(), getNotifications(user.id), getAuditLog(40)])
+      setMemories(mems); setKnowledge(know); setNotifs(nots); setAuditLog(log)
       const history = await getMessages(user.id)
       if (history.length > 0) {
         setMsgs(history.map((m, i) => ({ id: i, role: m.role, text: m.text, results: m.results, sugestoes: m.sugestoes || [] })))
         setInitialized(true); setLoading(false); return
       }
-      const ctx = buildCtx(l, a, user.nome, mems, know)
+      const ctx = buildCtx(l, a, user.nome, mems, know, log)
       const cargoInfo = CARGOS[user.nome] || { cargo: 'membro do time comercial' }
       const raw = await callAI([{ role: 'user', content: buildOnboardingPrompt(user.nome, cargoInfo.cargo) }], SYSTEM + '\n\n' + ctx)
       const txt = strip(raw)
@@ -516,7 +566,7 @@ export default function Chat() {
     const newMsgs = [...msgs, uMsg]; setMsgs(newMsgs); setLoading(true)
     await saveMessage(user.id, 'user', t2)
     try {
-      const ctx = buildCtx(leads, acts, user.nome, memories, knowledge)
+      const ctx = buildCtx(leads, acts, user.nome, memories, knowledge, auditLog)
       const apiMsgs = newMsgs.slice(-40).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
       const raw = await callAI(apiMsgs, SYSTEM + '\n\n' + ctx)
       const actions = parseActions(raw)
@@ -525,12 +575,20 @@ export default function Chat() {
       const cleanTxt = strip(raw)
       const results = []
       let curL = [...leads], curA = [...acts], openRadar = false
+      let auditUpdated = false
 
       for (const act of actions) {
         if (act.type === 'CONCLUIR') {
           const found = curA.find(a => a.id === act.data.id)
           curA = curA.map(a => a.id === act.data.id ? { ...a, ok: true } : a)
           await upsertActivity({ ...found, ok: true })
+          await logAudit({
+            evento: 'atividade_concluida',
+            conta: found?.lead || '',
+            detalhe: found?.descricao || '',
+            feito_por: user.nome,
+          })
+          auditUpdated = true
           results.push(`✅ Concluído: ${found?.descricao || act.data.id}`)
         } else if (act.type === 'CRIAR') {
           const nA = {
@@ -540,12 +598,40 @@ export default function Chat() {
             dt: act.data.dt, resp: act.data.resp, tipo: act.data.tipo || 'Atividade'
           }
           curA = [...curA, nA]; await upsertActivity(nA)
+          await logAudit({
+            evento: 'atividade_criada',
+            conta: act.data.lead || '',
+            detalhe: `[${act.data.tipo || 'Atividade'}] ${act.data.descricao} — até ${act.data.dt || 'sem prazo'} | ${act.data.resp}`,
+            feito_por: user.nome,
+          })
+          auditUpdated = true
           results.push(`✅ Criado: ${act.data.descricao}`)
         } else if (act.type === 'UPDATE_LEAD') {
-          const { nome, campo, valor } = act.data
+          const { nome, campo, valor, etapa_anterior } = act.data
+          const before = curL.find(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()))
           curL = curL.map(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()) ? { ...l, [campo]: valor } : l)
           const updated = curL.find(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()))
           if (updated) await upsertLead(updated)
+          if (campo === 'etapa') {
+            await logAudit({
+              evento: 'etapa_avancada',
+              conta: updated?.conta || nome,
+              servico: updated?.servico || '',
+              detalhe: `${etapa_anterior || before?.etapa || '?'} → ${valor}`,
+              de: etapa_anterior || before?.etapa || '',
+              para: valor,
+              feito_por: user.nome,
+            })
+          } else {
+            await logAudit({
+              evento: 'lead_atualizado',
+              conta: updated?.conta || nome,
+              servico: updated?.servico || '',
+              detalhe: `${campo}: ${valor}`,
+              feito_por: user.nome,
+            })
+          }
+          auditUpdated = true
           results.push(`✅ ${nome} atualizado`)
         } else if (act.type === 'CRIAR_OPP') {
           const { conta, servico, etapa, resp } = act.data
@@ -557,6 +643,15 @@ export default function Chat() {
             op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: ''
           }
           curL = [...curL, nL]; await upsertLead(nL)
+          await logAudit({
+            evento: 'oportunidade_criada',
+            conta: conta || '',
+            servico: servico || '',
+            lead_nome: nome,
+            detalhe: `Etapa: ${etapa || 'Prospecção'} | Resp: ${resp || user.nome}`,
+            feito_por: user.nome,
+          })
+          auditUpdated = true
           results.push(`✅ Oportunidade criada: ${nome}`)
         } else if (act.type === 'CRIAR_CONTATO') {
           const contato = {
@@ -572,6 +667,13 @@ export default function Chat() {
             criado_por: user.nome,
           }
           await upsertContact(contato)
+          await logAudit({
+            evento: 'contato_adicionado',
+            conta: act.data.conta || '',
+            detalhe: `${contato.tipo === 'advisor' ? '🤝 Advisor' : '👤 Contato'}: ${contato.nome}${contato.cargo ? ` (${contato.cargo})` : ''}`,
+            feito_por: user.nome,
+          })
+          auditUpdated = true
           results.push(`✅ ${contato.tipo === 'advisor' ? '🤝 Advisor' : '👤 Contato'} salvo: ${contato.nome}`)
         } else if (act.type === 'GERAR_RADAR') {
           openRadar = true; results.push(`📊 Radar Semanal gerado`)
@@ -589,6 +691,7 @@ export default function Chat() {
       }
 
       setLeads(curL); setActs(curA)
+      if (auditUpdated) refreshAuditLog()
       if (openRadar) setRadarReady(true)
       const aMsg = { id: Date.now() + 1, role: 'assistant', text: cleanTxt, results, sugestoes }
       setMsgs([...newMsgs, aMsg])
@@ -605,7 +708,7 @@ export default function Chat() {
   async function handleClear() {
     await clearMessages(user.id); setMsgs([]); setLoading(true)
     try {
-      const ctx = buildCtx(leads, acts, user.nome, memories, knowledge)
+      const ctx = buildCtx(leads, acts, user.nome, memories, knowledge, auditLog)
       const raw = await callAI([{ role: 'user', content: `Reabra a conversa com ${user.nome} com nova saudação breve.` }], SYSTEM + '\n\n' + ctx)
       const txt = strip(raw)
       setMsgs([{ id: Date.now(), role: 'assistant', text: txt, results: [], sugestoes: [] }])
