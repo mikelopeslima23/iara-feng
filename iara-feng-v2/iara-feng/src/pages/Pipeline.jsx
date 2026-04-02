@@ -4,7 +4,6 @@ import {
   getLeads, getActivities, upsertLead,
   getContactsByConta, upsertContact, deleteContact,
   getDocumentsByConta, upsertDocument, deleteDocument,
-  logAudit,
 } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL } from '../data/pipeline'
 import { getTheme, saveTheme, THEMES } from '../lib/theme'
@@ -273,7 +272,7 @@ function ContactModalInline({ contact, defaultConta, defaultLeadId, t, onSave, o
 }
 
 // ─── MODAL PRINCIPAL ─────────────────────────────────────────────────────────
-function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
+function Modal({ lead, acts, onClose, onSave, onReativar, onEnviarGeladeira, t }) {
   const user    = JSON.parse(localStorage.getItem('iara_user') || '{}')
   const isAdmin = ['Mike Lopes', 'Bruno Braga'].includes(user.nome)
 
@@ -328,13 +327,6 @@ function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
     if (!toSave.conta)       toSave.conta       = lead.conta || lead.nome || ''
     if (!toSave.criado_por)  toSave.criado_por  = user.nome
     await upsertContact(toSave)
-    await logAudit({
-      evento: 'contato_adicionado',
-      conta: lead.conta || lead.nome || '',
-      servico: lead.servico || '',
-      detalhe: `${toSave.tipo === 'advisor' ? '🤝 Advisor' : '👤 Contato'}: ${toSave.nome}${toSave.cargo ? ` (${toSave.cargo})` : ''}`,
-      feito_por: user.nome,
-    })
     await loadContacts()
     setEditContact(null)
   }
@@ -360,13 +352,6 @@ function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
     if (!toSave.lead_id)    toSave.lead_id    = lead.id || ''
     if (!toSave.criado_por) toSave.criado_por = user.nome
     await upsertDocument(toSave)
-    await logAudit({
-      evento: 'documento_adicionado',
-      conta: lead.conta || lead.nome || '',
-      servico: lead.servico || '',
-      detalhe: `${toSave.tipo || 'Documento'}: ${toSave.nome}`,
-      feito_por: user.nome,
-    })
     await loadDocs()
     setEditDoc(null)
   }
@@ -702,12 +687,21 @@ function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
         {/* ── Footer ── */}
         <div style={{ padding: '14px 24px', borderTop: `1px solid ${t.borderLight}`, flexShrink: 0 }}>
           {abaModal === 'detalhes' ? (
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={onClose} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={() => onSave({ ...form, nome: form.conta && form.servico ? `${form.conta} — ${form.servico}` : (form.nome || form.conta || '') })}
-                style={{ flex: 2, background: 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 10, color: 'white', padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.3)' }}>
-                Salvar
-              </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {!lead.off && !lead.op && (
+                <button
+                  onClick={() => { if (confirm(`Enviar "${lead.conta || lead.nome}" para a Geladeira?`)) onEnviarGeladeira(form) }}
+                  style={{ width: '100%', background: 'none', border: `1px solid rgba(107,90,144,0.4)`, borderRadius: 10, color: t.textHint, padding: '9px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  🧊 Enviar para a Geladeira
+                </button>
+              )}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={onClose} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={() => onSave({ ...form, nome: form.conta && form.servico ? `${form.conta} — ${form.servico}` : (form.nome || form.conta || '') })}
+                  style={{ flex: 2, background: 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 10, color: 'white', padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.3)' }}>
+                  Salvar
+                </button>
+              </div>
             </div>
           ) : (
             <button onClick={onClose} style={{ width: '100%', background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>Fechar</button>
@@ -751,6 +745,7 @@ export default function Pipeline() {
   const [syncing,     setSyncing]     = useState(false)
   const [selected,    setSelected]    = useState(null)
   const [filterResp,  setFilterResp]  = useState('Todos')
+  const [searchQuery, setSearchQuery] = useState('')
   const [aba,         setAba]         = useState('pipeline')
 
   function toggleTheme() {
@@ -798,27 +793,7 @@ export default function Pipeline() {
   }
 
   async function handleSave(form) {
-    const before = leads.find(l => l.id === form.id)
     await upsertLead(form)
-    if (before?.etapa && form.etapa && before.etapa !== form.etapa) {
-      await logAudit({
-        evento: 'etapa_avancada',
-        conta: form.conta || form.nome || '',
-        servico: form.servico || '',
-        detalhe: `${before.etapa} → ${form.etapa}`,
-        de: before.etapa,
-        para: form.etapa,
-        feito_por: JSON.parse(localStorage.getItem('iara_user') || '{}').nome || '',
-      })
-    } else {
-      await logAudit({
-        evento: 'lead_atualizado',
-        conta: form.conta || form.nome || '',
-        servico: form.servico || '',
-        detalhe: 'Dados da oportunidade atualizados',
-        feito_por: JSON.parse(localStorage.getItem('iara_user') || '{}').nome || '',
-      })
-    }
     setLeads(prev => prev.map(l => l.id === form.id ? form : l))
     setSelected(null)
   }
@@ -826,14 +801,21 @@ export default function Pipeline() {
   async function handleReativar(form) {
     const reativado = { ...form, off: false, dias: 0, aging: 'Hot' }
     await upsertLead(reativado)
+    setLeads(prev => prev.map(l => l.id === form.id ? reativado : l))
+    setSelected(null)
+  }
+
+  async function handleEnviarGeladeira(form) {
+    const gelado = { ...form, off: true, aging: 'Geladeira' }
+    await upsertLead(gelado)
     await logAudit({
-      evento: 'oportunidade_reativada',
+      evento: 'lead_atualizado',
       conta: form.conta || form.nome || '',
       servico: form.servico || '',
-      detalhe: `Reativada da Geladeira — estava há ${form.dias}d sem contato`,
+      detalhe: 'Enviado manualmente para a Geladeira',
       feito_por: JSON.parse(localStorage.getItem('iara_user') || '{}').nome || '',
     })
-    setLeads(prev => prev.map(l => l.id === form.id ? reativado : l))
+    setLeads(prev => prev.map(l => l.id === form.id ? gelado : l))
     setSelected(null)
   }
 
@@ -849,8 +831,23 @@ export default function Pipeline() {
   const resps = ['Todos', ...Array.from(new Set(
     [...todosAtivos, ...todosGeladeira].map(l => l.resp?.split(' ')[0]).filter(Boolean)
   ))]
-  const ativos    = filterResp === 'Todos' ? todosAtivos    : todosAtivos.filter(l => l.resp?.includes(filterResp))
-  const geladeira = filterResp === 'Todos' ? todosGeladeira : todosGeladeira.filter(l => l.resp?.includes(filterResp))
+  const ativosFiltradosResp = filterResp === 'Todos' ? todosAtivos : todosAtivos.filter(l => l.resp?.includes(filterResp))
+  const ativos = searchQuery.trim() === ''
+    ? ativosFiltradosResp
+    : ativosFiltradosResp.filter(l => {
+        const q = searchQuery.toLowerCase()
+        return (l.conta || l.nome || '').toLowerCase().includes(q) ||
+               (l.servico || '').toLowerCase().includes(q) ||
+               (l.resp || '').toLowerCase().includes(q)
+      })
+  const geladeiraPorResp = filterResp === 'Todos' ? todosGeladeira : todosGeladeira.filter(l => l.resp?.includes(filterResp))
+  const geladeira = searchQuery.trim() === ''
+    ? geladeiraPorResp
+    : geladeiraPorResp.filter(l => {
+        const q = searchQuery.toLowerCase()
+        return (l.conta || l.nome || '').toLowerCase().includes(q) ||
+               (l.servico || '').toLowerCase().includes(q)
+      })
   const byEtapa   = ETAPAS.reduce((acc, e) => { acc[e] = ativos.filter(l => l.etapa === e); return acc }, {})
   const riscos    = ativos.filter(l => l.risco)
   const contasAtivas = ativos.reduce((acc, l) => {
@@ -947,6 +944,27 @@ export default function Pipeline() {
               </div>
             </div>
           )}
+
+          {/* Search bar */}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ flex: 1, maxWidth: 320, position: 'relative' }}>
+              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: t.textMuted, pointerEvents: 'none' }}>🔍</span>
+              <input
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                placeholder="Buscar por clube, serviço ou responsável..."
+                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${searchQuery ? t.purple : t.border}`, borderRadius: 10, padding: '8px 12px 8px 32px', color: t.text, fontSize: 13, outline: 'none', transition: 'border-color 0.15s' }}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', fontSize: 14, padding: 0 }}>✕</button>
+              )}
+            </div>
+            {searchQuery && (
+              <span style={{ fontSize: 12, color: t.purple, fontWeight: 600 }}>
+                {ativos.length} resultado{ativos.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
 
           <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch' }}>
             {ETAPAS.filter(e => e !== 'Operação / Go-Live').map(etapa => {
@@ -1128,7 +1146,8 @@ export default function Pipeline() {
           t={t}
           onClose={() => setSelected(null)}
           onSave={handleSave}
-          onReativar={handleReativar} />
+          onReativar={handleReativar}
+          onEnviarGeladeira={handleEnviarGeladeira} />
       )}
     </div>
   )
