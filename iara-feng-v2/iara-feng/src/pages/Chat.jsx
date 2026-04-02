@@ -224,8 +224,9 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = [], auditLog
   const g12 = leads.filter(l => l.g12 && !l.off)
   const isAdmin = ADMINS.includes(userName)
 
-  let c = `DATA:${hoje} | USUÁRIO:${userName} | ADMIN:${isAdmin}\n`
-  c += `RESUMO:${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
+  let c = `🗓️ DATA DE HOJE: ${hoje} (${hojeISO}) — USE SEMPRE ESTA DATA COMO REFERÊNCIA\n`
+  c += `USUÁRIO: ${userName} | ADMIN: ${isAdmin}\n`
+  c += `RESUMO: ${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
 
   // ── Audit Log — movimentos recentes ──────────────────────────────────────
   if (auditLog.length > 0) {
@@ -388,6 +389,13 @@ Use markdown nas confirmações, relatórios e resumos:
 - - item → lista com ▸ roxo
 - --- → separador entre seções distintas
 Em conversas simples e rápidas: sem formatação, texto direto.
+
+DATA ATUAL:
+- A data de hoje está SEMPRE na primeira linha do contexto como 🗓️ DATA DE HOJE
+- USE SEMPRE essa data como referência para "hoje", "esta semana", "ontem"
+- NUNCA confunda a data das atividades/movimentos com a data atual
+- As atividades têm suas próprias datas (Dt_atualização, criado) — essas são datas dos REGISTROS, não de hoje
+- Sempre que citar "hoje é X", use a data do contexto, não a data de nenhuma atividade
 
 HISTÓRICO DE MOVIMENTOS:
 - Você tem acesso ao audit log completo na seção 📋 MOVIMENTOS RECENTES
