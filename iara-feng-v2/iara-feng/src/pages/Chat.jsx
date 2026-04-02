@@ -19,6 +19,7 @@ const SUGESTAO_CONFIG = {
   discord: { label: '💬 Sugestão para Discord', color: '#5865F2', bg: 'rgba(88,101,242,0.08)', border: 'rgba(88,101,242,0.25)' },
   whatsapp: { label: '📱 Sugestão WhatsApp — Diretoria', color: '#25D366', bg: 'rgba(37,211,102,0.08)', border: 'rgba(37,211,102,0.25)' },
   juridico: { label: '⚖️ Briefing para o Jurídico', color: '#3B82F6', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.25)' },
+  proposta: { label: '📄 Gerar Proposta Onepage', color: '#7C3AED', bg: 'rgba(124,58,237,0.06)', border: 'rgba(124,58,237,0.35)' },
 }
 
 const NOTIF_TIPO_CONFIG = {
@@ -130,7 +131,181 @@ function inlineRender(text, t) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-function SugestaoCard({ tipo, texto, t }) {
+// ─── PROPOSTA ONEPAGE MODAL ───────────────────────────────────────────────────
+function PropostaModal({ data, onClose }) {
+  const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const validade = data.validade || '10 dias úteis'
+  const prazo = data.prazo || '12 meses'
+  const cenarios = data.cenarios || []
+  const temCenarios = cenarios.length > 1
+
+  function handlePrint() {
+    const el = document.getElementById('proposta-print')
+    const win = window.open('', '_blank')
+    win.document.write(`
+      <html><head><title>Proposta ${data.conta} — ${data.servico}</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body{margin:0;font-family:'Inter',sans-serif;font-size:13px;color:#1a1a1a;background:#fff}
+        ${el.querySelector('style')?.textContent || ''}
+      </style></head><body>${el.innerHTML}</body></html>
+    `)
+    win.document.close()
+    setTimeout(() => { win.print(); win.close() }, 400)
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', backdropFilter: 'blur(4px)', overflowY: 'auto', padding: '24px 16px' }}>
+      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 720, boxShadow: '0 24px 80px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
+        {/* Toolbar */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', background: '#7C3AED', color: '#fff' }}>
+          <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.04em' }}>📄 Proposta Onepage — Preview</span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={handlePrint} style={{ background: '#fff', color: '#7C3AED', border: 'none', borderRadius: 8, padding: '6px 16px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>🖨 Imprimir / Salvar PDF</button>
+            <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 14, cursor: 'pointer' }}>✕</button>
+          </div>
+        </div>
+
+        {/* Document */}
+        <div id="proposta-print" style={{ padding: '40px 48px', fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#1a1a1a', lineHeight: 1.6 }}>
+          <style>{`
+            .proposta-h1{font-size:22px;font-weight:700;text-align:center;text-decoration:underline;margin:0 0 4px}
+            .proposta-sub{font-size:14px;font-style:italic;text-align:center;margin:0 0 24px;color:#444}
+            .proposta-section{margin-bottom:18px}
+            .proposta-label{font-weight:700;font-size:13px;margin-bottom:6px}
+            .proposta-ul{margin:6px 0 0 0;padding-left:20px}
+            .proposta-ul li{margin-bottom:4px}
+            .proposta-table{width:100%;border-collapse:collapse;margin-top:6px}
+            .proposta-table td,.proposta-table th{border:1px solid #ddd;padding:8px 12px;font-size:12px}
+            .proposta-table th{background:#f5f0ff;font-weight:600;color:#7C3AED}
+            .proposta-divider{border:none;border-top:1px solid #e2e8f0;margin:20px 0}
+            .proposta-footer{font-size:11px;color:#888;text-align:center;margin-top:32px}
+            .proposta-logo{font-size:26px;font-weight:900;color:#7C3AED;letter-spacing:0.04em;font-family:'Inter',sans-serif}
+          `}</style>
+
+          {/* Header row */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
+            <span className="proposta-logo">fëng</span>
+            <span style={{ fontSize: 11, color: '#666' }}>{hoje}</span>
+          </div>
+
+          <h1 className="proposta-h1">Proposta Comercial</h1>
+          <p className="proposta-sub">{data.servico}</p>
+
+          {/* Client info */}
+          <div className="proposta-section">
+            <div><strong>{data.conta?.toUpperCase()}</strong></div>
+            {data.contatos && <div style={{ color: '#444' }}>{data.contatos}</div>}
+            <div><strong>Validade da proposta –</strong> {validade}</div>
+            {data.reuniao && <div style={{ marginTop: 4 }}><strong>Reunião:</strong> {data.reuniao}</div>}
+          </div>
+          <div><strong>Ref.:</strong> Proposta para {data.servico} — {data.conta}.</div>
+
+          <hr className="proposta-divider" />
+
+          {/* Introdução */}
+          <div className="proposta-section">
+            <div className="proposta-label">Introdução</div>
+            <p style={{ margin: 0 }}>
+              Esta proposta tem como objetivo formalizar a contratação de {data.servico} para o {data.conta}.
+              {data.intro ? ' ' + data.intro : ' A FENG, empresa de tecnologia e marketing digital para clubes e esportes na América Latina, apresenta abaixo as condições e escopo acordados.'}
+            </p>
+          </div>
+
+          {/* Escopo */}
+          {data.escopo && (
+            <div className="proposta-section">
+              <div className="proposta-label">Escopo do Serviço</div>
+              <p style={{ margin: 0 }}>{data.escopo}</p>
+            </div>
+          )}
+
+          {/* Cenários / Investimento */}
+          <div className="proposta-section">
+            <div className="proposta-label">Investimento</div>
+            {temCenarios ? (
+              <table className="proposta-table">
+                <thead>
+                  <tr><th>Cenário</th><th>Descrição</th><th>Valor Mensal</th></tr>
+                </thead>
+                <tbody>
+                  {cenarios.map((c, i) => (
+                    <tr key={i}>
+                      <td style={{ fontWeight: 600 }}>{i + 1}</td>
+                      <td>{c.label}</td>
+                      <td style={{ fontWeight: 700, color: '#7C3AED' }}>{c.valor}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div style={{ marginTop: 6 }}>
+                <strong>Mensalidade (FEE):</strong>{' '}
+                <span style={{ color: '#7C3AED', fontWeight: 700 }}>{cenarios[0]?.valor || '—'}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Prazo */}
+          <div className="proposta-section">
+            <div className="proposta-label">Prazo de Contrato</div>
+            <p style={{ margin: 0 }}>{prazo}</p>
+          </div>
+
+          {/* Considerações */}
+          <div className="proposta-section">
+            <div className="proposta-label">Considerações Finais</div>
+            <p style={{ margin: 0 }}>
+              Estamos comprometidos em entregar resultados que fortaleçam a parceria com o {data.conta} e gerem impacto real nos objetivos da organização.
+            </p>
+          </div>
+
+          <hr className="proposta-divider" />
+
+          {/* Assinatura */}
+          <div style={{ marginTop: 16 }}>
+            <p style={{ margin: '0 0 24px' }}>Atenciosamente</p>
+            <div style={{ fontWeight: 700 }}>Mike Lopes</div>
+            <div style={{ color: '#555', fontSize: 12 }}>Head Sênior Comercial – FENG</div>
+          </div>
+
+          <div className="proposta-footer">
+            @fengbrasil · www.fengbrasil.com.br · Rua Rodrigo Silva, 26, 22 andar, Centro, Rio de Janeiro, 20011-040
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PropostaCard({ texto, t }) {
+  const [open, setOpen] = useState(false)
+  let data = {}
+  try { data = JSON.parse(texto) } catch {}
+  const cfg = SUGESTAO_CONFIG.proposta
+  return (
+    <>
+      <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: '0 10px 10px 10px', padding: '12px 14px', marginTop: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <span style={{ fontSize: 11, fontWeight: 700, color: cfg.color, letterSpacing: '0.03em' }}>{cfg.label}</span>
+            <div style={{ fontSize: 12, color: t.textMuted, marginTop: 4 }}>
+              {data.conta && <span style={{ marginRight: 8 }}>🏟 <strong>{data.conta}</strong></span>}
+              {data.servico && <span>· {data.servico}</span>}
+            </div>
+          </div>
+          <button onClick={() => setOpen(true)} style={{ background: cfg.color, border: 'none', borderRadius: 8, color: '#fff', padding: '6px 16px', fontSize: 12, cursor: 'pointer', fontWeight: 700, boxShadow: `0 4px 12px ${cfg.color}44` }}>
+            Gerar →
+          </button>
+        </div>
+      </div>
+      {open && <PropostaModal data={data} onClose={() => setOpen(false)} />}
+    </>
+  )
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
+
   const [copied, setCopied] = useState(false)
   const cfg = SUGESTAO_CONFIG[tipo] || SUGESTAO_CONFIG.discord
   function copy() { navigator.clipboard.writeText(texto); setCopied(true); setTimeout(() => setCopied(false), 2000) }
@@ -224,9 +399,8 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = [], auditLog
   const g12 = leads.filter(l => l.g12 && !l.off)
   const isAdmin = ADMINS.includes(userName)
 
-  let c = `🗓️ DATA DE HOJE: ${hoje} (${hojeISO}) — USE SEMPRE ESTA DATA COMO REFERÊNCIA\n`
-  c += `USUÁRIO: ${userName} | ADMIN: ${isAdmin}\n`
-  c += `RESUMO: ${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
+  let c = `DATA:${hoje} | USUÁRIO:${userName} | ADMIN:${isAdmin}\n`
+  c += `RESUMO:${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
 
   // ── Audit Log — movimentos recentes ──────────────────────────────────────
   if (auditLog.length > 0) {
@@ -390,13 +564,6 @@ Use markdown nas confirmações, relatórios e resumos:
 - --- → separador entre seções distintas
 Em conversas simples e rápidas: sem formatação, texto direto.
 
-DATA ATUAL:
-- A data de hoje está SEMPRE na primeira linha do contexto como 🗓️ DATA DE HOJE
-- USE SEMPRE essa data como referência para "hoje", "esta semana", "ontem"
-- NUNCA confunda a data das atividades/movimentos com a data atual
-- As atividades têm suas próprias datas (Dt_atualização, criado) — essas são datas dos REGISTROS, não de hoje
-- Sempre que citar "hoje é X", use a data do contexto, não a data de nenhuma atividade
-
 HISTÓRICO DE MOVIMENTOS:
 - Você tem acesso ao audit log completo na seção 📋 MOVIMENTOS RECENTES
 - Ele registra: criação de oportunidades, avanços de etapa, contatos adicionados, documentos, atividades criadas e concluídas, reativações da Geladeira
@@ -450,7 +617,22 @@ G12/G15/SÓCIO → [SUGESTÃO:whatsapp]🏆 *[LEAD]* — Atualização\n[Status 
 JURÍDICO → [SUGESTÃO:juridico]Briefing Jurídico — [Lead]\nContexto: ...\nNecessidade: ...\nPrazo: ...\nResp: [nome][/SUGESTÃO]
 
 REGRA: Máximo 2 sugestões por resposta. Não sugira em consultas.
-ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE.`
+ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE.
+
+BRIEFING COMERCIAL:
+Quando o usuário colar um briefing (texto com cliente, escopo, valor/fee, data de reunião ou cenários de preço), detecta automaticamente. Fluxo:
+1. Mostre com ## "Briefing detectado — [Conta]" e liste com numeração as ações que serão criadas (oportunidade + atividade de reunião se houver data).
+2. SIMULTANEAMENTE emita [SUGESTÃO:proposta] com os dados extraídos do briefing (assim o usuário pode gerar a proposta onepage a qualquer momento).
+3. Aguarde confirmação do usuário para executar os marcadores [AÇÃO].
+
+Formato do [SUGESTÃO:proposta] — JSON compacto em linha única dentro da tag:
+[SUGESTÃO:proposta]{"conta":"CONTA","servico":"SERVIÇO","contatos":"CONTATOS","escopo":"ESCOPO","cenarios":[{"label":"DESC","valor":"VALOR"}],"prazo":"PRAZO","validade":"10 dias úteis","reuniao":"DATA/HORA"}[/SUGESTÃO]
+
+Regras para o JSON da proposta:
+- Se houver apenas um valor (sem cenários): "cenarios":[{"label":"Mensalidade (FEE)","valor":"R$ X.XXX,00"}]
+- Se houver múltiplos cenários (ex: Cenário 1, Cenário 2): liste todos em "cenarios"
+- "contatos": nomes dos contatos do cliente mencionados no briefing
+- "reuniao": data e hora da reunião se mencionadas (ex: "07/04/2025 às 9h")`
 
 const EXTRACT_SYSTEM = `Você é um extrator de memórias. Analise a troca e extraia APENAS fatos relevantes e duráveis.
 TIPOS: pessoal, time, perfil. Máximo 3. Se não houver, retorne {"memorias": []}.
@@ -845,7 +1027,10 @@ export default function Chat() {
                 )}
                 {m.sugestoes?.length > 0 && (
                   <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {m.sugestoes.map((s, i) => <SugestaoCard key={i} tipo={s.tipo} texto={s.texto} t={t} />)}
+                    {m.sugestoes.map((s, i) => s.tipo === 'proposta'
+                      ? <PropostaCard key={i} texto={s.texto} t={t} />
+                      : <SugestaoCard key={i} tipo={s.tipo} texto={s.texto} t={t} />
+                    )}
                   </div>
                 )}
               </div>
