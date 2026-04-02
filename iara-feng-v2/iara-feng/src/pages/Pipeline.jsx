@@ -4,6 +4,7 @@ import {
   getLeads, getActivities, upsertLead,
   getContactsByConta, upsertContact, deleteContact,
   getDocumentsByConta, upsertDocument, deleteDocument,
+  logAudit,
 } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL } from '../data/pipeline'
 import { getTheme, saveTheme, THEMES } from '../lib/theme'
@@ -327,6 +328,13 @@ function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
     if (!toSave.conta)       toSave.conta       = lead.conta || lead.nome || ''
     if (!toSave.criado_por)  toSave.criado_por  = user.nome
     await upsertContact(toSave)
+    await logAudit({
+      evento: 'contato_adicionado',
+      conta: lead.conta || lead.nome || '',
+      servico: lead.servico || '',
+      detalhe: `${toSave.tipo === 'advisor' ? '🤝 Advisor' : '👤 Contato'}: ${toSave.nome}${toSave.cargo ? ` (${toSave.cargo})` : ''}`,
+      feito_por: user.nome,
+    })
     await loadContacts()
     setEditContact(null)
   }
@@ -352,6 +360,13 @@ function Modal({ lead, acts, onClose, onSave, onReativar, t }) {
     if (!toSave.lead_id)    toSave.lead_id    = lead.id || ''
     if (!toSave.criado_por) toSave.criado_por = user.nome
     await upsertDocument(toSave)
+    await logAudit({
+      evento: 'documento_adicionado',
+      conta: lead.conta || lead.nome || '',
+      servico: lead.servico || '',
+      detalhe: `${toSave.tipo || 'Documento'}: ${toSave.nome}`,
+      feito_por: user.nome,
+    })
     await loadDocs()
     setEditDoc(null)
   }
@@ -783,7 +798,27 @@ export default function Pipeline() {
   }
 
   async function handleSave(form) {
+    const before = leads.find(l => l.id === form.id)
     await upsertLead(form)
+    if (before?.etapa && form.etapa && before.etapa !== form.etapa) {
+      await logAudit({
+        evento: 'etapa_avancada',
+        conta: form.conta || form.nome || '',
+        servico: form.servico || '',
+        detalhe: `${before.etapa} → ${form.etapa}`,
+        de: before.etapa,
+        para: form.etapa,
+        feito_por: JSON.parse(localStorage.getItem('iara_user') || '{}').nome || '',
+      })
+    } else {
+      await logAudit({
+        evento: 'lead_atualizado',
+        conta: form.conta || form.nome || '',
+        servico: form.servico || '',
+        detalhe: 'Dados da oportunidade atualizados',
+        feito_por: JSON.parse(localStorage.getItem('iara_user') || '{}').nome || '',
+      })
+    }
     setLeads(prev => prev.map(l => l.id === form.id ? form : l))
     setSelected(null)
   }
@@ -791,6 +826,13 @@ export default function Pipeline() {
   async function handleReativar(form) {
     const reativado = { ...form, off: false, dias: 0, aging: 'Hot' }
     await upsertLead(reativado)
+    await logAudit({
+      evento: 'oportunidade_reativada',
+      conta: form.conta || form.nome || '',
+      servico: form.servico || '',
+      detalhe: `Reativada da Geladeira — estava há ${form.dias}d sem contato`,
+      feito_por: JSON.parse(localStorage.getItem('iara_user') || '{}').nome || '',
+    })
     setLeads(prev => prev.map(l => l.id === form.id ? reativado : l))
     setSelected(null)
   }
