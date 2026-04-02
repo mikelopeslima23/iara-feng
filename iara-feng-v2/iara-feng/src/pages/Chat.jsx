@@ -609,7 +609,8 @@ export default function Chat() {
         } else if (act.type === 'UPDATE_LEAD') {
           const { nome, campo, valor, etapa_anterior } = act.data
           const before = curL.find(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()))
-          curL = curL.map(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()) ? { ...l, [campo]: valor } : l)
+          const hoje = new Date().toISOString().split('T')[0]
+          curL = curL.map(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()) ? { ...l, [campo]: valor, ultima_atualizacao: hoje } : l)
           const updated = curL.find(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()))
           if (updated) await upsertLead(updated)
           if (campo === 'etapa') {
@@ -640,7 +641,8 @@ export default function Chat() {
             id: `opp-${Date.now()}`, nome, conta: conta || '', servico: servico || '',
             etapa: etapa || 'Prospecção', resp: resp || user.nome, dias: 0, aging: 'Hot',
             mov: 'Nova oportunidade criada via IAra', prox: '', dt: '',
-            op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: ''
+            op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: '',
+            ultima_atualizacao: new Date().toISOString().split('T')[0],
           }
           curL = [...curL, nL]; await upsertLead(nL)
           await logAudit({
