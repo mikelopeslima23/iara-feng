@@ -37,10 +37,22 @@ function agingLabel(dias) {
 function applyAging(leads) {
   return leads.map(l => {
     if (l.op) return l
-    if ((l.dias || 0) >= 90 && !l.off) return { ...l, off: true, aging: 'Geladeira' }
+    const dias = calcDias(l)
+    if (dias >= 90 && !l.off) return { ...l, off: true, aging: 'Geladeira' }
     return l
   })
 }
+
+// ─── CÁLCULO DINÂMICO DE DIAS ────────────────────────────────────────────────
+function calcDias(lead) {
+  if (lead.ultima_atualizacao) {
+    const ultima = new Date(lead.ultima_atualizacao + 'T12:00:00')
+    const hoje   = new Date()
+    return Math.max(0, Math.floor((hoje - ultima) / (1000 * 60 * 60 * 24)))
+  }
+  return lead.dias || 0
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 function diasParaVencer(vencimento) {
   if (!vencimento) return null
@@ -97,7 +109,8 @@ function healthScore(lead, acts, contactsMap) {
   score -= atrasadas.length * 20
   if (!contatos.some(c => c.tipo === 'contato')) score -= 15
   if (!contatos.some(c => c.tipo === 'advisor'))  score -= 10
-  score -= Math.min(30, Math.floor((lead.dias || 0) / 7) * 5)
+  const diasRef = lead.dias || calcDias(lead)
+  score -= Math.min(30, Math.floor(diasRef / 7) * 5)
   if (lead.risco) score -= 10
   return Math.max(0, Math.min(100, score))
 }
@@ -390,7 +403,7 @@ function Modal({ lead, acts, onClose, onSave, onReativar, onEnviarGeladeira, t }
                 <span>·</span>
                 <span>👤 {lead.resp}</span>
                 <span>·</span>
-                <span style={{ color: lead.dias > 7 ? t.orange : t.textMuted }}>🕐 {lead.dias}d sem atualização</span>
+                <span style={{ color: calcDias(lead) > 7 ? t.orange : t.textMuted }}>🕐 {calcDias(lead)}d sem atualização</span>
                 {lead.op && <span style={{ color: t.green }}>· 🏭 Go-Live</span>}
                 {lead.valor > 0 && <span style={{ color: t.purple, fontWeight: 600 }}>· 💰 {formatValor(lead.valor)}</span>}
               </div>
@@ -799,7 +812,7 @@ export default function Pipeline() {
   }
 
   async function handleReativar(form) {
-    const reativado = { ...form, off: false, dias: 0, aging: 'Hot' }
+    const reativado = { ...form, off: false, dias: 0, aging: 'Hot', ultima_atualizacao: new Date().toISOString().split('T')[0] }
     await upsertLead(reativado)
     setLeads(prev => prev.map(l => l.id === form.id ? reativado : l))
     setSelected(null)
@@ -821,7 +834,7 @@ export default function Pipeline() {
 
   // ── Derived data ─────────────────────────────────────────────────────────────
   const todosAtivos    = leads.filter(l => !l.off && !l.op)
-  const todosGeladeira = leads.filter(l =>  l.off && !l.op).sort((a, b) => b.dias - a.dias)
+  const todosGeladeira = leads.filter(l =>  l.off && !l.op).sort((a, b) => calcDias(b) - calcDias(a))
   const goLive         = leads.filter(l => l.op)
   const renovacoes     = goLive
     .filter(l => { const d = diasParaVencer(l.vencimento); return d !== null && d <= 90 })
@@ -986,10 +999,11 @@ export default function Pipeline() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: t.bgAlt, border: `1px solid ${t.border}`, borderTop: 'none', borderRadius: '0 0 12px 12px', padding: 10, minHeight: 80 }}>
                     {cards.length === 0 && <div style={{ textAlign: 'center', color: t.border, fontSize: 12, padding: '20px 0' }}>vazio</div>}
                     {cards.map(l => {
-                      const { label: agLabel, color: agColor } = agingLabel(l.dias || 0)
+                      const diasL = calcDias(l)
+                      const { label: agLabel, color: agColor } = agingLabel(diasL)
                       const pendLead = acts.filter(a => a.lead?.toLowerCase().includes((l.conta || l.nome || '').toLowerCase()) && !a.ok)
                       const contaOps = contasAtivas[l.conta || l.nome] || 1
-                      const hs       = healthScore(l, acts, contactsMap)
+                      const hs       = healthScore({ ...l, dias: diasL }, acts, contactsMap)
                       const hsInfo   = healthLabel(hs)
                       return (
                         <div key={l.id} className="lead-card" onClick={() => setSelected(l)} style={{ background: t.surfaceInput, border: `1px solid ${l.risco ? t.orange + '44' : t.border}`, borderRadius: 10, padding: '11px 13px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 6, boxShadow: t.name === 'light' ? '0 1px 4px rgba(124,58,237,0.06)' : 'none' }}>
@@ -1002,7 +1016,7 @@ export default function Pipeline() {
                           </div>
                           <div style={{ fontSize: 11, color: t.textMuted }}>👤 {l.resp}</div>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 11, color: l.dias > 7 ? t.orange : t.textMuted }}>🕐 {l.dias}d</span>
+                            <span style={{ fontSize: 11, color: diasL > 7 ? t.orange : t.textMuted }}>🕐 {diasL}d</span>
                             {/* Health Score */}
                             <span title={`Health Score: ${hs}/100`} style={{ background: hsInfo.bg, border: `1px solid ${hsInfo.color}44`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: hsInfo.color, fontWeight: 700 }}>❤️ {hs}</span>
                             {pendLead.length > 0 && <span style={{ background: t.purpleFaint, border: `1px solid ${t.purple}44`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: t.purple }}>{pendLead.length} pend.</span>}
@@ -1109,7 +1123,7 @@ export default function Pipeline() {
             { label: '🟠 6 a 12 meses',   min: 180, max: 365 },
             { label: '🟡 3 a 6 meses',    min: 90,  max: 180 },
           ].map(grupo => {
-            const items = geladeira.filter(l => l.dias >= grupo.min && (!grupo.max || l.dias < grupo.max))
+            const items = geladeira.filter(l => calcDias(l) >= grupo.min && (!grupo.max || calcDias(l) < grupo.max))
             if (items.length === 0) return null
             return (
               <div key={grupo.label}>
@@ -1118,7 +1132,7 @@ export default function Pipeline() {
                   {items.map(l => (
                     <div key={l.id} className="gel-card" onClick={() => setSelected(l)} style={{ background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 12, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
                       <div style={{ minWidth: 52, textAlign: 'center', background: t.surface, borderRadius: 8, padding: '6px 4px', border: `1px solid ${t.border}` }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: t.textMuted }}>{l.dias}</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: t.textMuted }}>{calcDias(l)}</div>
                         <div style={{ fontSize: 9, color: t.textHint }}>dias</div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
