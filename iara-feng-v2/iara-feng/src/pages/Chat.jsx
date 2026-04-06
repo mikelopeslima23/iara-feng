@@ -19,7 +19,6 @@ const SUGESTAO_CONFIG = {
   discord: { label: '💬 Sugestão para Discord', color: '#5865F2', bg: 'rgba(88,101,242,0.08)', border: 'rgba(88,101,242,0.25)' },
   whatsapp: { label: '📱 Sugestão WhatsApp — Diretoria', color: '#25D366', bg: 'rgba(37,211,102,0.08)', border: 'rgba(37,211,102,0.25)' },
   juridico: { label: '⚖️ Briefing para o Jurídico', color: '#3B82F6', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.25)' },
-  proposta: { label: '📄 Gerar Proposta Onepage', color: '#7C3AED', bg: 'rgba(124,58,237,0.06)', border: 'rgba(124,58,237,0.35)' },
 }
 
 const NOTIF_TIPO_CONFIG = {
@@ -131,198 +130,7 @@ function inlineRender(text, t) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ─── PROPOSTA ONEPAGE MODAL ───────────────────────────────────────────────────
-function PropostaModal({ data, onClose }) {
-  const hoje = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  const validade = data.validade || '10 dias úteis'
-  const prazo = data.prazo || '12 meses'
-  const cenarios = data.cenarios || []
-  const temCenarios = cenarios.length > 1
-  const [downloading, setDownloading] = useState(false)
-
-  async function handleDownload() {
-    setDownloading(true)
-    try {
-      // Carrega html2pdf dinamicamente se ainda não estiver disponível
-      if (!window.html2pdf) {
-        await new Promise((resolve, reject) => {
-          const s = document.createElement('script')
-          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js'
-          s.onload = resolve; s.onerror = reject
-          document.head.appendChild(s)
-        })
-      }
-      const el = document.getElementById('proposta-print')
-      const nomeArquivo = `Proposta_FENG_${(data.conta || 'Cliente').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`
-      await window.html2pdf().set({
-        margin: [10, 12, 10, 12],
-        filename: nomeArquivo,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['avoid-all', 'css'] },
-      }).from(el).save()
-    } catch (e) {
-      console.error('Erro ao gerar PDF:', e)
-      alert('Erro ao gerar PDF. Tente novamente.')
-    }
-    setDownloading(false)
-  }
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', zIndex: 300, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', backdropFilter: 'blur(4px)', overflowY: 'auto', padding: '24px 16px' }}>
-      <div style={{ background: '#fff', borderRadius: 16, width: '100%', maxWidth: 720, boxShadow: '0 24px 80px rgba(0,0,0,0.25)', overflow: 'hidden' }}>
-        {/* Toolbar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 20px', background: '#7C3AED', color: '#fff' }}>
-          <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: '0.04em' }}>📄 Proposta Onepage — Preview</span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={handleDownload} disabled={downloading} style={{ background: downloading ? 'rgba(255,255,255,0.5)' : '#fff', color: '#7C3AED', border: 'none', borderRadius: 8, padding: '6px 16px', fontSize: 12, fontWeight: 700, cursor: downloading ? 'not-allowed' : 'pointer', minWidth: 140, transition: 'all 0.15s' }}>
-              {downloading ? '⏳ Gerando PDF...' : '⬇️ Baixar PDF'}
-            </button>
-            <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.2)', color: '#fff', border: 'none', borderRadius: 8, padding: '6px 12px', fontSize: 14, cursor: 'pointer' }}>✕</button>
-          </div>
-        </div>
-
-        {/* Document */}
-        <div id="proposta-print" style={{ padding: '40px 48px', fontFamily: "'Inter',sans-serif", fontSize: 13, color: '#1a1a1a', lineHeight: 1.6 }}>
-          <style>{`
-            .proposta-h1{font-size:22px;font-weight:700;text-align:center;text-decoration:underline;margin:0 0 4px}
-            .proposta-sub{font-size:14px;font-style:italic;text-align:center;margin:0 0 24px;color:#444}
-            .proposta-section{margin-bottom:18px}
-            .proposta-label{font-weight:700;font-size:13px;margin-bottom:6px}
-            .proposta-ul{margin:6px 0 0 0;padding-left:20px}
-            .proposta-ul li{margin-bottom:4px}
-            .proposta-table{width:100%;border-collapse:collapse;margin-top:6px}
-            .proposta-table td,.proposta-table th{border:1px solid #ddd;padding:8px 12px;font-size:12px}
-            .proposta-table th{background:#f5f0ff;font-weight:600;color:#7C3AED}
-            .proposta-divider{border:none;border-top:1px solid #e2e8f0;margin:20px 0}
-            .proposta-footer{font-size:11px;color:#888;text-align:center;margin-top:32px}
-            .proposta-logo{font-size:26px;font-weight:900;color:#7C3AED;letter-spacing:0.04em;font-family:'Inter',sans-serif}
-          `}</style>
-
-          {/* Header row */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}>
-            <span className="proposta-logo">fëng</span>
-            <span style={{ fontSize: 11, color: '#666' }}>{hoje}</span>
-          </div>
-
-          <h1 className="proposta-h1">Proposta Comercial</h1>
-          <p className="proposta-sub">{data.servico}</p>
-
-          {/* Client info */}
-          <div className="proposta-section">
-            <div><strong>{data.conta?.toUpperCase()}</strong></div>
-            {data.contatos && <div style={{ color: '#444' }}>{data.contatos}</div>}
-            <div><strong>Validade da proposta –</strong> {validade}</div>
-            {data.reuniao && <div style={{ marginTop: 4 }}><strong>Reunião:</strong> {data.reuniao}</div>}
-          </div>
-          <div><strong>Ref.:</strong> Proposta para {data.servico} — {data.conta}.</div>
-
-          <hr className="proposta-divider" />
-
-          {/* Introdução */}
-          <div className="proposta-section">
-            <div className="proposta-label">Introdução</div>
-            <p style={{ margin: 0 }}>
-              Esta proposta tem como objetivo formalizar a contratação de {data.servico} para o {data.conta}.
-              {data.intro ? ' ' + data.intro : ' A FENG, empresa de tecnologia e marketing digital para clubes e esportes na América Latina, apresenta abaixo as condições e escopo acordados.'}
-            </p>
-          </div>
-
-          {/* Escopo */}
-          {data.escopo && (
-            <div className="proposta-section">
-              <div className="proposta-label">Escopo do Serviço</div>
-              <p style={{ margin: 0 }}>{data.escopo}</p>
-            </div>
-          )}
-
-          {/* Cenários / Investimento */}
-          <div className="proposta-section">
-            <div className="proposta-label">Investimento</div>
-            {temCenarios ? (
-              <table className="proposta-table">
-                <thead>
-                  <tr><th>Cenário</th><th>Descrição</th><th>Valor Mensal</th></tr>
-                </thead>
-                <tbody>
-                  {cenarios.map((c, i) => (
-                    <tr key={i}>
-                      <td style={{ fontWeight: 600 }}>{i + 1}</td>
-                      <td>{c.label}</td>
-                      <td style={{ fontWeight: 700, color: '#7C3AED' }}>{c.valor}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div style={{ marginTop: 6 }}>
-                <strong>Mensalidade (FEE):</strong>{' '}
-                <span style={{ color: '#7C3AED', fontWeight: 700 }}>{cenarios[0]?.valor || '—'}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Prazo */}
-          <div className="proposta-section">
-            <div className="proposta-label">Prazo de Contrato</div>
-            <p style={{ margin: 0 }}>{prazo}</p>
-          </div>
-
-          {/* Considerações */}
-          <div className="proposta-section">
-            <div className="proposta-label">Considerações Finais</div>
-            <p style={{ margin: 0 }}>
-              Estamos comprometidos em entregar resultados que fortaleçam a parceria com o {data.conta} e gerem impacto real nos objetivos da organização.
-            </p>
-          </div>
-
-          <hr className="proposta-divider" />
-
-          {/* Assinatura */}
-          <div style={{ marginTop: 16 }}>
-            <p style={{ margin: '0 0 24px' }}>Atenciosamente</p>
-            <div style={{ fontWeight: 700 }}>Mike Lopes</div>
-            <div style={{ color: '#555', fontSize: 12 }}>Head Sênior Comercial – FENG</div>
-          </div>
-
-          <div className="proposta-footer">
-            @fengbrasil · www.fengbrasil.com.br · Rua Rodrigo Silva, 26, 22 andar, Centro, Rio de Janeiro, 20011-040
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function PropostaCard({ texto, t }) {
-  const [open, setOpen] = useState(false)
-  let data = {}
-  try { data = JSON.parse(texto) } catch {}
-  const cfg = SUGESTAO_CONFIG.proposta
-  return (
-    <>
-      <div style={{ background: cfg.bg, border: `1px solid ${cfg.border}`, borderLeft: `3px solid ${cfg.color}`, borderRadius: '0 10px 10px 10px', padding: '12px 14px', marginTop: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <span style={{ fontSize: 11, fontWeight: 700, color: cfg.color, letterSpacing: '0.03em' }}>{cfg.label}</span>
-            <div style={{ fontSize: 12, color: t.textMuted, marginTop: 4 }}>
-              {data.conta && <span style={{ marginRight: 8 }}>🏟 <strong>{data.conta}</strong></span>}
-              {data.servico && <span>· {data.servico}</span>}
-            </div>
-          </div>
-          <button onClick={() => setOpen(true)} style={{ background: cfg.color, border: 'none', borderRadius: 8, color: '#fff', padding: '6px 16px', fontSize: 12, cursor: 'pointer', fontWeight: 700, boxShadow: `0 4px 12px ${cfg.color}44` }}>
-            Gerar →
-          </button>
-        </div>
-      </div>
-      {open && <PropostaModal data={data} onClose={() => setOpen(false)} />}
-    </>
-  )
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
-
+function SugestaoCard({ tipo, texto, t }) {
   const [copied, setCopied] = useState(false)
   const cfg = SUGESTAO_CONFIG[tipo] || SUGESTAO_CONFIG.discord
   function copy() { navigator.clipboard.writeText(texto); setCopied(true); setTimeout(() => setCopied(false), 2000) }
@@ -416,8 +224,9 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = [], auditLog
   const g12 = leads.filter(l => l.g12 && !l.off)
   const isAdmin = ADMINS.includes(userName)
 
-  let c = `DATA:${hoje} | USUÁRIO:${userName} | ADMIN:${isAdmin}\n`
-  c += `RESUMO:${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
+  let c = `🗓️ DATA DE HOJE: ${hoje} (${hojeISO}) — USE SEMPRE ESTA DATA COMO REFERÊNCIA\n`
+  c += `USUÁRIO: ${userName} | ADMIN: ${isAdmin}\n`
+  c += `RESUMO: ${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
 
   // ── Audit Log — movimentos recentes ──────────────────────────────────────
   if (auditLog.length > 0) {
@@ -581,6 +390,13 @@ Use markdown nas confirmações, relatórios e resumos:
 - --- → separador entre seções distintas
 Em conversas simples e rápidas: sem formatação, texto direto.
 
+DATA ATUAL:
+- A data de hoje está SEMPRE na primeira linha do contexto como 🗓️ DATA DE HOJE
+- USE SEMPRE essa data como referência para "hoje", "esta semana", "ontem"
+- NUNCA confunda a data das atividades/movimentos com a data atual
+- As atividades têm suas próprias datas (Dt_atualização, criado) — essas são datas dos REGISTROS, não de hoje
+- Sempre que citar "hoje é X", use a data do contexto, não a data de nenhuma atividade
+
 HISTÓRICO DE MOVIMENTOS:
 - Você tem acesso ao audit log completo na seção 📋 MOVIMENTOS RECENTES
 - Ele registra: criação de oportunidades, avanços de etapa, contatos adicionados, documentos, atividades criadas e concluídas, reativações da Geladeira
@@ -634,22 +450,7 @@ G12/G15/SÓCIO → [SUGESTÃO:whatsapp]🏆 *[LEAD]* — Atualização\n[Status 
 JURÍDICO → [SUGESTÃO:juridico]Briefing Jurídico — [Lead]\nContexto: ...\nNecessidade: ...\nPrazo: ...\nResp: [nome][/SUGESTÃO]
 
 REGRA: Máximo 2 sugestões por resposta. Não sugira em consultas.
-ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE.
-
-BRIEFING COMERCIAL:
-Quando o usuário colar um briefing (texto com cliente, escopo, valor/fee, data de reunião ou cenários de preço), detecta automaticamente. Fluxo:
-1. Mostre com ## "Briefing detectado — [Conta]" e liste com numeração as ações que serão criadas (oportunidade + atividade de reunião se houver data). Já inclua [SUGESTÃO:proposta] com os dados extraídos NESSA PRIMEIRA RESPOSTA.
-2. Aguarde confirmação do usuário para executar os marcadores [AÇÃO].
-3. Após executar as ações (resposta pós-confirmação): OBRIGATORIAMENTE emita [SUGESTÃO:proposta] novamente com os mesmos dados. Isso é OBRIGATÓRIO — não é opcional, não é contextual. Se não emitir, o usuário perde acesso ao gerador de proposta.
-
-Formato do [SUGESTÃO:proposta] — JSON compacto em linha única dentro da tag:
-[SUGESTÃO:proposta]{"conta":"CONTA","servico":"SERVIÇO","contatos":"CONTATOS","escopo":"ESCOPO","cenarios":[{"label":"DESC","valor":"VALOR"}],"prazo":"PRAZO","validade":"10 dias úteis","reuniao":"DATA/HORA"}[/SUGESTÃO]
-
-Regras para o JSON da proposta:
-- Se houver apenas um valor (sem cenários): "cenarios":[{"label":"Mensalidade (FEE)","valor":"R$ X.XXX,00"}]
-- Se houver múltiplos cenários (ex: Cenário 1, Cenário 2): liste todos em "cenarios"
-- "contatos": nomes dos contatos do cliente mencionados no briefing
-- "reuniao": data e hora da reunião se mencionadas (ex: "07/04/2025 às 9h")`
+ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE.`
 
 const EXTRACT_SYSTEM = `Você é um extrator de memórias. Analise a troca e extraia APENAS fatos relevantes e duráveis.
 TIPOS: pessoal, time, perfil. Máximo 3. Se não houver, retorne {"memorias": []}.
@@ -685,62 +486,6 @@ async function callAI(messages, system) {
   if (!r.ok) throw new Error(`API error ${r.status}`)
   const d = await r.json(); return d.text || ''
 }
-
-// ─── BRIEFING DETECTOR (frontend — não depende do modelo emitir o marcador) ──
-function detectBriefing(text) {
-  const t = text.toLowerCase()
-  const hasBriefing = t.includes('briefing') || t.includes('cenário 1') || t.includes('cenario 1') || t.includes('cenário 2') || t.includes('cenario 2')
-  const hasValor = /r\$\s*[\d.,]+/.test(t) || t.includes('valor mensal') || t.includes('mensalidade') || t.includes('fee')
-  const hasCliente = t.includes('maracanã') || t.includes('escopo') || t.includes('alocação') || t.includes('alocacao')
-  return hasBriefing || (hasValor && hasCliente)
-}
-
-function extractPropostaFromBriefing(text) {
-  // Conta
-  const contaMatch = text.match(/(?:Maracanã|maracanã|MARACANÃ|Proposta[^|]+\|\s*)([A-ZÀ-Ú][^\n|]+)/i)
-  let conta = 'Maracanã'
-  if (text.toLowerCase().includes('maracanã')) conta = 'Maracanã'
-
-  // Serviço — pega o que vem após "Proposta" ou título
-  const tituloMatch = text.match(/Proposta[^—\n]*[—–-]\s*([^\n|]+)/i)
-  const servico = tituloMatch ? tituloMatch[1].trim().replace(/^\|.*/, '').trim() : 'Redes Sociais — Alocação Presencial'
-
-  // Escopo
-  const escopoMatch = text.match(/Escopo[^:]*:?\s*[\n\r]([^\n]+(?:\n(?!Cenário|Valor|Importante)[^\n]+)*)/i)
-  const escopo = escopoMatch ? escopoMatch[1].replace(/\n/g, ' ').trim() : ''
-
-  // Reunião
-  const reuniaoMatch = text.match(/(?:reunião|meeting)[^,\n]*,?\s*([\d]{1,2}\/[\d]{1,2}(?:\/[\d]{2,4})?)[^,\n]*(?:,|\s)?\s*(?:às\s*)?([\d]{1,2}h[\d]{0,2})?/i)
-  const reuniao = reuniaoMatch ? `${reuniaoMatch[1]}${reuniaoMatch[2] ? ' às ' + reuniaoMatch[2] : ''}` : ''
-
-  // Cenários — busca padrões "Cenário N" + valor
-  const cenarios = []
-  const cenRegex = /Cenário\s*(\d+)[^\n]*\n([^\n]+)\nValor[^\n]*:\s*(R\$\s*[\d.,]+)/gi
-  let m
-  while ((m = cenRegex.exec(text)) !== null) {
-    cenarios.push({ label: `Cenário ${m[1]} — ${m[2].trim()}`, valor: m[3].trim() })
-  }
-  // Fallback: busca linhas com "Valor mensal: R$"
-  if (cenarios.length === 0) {
-    const valorLines = [...text.matchAll(/Valor\s+mensal:\s*(R\$\s*[\d.,]+)/gi)]
-    const labelLines = [...text.matchAll(/Cenário\s*\d+[^\n]*/gi)]
-    valorLines.forEach((v, i) => {
-      cenarios.push({ label: labelLines[i]?.[0]?.trim() || `Cenário ${i + 1}`, valor: v[1].trim() })
-    })
-  }
-  // Fallback single fee
-  if (cenarios.length === 0) {
-    const feeMatch = text.match(/(?:mensalidade|fee)[^R$\n]*R\$\s*([\d.,]+)/i)
-    if (feeMatch) cenarios.push({ label: 'Mensalidade (FEE)', valor: `R$ ${feeMatch[1]}` })
-  }
-
-  // Prazo
-  const prazoMatch = text.match(/(\d+)\s*anos?/i)
-  const prazo = prazoMatch ? `${prazoMatch[1]} anos` : '12 meses'
-
-  return { conta, servico, contatos: '', escopo, cenarios, prazo, validade: '10 dias úteis', reuniao }
-}
-// ─────────────────────────────────────────────────────────────────────────────
 async function extractAndSaveMemories(userId, userMsg, assistantMsg) {
   try {
     const raw = await callAI([{ role: 'user', content: `Usuário disse: "${userMsg}"\nIAra respondeu: "${assistantMsg.slice(0, 300)}"\n\nExtraia memórias relevantes.` }], EXTRACT_SYSTEM)
@@ -748,6 +493,22 @@ async function extractAndSaveMemories(userId, userMsg, assistantMsg) {
     if (parsed.memorias?.length > 0) for (const m of parsed.memorias) if (m.tipo && m.conteudo) await saveMemory(userId, m.tipo, m.conteudo)
   } catch {}
 }
+
+// ─── SAFE WRAPPERS — nunca quebram o fluxo principal ─────────────────────────
+async function safeLog(params) {
+  try { await safeLog(params) } catch (e) { console.warn('audit log skipped:', e.message) }
+}
+async function safeUpsertLead(lead) {
+  try {
+    // Remover campos que podem não existir na tabela ainda
+    const { ultima_atualizacao, ...rest } = lead
+    // Tentar com ultima_atualizacao primeiro
+    try { return await upsertLead(lead) } catch {
+      return await upsertLead(rest)
+    }
+  } catch (e) { console.warn('upsertLead failed:', e.message) }
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 export default function Chat() {
   const navigate = useNavigate()
@@ -792,7 +553,7 @@ export default function Chat() {
   }, [user.id])
 
   async function refreshAuditLog() {
-    try { const log = await getAuditLog(40); setAuditLog(log) } catch {}
+    try { const log = await getAuditLog(40); setAuditLog(log) } catch (e) { console.warn('audit log unavailable:', e.message) }
   }
 
   async function init() {
@@ -802,7 +563,10 @@ export default function Chat() {
       if (!l.length) { for (const lead of PIPELINE_INITIAL) await upsertLead(lead); l = PIPELINE_INITIAL }
       if (!a.length) { for (const act of ACTIVITIES_INITIAL) await upsertActivity(act); a = ACTIVITIES_INITIAL }
       setLeads(l); setActs(a)
-      const [mems, know, nots, log] = await Promise.all([getMemories(user.id), getKnowledge(), getNotifications(user.id), getAuditLog(40)])
+      // getAuditLog é opcional — não quebra o init se falhar
+      const [mems, know, nots] = await Promise.all([getMemories(user.id), getKnowledge(), getNotifications(user.id)])
+      let log = []
+      try { log = await getAuditLog(40) } catch (e) { console.warn('audit log unavailable:', e.message) }
       setMemories(mems); setKnowledge(know); setNotifs(nots); setAuditLog(log)
       const history = await getMessages(user.id)
       if (history.length > 0) {
@@ -840,18 +604,12 @@ export default function Chat() {
       let curL = [...leads], curA = [...acts], openRadar = false
       let auditUpdated = false
 
-      // ── Frontend briefing detection: inject PropostaCard if model missed it ──
-      if (detectBriefing(t2) && !sugestoes.find(s => s.tipo === 'proposta')) {
-        const propostoData = extractPropostaFromBriefing(t2)
-        sugestoes.push({ tipo: 'proposta', texto: JSON.stringify(propostoData) })
-      }
-
       for (const act of actions) {
         if (act.type === 'CONCLUIR') {
           const found = curA.find(a => a.id === act.data.id)
           curA = curA.map(a => a.id === act.data.id ? { ...a, ok: true } : a)
           await upsertActivity({ ...found, ok: true })
-          await logAudit({
+          await safeLog({
             evento: 'atividade_concluida',
             conta: found?.lead || '',
             detalhe: found?.descricao || '',
@@ -863,11 +621,11 @@ export default function Chat() {
           const nA = {
             id: `act-${Date.now()}`, ok: false,
             criado: new Date().toISOString().split('T')[0],
-            lead: act.data.lead, descricao: act.data.descricao || act.data.desc || '',
+            lead: act.data.lead, descricao: act.data.descricao,
             dt: act.data.dt, resp: act.data.resp, tipo: act.data.tipo || 'Atividade'
           }
           curA = [...curA, nA]; await upsertActivity(nA)
-          await logAudit({
+          await safeLog({
             evento: 'atividade_criada',
             conta: act.data.lead || '',
             detalhe: `[${act.data.tipo || 'Atividade'}] ${act.data.descricao} — até ${act.data.dt || 'sem prazo'} | ${act.data.resp}`,
@@ -881,9 +639,9 @@ export default function Chat() {
           const hoje = new Date().toISOString().split('T')[0]
           curL = curL.map(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()) ? { ...l, [campo]: valor, ultima_atualizacao: hoje } : l)
           const updated = curL.find(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()))
-          if (updated) await upsertLead(updated)
+          if (updated) await safeUpsertLead(updated)
           if (campo === 'etapa') {
-            await logAudit({
+            await safeLog({
               evento: 'etapa_avancada',
               conta: updated?.conta || nome,
               servico: updated?.servico || '',
@@ -893,7 +651,7 @@ export default function Chat() {
               feito_por: user.nome,
             })
           } else {
-            await logAudit({
+            await safeLog({
               evento: 'lead_atualizado',
               conta: updated?.conta || nome,
               servico: updated?.servico || '',
@@ -913,8 +671,8 @@ export default function Chat() {
             op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: '',
             ultima_atualizacao: new Date().toISOString().split('T')[0],
           }
-          curL = [...curL, nL]; await upsertLead(nL)
-          await logAudit({
+          curL = [...curL, nL]; await safeUpsertLead(nL)
+          await safeLog({
             evento: 'oportunidade_criada',
             conta: conta || '',
             servico: servico || '',
@@ -938,7 +696,7 @@ export default function Chat() {
             criado_por: user.nome,
           }
           await upsertContact(contato)
-          await logAudit({
+          await safeLog({
             evento: 'contato_adicionado',
             conta: act.data.conta || '',
             detalhe: `${contato.tipo === 'advisor' ? '🤝 Advisor' : '👤 Contato'}: ${contato.nome}${contato.cargo ? ` (${contato.cargo})` : ''}`,
@@ -1106,10 +864,7 @@ export default function Chat() {
                 )}
                 {m.sugestoes?.length > 0 && (
                   <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {m.sugestoes.map((s, i) => s.tipo === 'proposta'
-                      ? <PropostaCard key={i} texto={s.texto} t={t} />
-                      : <SugestaoCard key={i} tipo={s.tipo} texto={s.texto} t={t} />
-                    )}
+                    {m.sugestoes.map((s, i) => <SugestaoCard key={i} tipo={s.tipo} texto={s.texto} t={t} />)}
                   </div>
                 )}
               </div>
