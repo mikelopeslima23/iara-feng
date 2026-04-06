@@ -376,7 +376,12 @@ Faça uma apresentação completa e envolvente. Use seu tom característico — 
 Prosa fluida, sem bullet points. Máximo 250 palavras.`
 }
 
-const SYSTEM = `Você é a IAra, agente de inteligência comercial da FENG — empresa de tecnologia para clubes de futebol e esportes na América Latina.
+function buildSystem() {
+  const hoje = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' })
+  const hojeISO = new Date().toISOString().split('T')[0]
+  return `ATENÇÃO — DATA DE HOJE: ${hoje} (${hojeISO}). Use SEMPRE esta data. Ignore qualquer data de mensagens anteriores do histórico.
+
+Você é a IAra, agente de inteligência comercial da FENG — empresa de tecnologia para clubes de futebol e esportes na América Latina.
 
 IDENTIDADE: IAra — Intelligence and Action for Revenue Acceleration. Tom: colega descontraída, direta, bem-humorada. Português informal. NUNCA diz "Como posso te ajudar?". NUNCA repete a mesma frase.
 
@@ -575,7 +580,7 @@ export default function Chat() {
       }
       const ctx = buildCtx(l, a, user.nome, mems, know, log)
       const cargoInfo = CARGOS[user.nome] || { cargo: 'membro do time comercial' }
-      const raw = await callAI([{ role: 'user', content: buildOnboardingPrompt(user.nome, cargoInfo.cargo) }], SYSTEM + '\n\n' + ctx)
+      const raw = await callAI([{ role: 'user', content: buildOnboardingPrompt(user.nome, cargoInfo.cargo) }], buildSystem() + '\n\n' + ctx)
       const txt = strip(raw)
       setMsgs([{ id: 'g1', role: 'assistant', text: txt, results: [], sugestoes: [] }])
       await saveMessage(user.id, 'assistant', txt)
@@ -595,7 +600,7 @@ export default function Chat() {
     try {
       const ctx = buildCtx(leads, acts, user.nome, memories, knowledge, auditLog)
       const apiMsgs = newMsgs.slice(-40).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
-      const raw = await callAI(apiMsgs, SYSTEM + '\n\n' + ctx)
+      const raw = await callAI(apiMsgs, buildSystem() + '\n\n' + ctx)
       const actions = parseActions(raw)
       const sugestoes = parseSugestoes(raw)
       const notifsParsed = parseNotifs(raw)
@@ -738,7 +743,7 @@ export default function Chat() {
     await clearMessages(user.id); setMsgs([]); setLoading(true)
     try {
       const ctx = buildCtx(leads, acts, user.nome, memories, knowledge, auditLog)
-      const raw = await callAI([{ role: 'user', content: `Reabra a conversa com ${user.nome} com nova saudação breve.` }], SYSTEM + '\n\n' + ctx)
+      const raw = await callAI([{ role: 'user', content: `Reabra a conversa com ${user.nome} com nova saudação breve.` }], buildSystem() + '\n\n' + ctx)
       const txt = strip(raw)
       setMsgs([{ id: Date.now(), role: 'assistant', text: txt, results: [], sugestoes: [] }])
       await saveMessage(user.id, 'assistant', txt)
