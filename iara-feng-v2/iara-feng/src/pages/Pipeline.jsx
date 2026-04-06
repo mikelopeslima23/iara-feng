@@ -744,6 +744,10 @@ function Modal({ lead, acts, onClose, onSave, onReativar, onEnviarGeladeira, t }
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+async function safeLog(params) {
+  try { await safeLog(params) } catch (e) { console.warn('audit log skipped:', e.message) }
+}
+
 export default function Pipeline() {
   const navigate  = useNavigate()
   const user      = JSON.parse(localStorage.getItem('iara_user') || '{}')
@@ -821,7 +825,7 @@ export default function Pipeline() {
   async function handleEnviarGeladeira(form) {
     const gelado = { ...form, off: true, aging: 'Geladeira' }
     await upsertLead(gelado)
-    await logAudit({
+    await safeLog({
       evento: 'lead_atualizado',
       conta: form.conta || form.nome || '',
       servico: form.servico || '',
