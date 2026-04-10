@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  getLeads, getActivities, upsertLead,
+  getLeads, getActivities, upsertLead, upsertActivity,
   getContactsByConta, upsertContact, deleteContact,
   getDocumentsByConta, upsertDocument, deleteDocument,
 } from '../lib/supabase'
@@ -37,22 +37,10 @@ function agingLabel(dias) {
 function applyAging(leads) {
   return leads.map(l => {
     if (l.op) return l
-    const dias = calcDias(l)
-    if (dias >= 90 && !l.off) return { ...l, off: true, aging: 'Geladeira' }
+    if ((l.dias || 0) >= 90 && !l.off) return { ...l, off: true, aging: 'Geladeira' }
     return l
   })
 }
-
-// ─── CÁLCULO DINÂMICO DE DIAS ────────────────────────────────────────────────
-function calcDias(lead) {
-  if (lead.ultima_atualizacao) {
-    const ultima = new Date(lead.ultima_atualizacao + 'T12:00:00')
-    const hoje   = new Date()
-    return Math.max(0, Math.floor((hoje - ultima) / (1000 * 60 * 60 * 24)))
-  }
-  return lead.dias || 0
-}
-// ─────────────────────────────────────────────────────────────────────────────
 
 function diasParaVencer(vencimento) {
   if (!vencimento) return null
@@ -109,8 +97,7 @@ function healthScore(lead, acts, contactsMap) {
   score -= atrasadas.length * 20
   if (!contatos.some(c => c.tipo === 'contato')) score -= 15
   if (!contatos.some(c => c.tipo === 'advisor'))  score -= 10
-  const diasRef = lead.dias || calcDias(lead)
-  score -= Math.min(30, Math.floor(diasRef / 7) * 5)
+  score -= Math.min(30, Math.floor((lead.dias || 0) / 7) * 5)
   if (lead.risco) score -= 10
   return Math.max(0, Math.min(100, score))
 }
@@ -158,6 +145,17 @@ function CardIndicators({ lead, acts, contactsMap, t }) {
     indicators.push({ icon: '👤', label: 'Sem contato', color: '#F59E0B' })
   if (!contatos.some(c => c.tipo === 'advisor'))
     indicators.push({ icon: '🤝', label: 'Sem advisor', color: t.textHint })
+
+  // Flag de oportunidade ativa sem nenhuma atividade futura pendente
+  if (!lead.off && !lead.op) {
+    const pendLead = acts.filter(a => {
+      if (a.ok) return false
+      return a.lead?.toLowerCase().includes(contaKey)
+    })
+    if (pendLead.length === 0)
+      indicators.push({ icon: '⚡', label: 'Sem próx. atividade', color: '#7C3AED' })
+  }
+
   if (indicators.length === 0) return null
 
   return (
@@ -285,7 +283,7 @@ function ContactModalInline({ contact, defaultConta, defaultLeadId, t, onSave, o
 }
 
 // ─── MODAL PRINCIPAL ─────────────────────────────────────────────────────────
-function Modal({ lead, acts, onClose, onSave, onReativar, onEnviarGeladeira, t }) {
+function Modal({ lead, acts, onClose, onSave, onReativar, onConcluirAct, onDeleteAct, t }) {
   const user    = JSON.parse(localStorage.getItem('iara_user') || '{}')
   const isAdmin = ['Mike Lopes', 'Bruno Braga'].includes(user.nome)
 
@@ -381,6 +379,9 @@ function Modal({ lead, acts, onClose, onSave, onReativar, onEnviarGeladeira, t }
   const hasAdvisor    = advisors.length > 0
   const totalAlertas  = atrasadas.length + (!hasContato ? 1 : 0)
 
+  // Flag: oportunidade ativa sem nenhuma atividade futura pendente
+  const semAtividadeFutura = !lead.off && !lead.op && pendentes.length === 0
+
   const TABS = [
     { id: 'timeline', label: `📅 Timeline${allActs.length > 0 ? ` (${allActs.length})` : ''}` },
     { id: 'contatos', label: `👥 Contatos${contacts.length > 0 ? ` (${contacts.length})` : ''}` },
@@ -403,7 +404,7 @@ function Modal({ lead, acts, onClose, onSave, onReativar, onEnviarGeladeira, t }
                 <span>·</span>
                 <span>👤 {lead.resp}</span>
                 <span>·</span>
-                <span style={{ color: calcDias(lead) > 7 ? t.orange : t.textMuted }}>🕐 {calcDias(lead)}d sem atualização</span>
+                <span style={{ color: lead.dias > 7 ? t.orange : t.textMuted }}>🕐 {lead.dias}d sem atualização</span>
                 {lead.op && <span style={{ color: t.green }}>· 🏭 Go-Live</span>}
                 {lead.valor > 0 && <span style={{ color: t.purple, fontWeight: 600 }}>· 💰 {formatValor(lead.valor)}</span>}
               </div>
@@ -415,11 +416,16 @@ function Modal({ lead, acts, onClose, onSave, onReativar, onEnviarGeladeira, t }
           </div>
 
           {/* Alertas */}
-          {(totalAlertas > 0 || !hasAdvisor) && (
+          {(totalAlertas > 0 || !hasAdvisor || semAtividadeFutura) && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
               {atrasadas.length > 0 && (
                 <span style={{ fontSize: 11, color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 6, padding: '3px 8px', fontWeight: 600 }}>
                   ⏰ {atrasadas.length} atrasada{atrasadas.length > 1 ? 's' : ''}
+                </span>
+              )}
+              {semAtividadeFutura && (
+                <span style={{ fontSize: 11, color: '#7C3AED', background: 'rgba(124,58,237,0.1)', border: '1px solid rgba(124,58,237,0.3)', borderRadius: 6, padding: '3px 8px', fontWeight: 600 }}>
+                  ⚡ Sem próxima atividade
                 </span>
               )}
               {!hasContato && (
@@ -473,13 +479,29 @@ function Modal({ lead, acts, onClose, onSave, onReativar, onEnviarGeladeira, t }
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {pendentes.map(a => {
-                    const isAtrasada = a.dt && new Date(a.dt) < hoje
+                    const isAtrasada = a.dt && new Date(a.dt + 'T00:00:00') < new Date(hoje)
                     const cor = tipoColor(a.tipo)
                     return (
                       <div key={a.id} style={{ background: t.bg, border: `1px solid ${isAtrasada ? '#EF444433' : t.border}`, borderLeft: `3px solid ${isAtrasada ? '#EF4444' : cor}`, borderRadius: '0 10px 10px 0', padding: '10px 14px' }}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
                           <span style={{ fontSize: 10, fontWeight: 700, color: cor, background: `${cor}15`, border: `1px solid ${cor}33`, borderRadius: 4, padding: '1px 6px' }}>{a.tipo || 'Atividade'}</span>
                           {isAtrasada && <span style={{ fontSize: 10, color: '#EF4444', fontWeight: 700 }}>⏰ ATRASADA</span>}
+                          <div style={{ marginLeft: 'auto', display: 'flex', gap: 5, flexShrink: 0 }}>
+                            <button
+                              onClick={() => onConcluirAct && onConcluirAct(a)}
+                              title="Marcar como concluída"
+                              style={{ fontSize: 11, padding: '2px 8px', borderRadius: 5, border: '1px solid rgba(16,185,129,0.35)', background: 'rgba(16,185,129,0.08)', color: '#10B981', cursor: 'pointer', fontWeight: 600 }}>
+                              ✓ Concluir
+                            </button>
+                            {isAdmin && (
+                              <button
+                                onClick={() => onDeleteAct && onDeleteAct(a)}
+                                title="Apagar atividade duplicada"
+                                style={{ fontSize: 11, padding: '2px 7px', borderRadius: 5, border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.07)', color: '#EF4444', cursor: 'pointer' }}>
+                                🗑
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <div style={{ fontSize: 13, color: t.text, lineHeight: 1.4 }}>{a.descricao}</div>
                         <div style={{ fontSize: 11, color: t.textMuted, marginTop: 4 }}>
@@ -700,21 +722,12 @@ function Modal({ lead, acts, onClose, onSave, onReativar, onEnviarGeladeira, t }
         {/* ── Footer ── */}
         <div style={{ padding: '14px 24px', borderTop: `1px solid ${t.borderLight}`, flexShrink: 0 }}>
           {abaModal === 'detalhes' ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {!lead.off && !lead.op && (
-                <button
-                  onClick={() => { if (confirm(`Enviar "${lead.conta || lead.nome}" para a Geladeira?`)) onEnviarGeladeira(form) }}
-                  style={{ width: '100%', background: 'none', border: `1px solid rgba(107,90,144,0.4)`, borderRadius: 10, color: t.textHint, padding: '9px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                  🧊 Enviar para a Geladeira
-                </button>
-              )}
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={onClose} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
-                <button onClick={() => onSave({ ...form, nome: form.conta && form.servico ? `${form.conta} — ${form.servico}` : (form.nome || form.conta || '') })}
-                  style={{ flex: 2, background: 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 10, color: 'white', padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.3)' }}>
-                  Salvar
-                </button>
-              </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={onClose} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={() => onSave({ ...form, nome: form.conta && form.servico ? `${form.conta} — ${form.servico}` : (form.nome || form.conta || '') })}
+                style={{ flex: 2, background: 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 10, color: 'white', padding: '11px', fontSize: 14, fontWeight: 600, cursor: 'pointer', boxShadow: '0 4px 14px rgba(124,58,237,0.3)' }}>
+                Salvar
+              </button>
             </div>
           ) : (
             <button onClick={onClose} style={{ width: '100%', background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>Fechar</button>
@@ -744,10 +757,6 @@ function Modal({ lead, acts, onClose, onSave, onReativar, onEnviarGeladeira, t }
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function safeLog(params) {
-  try { await safeLog(params) } catch (e) { console.warn('audit log skipped:', e.message) }
-}
-
 export default function Pipeline() {
   const navigate  = useNavigate()
   const user      = JSON.parse(localStorage.getItem('iara_user') || '{}')
@@ -762,7 +771,6 @@ export default function Pipeline() {
   const [syncing,     setSyncing]     = useState(false)
   const [selected,    setSelected]    = useState(null)
   const [filterResp,  setFilterResp]  = useState('Todos')
-  const [searchQuery, setSearchQuery] = useState('')
   const [aba,         setAba]         = useState('pipeline')
 
   function toggleTheme() {
@@ -779,6 +787,8 @@ export default function Pipeline() {
       let a = await getActivities()
       if (!l.length) l = PIPELINE_INITIAL
       if (!a.length) a = ACTIVITIES_INITIAL
+      // Filtra atividades marcadas como deletadas (soft delete)
+      a = a.filter(act => !act.deleted)
       const lAged = applyAging(l)
       setLeads(lAged); setActs(a)
       const changed = lAged.filter((nl, i) => nl.off !== l[i]?.off)
@@ -816,29 +826,29 @@ export default function Pipeline() {
   }
 
   async function handleReativar(form) {
-    const reativado = { ...form, off: false, dias: 0, aging: 'Hot', ultima_atualizacao: new Date().toISOString().split('T')[0] }
+    const reativado = { ...form, off: false, dias: 0, aging: 'Hot' }
     await upsertLead(reativado)
     setLeads(prev => prev.map(l => l.id === form.id ? reativado : l))
     setSelected(null)
   }
 
-  async function handleEnviarGeladeira(form) {
-    const gelado = { ...form, off: true, aging: 'Geladeira' }
-    await upsertLead(gelado)
-    await safeLog({
-      evento: 'lead_atualizado',
-      conta: form.conta || form.nome || '',
-      servico: form.servico || '',
-      detalhe: 'Enviado manualmente para a Geladeira',
-      feito_por: JSON.parse(localStorage.getItem('iara_user') || '{}').nome || '',
-    })
-    setLeads(prev => prev.map(l => l.id === form.id ? gelado : l))
-    setSelected(null)
+  async function handleConcluirAct(act) {
+    const concluida = { ...act, ok: true, concluido_em: new Date().toISOString() }
+    await upsertActivity(concluida)
+    setActs(prev => prev.map(a => a.id === act.id ? concluida : a))
+  }
+
+  async function handleDeleteAct(act) {
+    if (!confirm(`Apagar atividade "${act.descricao}"?`)) return
+    // Soft delete — marca como deletada sem remover do banco
+    const deletada = { ...act, deleted: true }
+    await upsertActivity(deletada)
+    setActs(prev => prev.filter(a => a.id !== act.id))
   }
 
   // ── Derived data ─────────────────────────────────────────────────────────────
   const todosAtivos    = leads.filter(l => !l.off && !l.op)
-  const todosGeladeira = leads.filter(l =>  l.off && !l.op).sort((a, b) => calcDias(b) - calcDias(a))
+  const todosGeladeira = leads.filter(l =>  l.off && !l.op).sort((a, b) => b.dias - a.dias)
   const goLive         = leads.filter(l => l.op)
   const renovacoes     = goLive
     .filter(l => { const d = diasParaVencer(l.vencimento); return d !== null && d <= 90 })
@@ -848,23 +858,8 @@ export default function Pipeline() {
   const resps = ['Todos', ...Array.from(new Set(
     [...todosAtivos, ...todosGeladeira].map(l => l.resp?.split(' ')[0]).filter(Boolean)
   ))]
-  const ativosFiltradosResp = filterResp === 'Todos' ? todosAtivos : todosAtivos.filter(l => l.resp?.includes(filterResp))
-  const ativos = searchQuery.trim() === ''
-    ? ativosFiltradosResp
-    : ativosFiltradosResp.filter(l => {
-        const q = searchQuery.toLowerCase()
-        return (l.conta || l.nome || '').toLowerCase().includes(q) ||
-               (l.servico || '').toLowerCase().includes(q) ||
-               (l.resp || '').toLowerCase().includes(q)
-      })
-  const geladeiraPorResp = filterResp === 'Todos' ? todosGeladeira : todosGeladeira.filter(l => l.resp?.includes(filterResp))
-  const geladeira = searchQuery.trim() === ''
-    ? geladeiraPorResp
-    : geladeiraPorResp.filter(l => {
-        const q = searchQuery.toLowerCase()
-        return (l.conta || l.nome || '').toLowerCase().includes(q) ||
-               (l.servico || '').toLowerCase().includes(q)
-      })
+  const ativos    = filterResp === 'Todos' ? todosAtivos    : todosAtivos.filter(l => l.resp?.includes(filterResp))
+  const geladeira = filterResp === 'Todos' ? todosGeladeira : todosGeladeira.filter(l => l.resp?.includes(filterResp))
   const byEtapa   = ETAPAS.reduce((acc, e) => { acc[e] = ativos.filter(l => l.etapa === e); return acc }, {})
   const riscos    = ativos.filter(l => l.risco)
   const contasAtivas = ativos.reduce((acc, l) => {
@@ -962,27 +957,6 @@ export default function Pipeline() {
             </div>
           )}
 
-          {/* Search bar */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <div style={{ flex: 1, maxWidth: 320, position: 'relative' }}>
-              <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 14, color: t.textMuted, pointerEvents: 'none' }}>🔍</span>
-              <input
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Buscar por clube, serviço ou responsável..."
-                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${searchQuery ? t.purple : t.border}`, borderRadius: 10, padding: '8px 12px 8px 32px', color: t.text, fontSize: 13, outline: 'none', transition: 'border-color 0.15s' }}
-              />
-              {searchQuery && (
-                <button onClick={() => setSearchQuery('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', fontSize: 14, padding: 0 }}>✕</button>
-              )}
-            </div>
-            {searchQuery && (
-              <span style={{ fontSize: 12, color: t.purple, fontWeight: 600 }}>
-                {ativos.length} resultado{ativos.length !== 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-
           <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch' }}>
             {ETAPAS.filter(e => e !== 'Operação / Go-Live').map(etapa => {
               const cards = byEtapa[etapa] || []
@@ -1003,11 +977,10 @@ export default function Pipeline() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: t.bgAlt, border: `1px solid ${t.border}`, borderTop: 'none', borderRadius: '0 0 12px 12px', padding: 10, minHeight: 80 }}>
                     {cards.length === 0 && <div style={{ textAlign: 'center', color: t.border, fontSize: 12, padding: '20px 0' }}>vazio</div>}
                     {cards.map(l => {
-                      const diasL = calcDias(l)
-                      const { label: agLabel, color: agColor } = agingLabel(diasL)
+                      const { label: agLabel, color: agColor } = agingLabel(l.dias || 0)
                       const pendLead = acts.filter(a => a.lead?.toLowerCase().includes((l.conta || l.nome || '').toLowerCase()) && !a.ok)
                       const contaOps = contasAtivas[l.conta || l.nome] || 1
-                      const hs       = healthScore({ ...l, dias: diasL }, acts, contactsMap)
+                      const hs       = healthScore(l, acts, contactsMap)
                       const hsInfo   = healthLabel(hs)
                       return (
                         <div key={l.id} className="lead-card" onClick={() => setSelected(l)} style={{ background: t.surfaceInput, border: `1px solid ${l.risco ? t.orange + '44' : t.border}`, borderRadius: 10, padding: '11px 13px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 6, boxShadow: t.name === 'light' ? '0 1px 4px rgba(124,58,237,0.06)' : 'none' }}>
@@ -1020,7 +993,7 @@ export default function Pipeline() {
                           </div>
                           <div style={{ fontSize: 11, color: t.textMuted }}>👤 {l.resp}</div>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 11, color: diasL > 7 ? t.orange : t.textMuted }}>🕐 {diasL}d</span>
+                            <span style={{ fontSize: 11, color: l.dias > 7 ? t.orange : t.textMuted }}>🕐 {l.dias}d</span>
                             {/* Health Score */}
                             <span title={`Health Score: ${hs}/100`} style={{ background: hsInfo.bg, border: `1px solid ${hsInfo.color}44`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: hsInfo.color, fontWeight: 700 }}>❤️ {hs}</span>
                             {pendLead.length > 0 && <span style={{ background: t.purpleFaint, border: `1px solid ${t.purple}44`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: t.purple }}>{pendLead.length} pend.</span>}
@@ -1127,7 +1100,7 @@ export default function Pipeline() {
             { label: '🟠 6 a 12 meses',   min: 180, max: 365 },
             { label: '🟡 3 a 6 meses',    min: 90,  max: 180 },
           ].map(grupo => {
-            const items = geladeira.filter(l => calcDias(l) >= grupo.min && (!grupo.max || calcDias(l) < grupo.max))
+            const items = geladeira.filter(l => l.dias >= grupo.min && (!grupo.max || l.dias < grupo.max))
             if (items.length === 0) return null
             return (
               <div key={grupo.label}>
@@ -1136,7 +1109,7 @@ export default function Pipeline() {
                   {items.map(l => (
                     <div key={l.id} className="gel-card" onClick={() => setSelected(l)} style={{ background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 12, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
                       <div style={{ minWidth: 52, textAlign: 'center', background: t.surface, borderRadius: 8, padding: '6px 4px', border: `1px solid ${t.border}` }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: t.textMuted }}>{calcDias(l)}</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: t.textMuted }}>{l.dias}</div>
                         <div style={{ fontSize: 9, color: t.textHint }}>dias</div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -1165,7 +1138,8 @@ export default function Pipeline() {
           onClose={() => setSelected(null)}
           onSave={handleSave}
           onReativar={handleReativar}
-          onEnviarGeladeira={handleEnviarGeladeira} />
+          onConcluirAct={handleConcluirAct}
+          onDeleteAct={handleDeleteAct} />
       )}
     </div>
   )
