@@ -224,9 +224,8 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = [], auditLog
   const g12 = leads.filter(l => l.g12 && !l.off)
   const isAdmin = ADMINS.includes(userName)
 
-  let c = `🗓️ DATA DE HOJE: ${hoje} (${hojeISO}) — USE SEMPRE ESTA DATA COMO REFERÊNCIA\n`
-  c += `USUÁRIO: ${userName} | ADMIN: ${isAdmin}\n`
-  c += `RESUMO: ${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
+  let c = `DATA:${hoje} | USUÁRIO:${userName} | ADMIN:${isAdmin}\n`
+  c += `RESUMO:${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
 
   // ── Audit Log — movimentos recentes ──────────────────────────────────────
   if (auditLog.length > 0) {
@@ -282,12 +281,20 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = [], auditLog
   // ── Atividades pendentes ──────────────────────────────────────────────────
   if (pend.length > 0) {
     c += `⏳ ATIVIDADES PENDENTES (${pend.length}):\n`
-    const atrasadas = pend.filter(a => a.dt && new Date(a.dt) < new Date())
+    // Usa comparação de string ISO para evitar confusão de fuso horário
+    // new Date(a.dt) < new Date() causava atividades de HOJE aparecerem como atrasadas
+    const atrasadas = pend.filter(a => a.dt && a.dt < hojeISO)
+    const deHoje    = pend.filter(a => a.dt === hojeISO)
+    const futuras   = pend.filter(a => !a.dt || a.dt > hojeISO)
     if (atrasadas.length > 0) {
       c += `  ⚠️ ATRASADAS (${atrasadas.length}):\n`
       atrasadas.forEach(a => c += `  • [${a.id}] ${a.lead}: ${a.descricao} | venceu ${a.dt} | ${a.resp}\n`)
     }
-    pend.filter(a => !a.dt || new Date(a.dt) >= new Date()).slice(0, 20)
+    if (deHoje.length > 0) {
+      c += `  📅 VENCEM HOJE (${deHoje.length}):\n`
+      deHoje.forEach(a => c += `  • [${a.id}] ${a.lead}: ${a.descricao} | HOJE ${hojeISO} | ${a.resp}\n`)
+    }
+    futuras.slice(0, 20)
       .forEach(a => c += `  • [${a.id}] ${a.lead}: ${a.descricao} | até ${a.dt} | ${a.resp}\n`)
     c += '\n'
   }
@@ -376,12 +383,7 @@ Faça uma apresentação completa e envolvente. Use seu tom característico — 
 Prosa fluida, sem bullet points. Máximo 250 palavras.`
 }
 
-function buildSystem() {
-  const hoje = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit' })
-  const hojeISO = new Date().toISOString().split('T')[0]
-  return `ATENÇÃO — DATA DE HOJE: ${hoje} (${hojeISO}). Use SEMPRE esta data. Ignore qualquer data de mensagens anteriores do histórico.
-
-Você é a IAra, agente de inteligência comercial da FENG — empresa de tecnologia para clubes de futebol e esportes na América Latina.
+const SYSTEM = `Você é a IAra, agente de inteligência comercial da FENG — empresa de tecnologia para clubes de futebol e esportes na América Latina.
 
 IDENTIDADE: IAra — Intelligence and Action for Revenue Acceleration. Tom: colega descontraída, direta, bem-humorada. Português informal. NUNCA diz "Como posso te ajudar?". NUNCA repete a mesma frase.
 
@@ -394,13 +396,6 @@ Use markdown nas confirmações, relatórios e resumos:
 - - item → lista com ▸ roxo
 - --- → separador entre seções distintas
 Em conversas simples e rápidas: sem formatação, texto direto.
-
-DATA ATUAL:
-- A data de hoje está SEMPRE na primeira linha do contexto como 🗓️ DATA DE HOJE
-- USE SEMPRE essa data como referência para "hoje", "esta semana", "ontem"
-- NUNCA confunda a data das atividades/movimentos com a data atual
-- As atividades têm suas próprias datas (Dt_atualização, criado) — essas são datas dos REGISTROS, não de hoje
-- Sempre que citar "hoje é X", use a data do contexto, não a data de nenhuma atividade
 
 HISTÓRICO DE MOVIMENTOS:
 - Você tem acesso ao audit log completo na seção 📋 MOVIMENTOS RECENTES
@@ -499,22 +494,6 @@ async function extractAndSaveMemories(userId, userMsg, assistantMsg) {
   } catch {}
 }
 
-// ─── SAFE WRAPPERS — nunca quebram o fluxo principal ─────────────────────────
-async function safeLog(params) {
-  try { await safeLog(params) } catch (e) { console.warn('audit log skipped:', e.message) }
-}
-async function safeUpsertLead(lead) {
-  try {
-    // Remover campos que podem não existir na tabela ainda
-    const { ultima_atualizacao, ...rest } = lead
-    // Tentar com ultima_atualizacao primeiro
-    try { return await upsertLead(lead) } catch {
-      return await upsertLead(rest)
-    }
-  } catch (e) { console.warn('upsertLead failed:', e.message) }
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
 export default function Chat() {
   const navigate = useNavigate()
   const user = JSON.parse(localStorage.getItem('iara_user') || '{}')
@@ -558,7 +537,7 @@ export default function Chat() {
   }, [user.id])
 
   async function refreshAuditLog() {
-    try { const log = await getAuditLog(40); setAuditLog(log) } catch (e) { console.warn('audit log unavailable:', e.message) }
+    try { const log = await getAuditLog(40); setAuditLog(log) } catch {}
   }
 
   async function init() {
@@ -568,10 +547,7 @@ export default function Chat() {
       if (!l.length) { for (const lead of PIPELINE_INITIAL) await upsertLead(lead); l = PIPELINE_INITIAL }
       if (!a.length) { for (const act of ACTIVITIES_INITIAL) await upsertActivity(act); a = ACTIVITIES_INITIAL }
       setLeads(l); setActs(a)
-      // getAuditLog é opcional — não quebra o init se falhar
-      const [mems, know, nots] = await Promise.all([getMemories(user.id), getKnowledge(), getNotifications(user.id)])
-      let log = []
-      try { log = await getAuditLog(40) } catch (e) { console.warn('audit log unavailable:', e.message) }
+      const [mems, know, nots, log] = await Promise.all([getMemories(user.id), getKnowledge(), getNotifications(user.id), getAuditLog(40)])
       setMemories(mems); setKnowledge(know); setNotifs(nots); setAuditLog(log)
       const history = await getMessages(user.id)
       if (history.length > 0) {
@@ -580,7 +556,7 @@ export default function Chat() {
       }
       const ctx = buildCtx(l, a, user.nome, mems, know, log)
       const cargoInfo = CARGOS[user.nome] || { cargo: 'membro do time comercial' }
-      const raw = await callAI([{ role: 'user', content: buildOnboardingPrompt(user.nome, cargoInfo.cargo) }], buildSystem() + '\n\n' + ctx)
+      const raw = await callAI([{ role: 'user', content: buildOnboardingPrompt(user.nome, cargoInfo.cargo) }], SYSTEM + '\n\n' + ctx)
       const txt = strip(raw)
       setMsgs([{ id: 'g1', role: 'assistant', text: txt, results: [], sugestoes: [] }])
       await saveMessage(user.id, 'assistant', txt)
@@ -600,7 +576,7 @@ export default function Chat() {
     try {
       const ctx = buildCtx(leads, acts, user.nome, memories, knowledge, auditLog)
       const apiMsgs = newMsgs.slice(-40).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
-      const raw = await callAI(apiMsgs, buildSystem() + '\n\n' + ctx)
+      const raw = await callAI(apiMsgs, SYSTEM + '\n\n' + ctx)
       const actions = parseActions(raw)
       const sugestoes = parseSugestoes(raw)
       const notifsParsed = parseNotifs(raw)
@@ -612,16 +588,33 @@ export default function Chat() {
       for (const act of actions) {
         if (act.type === 'CONCLUIR') {
           const found = curA.find(a => a.id === act.data.id)
-          curA = curA.map(a => a.id === act.data.id ? { ...a, ok: true } : a)
-          await upsertActivity({ ...found, ok: true })
-          await safeLog({
+          if (!found) {
+            // Tenta busca parcial pelo id — alguns ids podem ter sido truncados pela IA
+            const partial = curA.find(a => a.id?.includes(act.data.id) || act.data.id?.includes(a.id))
+            if (!partial) {
+              results.push(`⚠️ Atividade não encontrada: ${act.data.id}`)
+              continue
+            }
+            // Usa o encontrado pela busca parcial
+            const concluida = { ...partial, ok: true, concluido_em: new Date().toISOString() }
+            curA = curA.map(a => a.id === partial.id ? concluida : a)
+            await upsertActivity(concluida)
+            await logAudit({ evento: 'atividade_concluida', conta: partial.lead || '', detalhe: partial.descricao || '', feito_por: user.nome })
+            auditUpdated = true
+            results.push(`✅ Concluído: ${partial.descricao || act.data.id}`)
+            continue
+          }
+          const concluida = { ...found, ok: true, concluido_em: new Date().toISOString() }
+          curA = curA.map(a => a.id === act.data.id ? concluida : a)
+          await upsertActivity(concluida)
+          await logAudit({
             evento: 'atividade_concluida',
-            conta: found?.lead || '',
-            detalhe: found?.descricao || '',
+            conta: found.lead || '',
+            detalhe: found.descricao || '',
             feito_por: user.nome,
           })
           auditUpdated = true
-          results.push(`✅ Concluído: ${found?.descricao || act.data.id}`)
+          results.push(`✅ Concluído: ${found.descricao || act.data.id}`)
         } else if (act.type === 'CRIAR') {
           const nA = {
             id: `act-${Date.now()}`, ok: false,
@@ -630,7 +623,7 @@ export default function Chat() {
             dt: act.data.dt, resp: act.data.resp, tipo: act.data.tipo || 'Atividade'
           }
           curA = [...curA, nA]; await upsertActivity(nA)
-          await safeLog({
+          await logAudit({
             evento: 'atividade_criada',
             conta: act.data.lead || '',
             detalhe: `[${act.data.tipo || 'Atividade'}] ${act.data.descricao} — até ${act.data.dt || 'sem prazo'} | ${act.data.resp}`,
@@ -644,9 +637,9 @@ export default function Chat() {
           const hoje = new Date().toISOString().split('T')[0]
           curL = curL.map(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()) ? { ...l, [campo]: valor, ultima_atualizacao: hoje } : l)
           const updated = curL.find(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()))
-          if (updated) await safeUpsertLead(updated)
+          if (updated) await upsertLead(updated)
           if (campo === 'etapa') {
-            await safeLog({
+            await logAudit({
               evento: 'etapa_avancada',
               conta: updated?.conta || nome,
               servico: updated?.servico || '',
@@ -656,7 +649,7 @@ export default function Chat() {
               feito_por: user.nome,
             })
           } else {
-            await safeLog({
+            await logAudit({
               evento: 'lead_atualizado',
               conta: updated?.conta || nome,
               servico: updated?.servico || '',
@@ -676,8 +669,8 @@ export default function Chat() {
             op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: '',
             ultima_atualizacao: new Date().toISOString().split('T')[0],
           }
-          curL = [...curL, nL]; await safeUpsertLead(nL)
-          await safeLog({
+          curL = [...curL, nL]; await upsertLead(nL)
+          await logAudit({
             evento: 'oportunidade_criada',
             conta: conta || '',
             servico: servico || '',
@@ -701,7 +694,7 @@ export default function Chat() {
             criado_por: user.nome,
           }
           await upsertContact(contato)
-          await safeLog({
+          await logAudit({
             evento: 'contato_adicionado',
             conta: act.data.conta || '',
             detalhe: `${contato.tipo === 'advisor' ? '🤝 Advisor' : '👤 Contato'}: ${contato.nome}${contato.cargo ? ` (${contato.cargo})` : ''}`,
@@ -743,7 +736,7 @@ export default function Chat() {
     await clearMessages(user.id); setMsgs([]); setLoading(true)
     try {
       const ctx = buildCtx(leads, acts, user.nome, memories, knowledge, auditLog)
-      const raw = await callAI([{ role: 'user', content: `Reabra a conversa com ${user.nome} com nova saudação breve.` }], buildSystem() + '\n\n' + ctx)
+      const raw = await callAI([{ role: 'user', content: `Reabra a conversa com ${user.nome} com nova saudação breve.` }], SYSTEM + '\n\n' + ctx)
       const txt = strip(raw)
       setMsgs([{ id: Date.now(), role: 'assistant', text: txt, results: [], sugestoes: [] }])
       await saveMessage(user.id, 'assistant', txt)
