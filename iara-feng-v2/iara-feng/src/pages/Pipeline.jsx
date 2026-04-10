@@ -73,6 +73,7 @@ function tipoColor(tipo) {
     'Proposta':      '#F59E0B',
     'Jurídico':      '#EF4444',
     'Fazer Contato': '#10B981',
+    'Atualização':   '#6B7280',
   }
   return map[tipo] || '#6B5A90'
 }
@@ -820,8 +821,36 @@ export default function Pipeline() {
   }
 
   async function handleSave(form) {
+    const anterior = leads.find(l => l.id === form.id)
     await upsertLead(form)
     setLeads(prev => prev.map(l => l.id === form.id ? form : l))
+
+    // Se "Último Movimento" mudou → registra na timeline como atividade concluída
+    const movMudou  = anterior?.mov  !== form.mov  && form.mov?.trim()
+    const proxMudou = anterior?.prox !== form.prox && form.prox?.trim()
+
+    if (movMudou || proxMudou) {
+      const hoje = new Date().toISOString().split('T')[0]
+      const descricao = [
+        movMudou  ? `📝 Movimento: ${form.mov?.trim()}` : null,
+        proxMudou ? `→ Próxima ação: ${form.prox?.trim()}` : null,
+      ].filter(Boolean).join('\n')
+
+      const novaAct = {
+        id: `act-edit-${Date.now()}`,
+        ok: true,
+        criado: hoje,
+        concluido_em: new Date().toISOString(),
+        lead: form.conta && form.servico ? `${form.conta} — ${form.servico}` : (form.nome || form.conta || ''),
+        descricao,
+        dt: hoje,
+        resp: user.nome,
+        tipo: 'Atualização',
+      }
+      await upsertActivity(novaAct)
+      setActs(prev => [...prev, novaAct])
+    }
+
     setSelected(null)
   }
 
