@@ -216,15 +216,20 @@ function formatAuditDate(iso) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function buildCtx(leads, acts, userName, memories = [], knowledge = [], auditLog = []) {
-  const hoje = new Date().toLocaleDateString('pt-BR')
-  const hojeISO = new Date().toISOString().split('T')[0]
+  // Força fuso horário de São Paulo para evitar erro de data no servidor Vercel (UTC)
+  const TZ = 'America/Sao_Paulo'
+  const agora = new Date()
+  const hoje      = agora.toLocaleDateString('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric' })
+  const hojeISO   = agora.toLocaleDateString('sv-SE', { timeZone: TZ }) // retorna YYYY-MM-DD
+  const diaSemana = agora.toLocaleDateString('pt-BR', { timeZone: TZ, weekday: 'long' })
+  const horaAgora = agora.toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })
   const pend = acts.filter(a => !a.ok)
   const mine = pend.filter(a => a.resp?.toLowerCase().includes(userName.split(' ')[0].toLowerCase()))
   const ativos = leads.filter(l => !l.off && !l.op && l.aging !== 'Geladeira' && l.aging !== 'Inativo')
   const g12 = leads.filter(l => l.g12 && !l.off)
   const isAdmin = ADMINS.includes(userName)
 
-  let c = `DATA:${hoje} | USUÁRIO:${userName} | ADMIN:${isAdmin}\n`
+  let c = `📅 HOJE: ${diaSemana}, ${hoje} — ${horaAgora} (América/São Paulo) | USUÁRIO:${userName} | ADMIN:${isAdmin}\n`
   c += `RESUMO:${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
 
   // ── Audit Log — movimentos recentes ──────────────────────────────────────
