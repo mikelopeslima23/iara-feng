@@ -187,3 +187,6 @@ export async function getAuditLog(limit = 40) {
     .select('*').order('criado_em', { ascending: false }).limit(limit)
   return data || []
 }
+export async function deleteActivity(id) {
+  await supabase.from('iara_activities').delete().eq('id', id)
+}
