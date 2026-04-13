@@ -284,7 +284,7 @@ function ContactModalInline({ contact, defaultConta, defaultLeadId, t, onSave, o
 }
 
 // ─── MODAL PRINCIPAL ─────────────────────────────────────────────────────────
-function Modal({ lead, acts, onClose, onSave, onReativar, onConcluirAct, onDeleteAct, t }) {
+function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConcluirAct, onDeleteAct, t }) {
   const user    = JSON.parse(localStorage.getItem('iara_user') || '{}')
   const isAdmin = ['Mike Lopes', 'Bruno Braga'].includes(user.nome)
 
@@ -418,18 +418,15 @@ function Modal({ lead, acts, onClose, onSave, onReativar, onConcluirAct, onDelet
         tipo:      novaAtv.tipo,
       }
       await upsertActivity(nA)
-      // Atualiza ultima_atualizacao do lead → zera dias
+      // Atualiza ultima_atualizacao do lead com fuso SP — zera dias
       const leadAtualizado = { ...lead, ultima_atualizacao: hojeLocal, dias: 0 }
       await upsertLead(leadAtualizado)
-      onSave(leadAtualizado)   // atualiza estado do pai
-      // Notifica o modal via callback da mesma forma que o Chat
-      if (typeof window !== 'undefined') {
-        // Dispara atualização local das atividades via prop
-        setNovaAtv({ tipo: 'FUP', descricao: '', dt: hojeLocal, resp: lead.resp || user.nome })
-        // Volta para timeline para ver a nova atividade
-        setAbaModal('timeline')
-      }
-    } catch (e) { console.error(e) }
+      // Usa onLeadUpdate (não onSave) para evitar duplo-salvar e lógica de mov/prox
+      onLeadUpdate(leadAtualizado)
+    } catch (e) {
+      console.error('Erro ao salvar atividade:', e)
+      alert('Erro ao salvar. Tente novamente.')
+    }
     setSalvandoAtv(false)
   }
 
@@ -959,7 +956,7 @@ export default function Pipeline() {
 
   async function handleSave(form) {
     const anterior = leads.find(l => l.id === form.id)
-    const hoje = new Date().toISOString().split('T')[0]
+    const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
     const formAtualizado = { ...form, ultima_atualizacao: hoje, dias: 0 }
     await upsertLead(formAtualizado)
     setLeads(prev => prev.map(l => l.id === form.id ? formAtualizado : l))
@@ -997,6 +994,13 @@ export default function Pipeline() {
     const reativado = { ...form, off: false, dias: 0, aging: 'Hot' }
     await upsertLead(reativado)
     setLeads(prev => prev.map(l => l.id === form.id ? reativado : l))
+    setSelected(null)
+  }
+
+  // Atualiza apenas o estado do lead no pai (sem lógica de mov/prox)
+  // Usado pelo handleSaveNovaAtv do Modal para não duplo-salvar
+  function handleLeadUpdate(leadAtualizado) {
+    setLeads(prev => prev.map(l => l.id === leadAtualizado.id ? leadAtualizado : l))
     setSelected(null)
   }
 
@@ -1375,6 +1379,7 @@ export default function Pipeline() {
           t={t}
           onClose={() => setSelected(null)}
           onSave={handleSave}
+          onLeadUpdate={handleLeadUpdate}
           onReativar={handleReativar}
           onConcluirAct={handleConcluirAct}
           onDeleteAct={handleDeleteAct} />
