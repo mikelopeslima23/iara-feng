@@ -384,11 +384,54 @@ function Modal({ lead, acts, onClose, onSave, onReativar, onConcluirAct, onDelet
   const semAtividadeFutura = !lead.off && !lead.op && pendentes.length === 0
 
   const TABS = [
-    { id: 'timeline', label: `📅 Timeline${allActs.length > 0 ? ` (${allActs.length})` : ''}` },
-    { id: 'contatos', label: `👥 Contatos${contacts.length > 0 ? ` (${contacts.length})` : ''}` },
-    { id: 'docs',     label: `📎 Docs${docs.length > 0 ? ` (${docs.length})` : ''}` },
-    { id: 'detalhes', label: '✏️ Editar' },
+    { id: 'timeline',     label: `📅 Timeline${allActs.length > 0 ? ` (${allActs.length})` : ''}` },
+    { id: 'contatos',     label: `👥 Contatos${contacts.length > 0 ? ` (${contacts.length})` : ''}` },
+    { id: 'docs',         label: `📎 Docs${docs.length > 0 ? ` (${docs.length})` : ''}` },
+    { id: 'novaAtividade',label: '➕ Atividade' },
+    { id: 'detalhes',     label: '⚙️ Editar' },
   ]
+
+  // Estado do formulário de nova atividade
+  const hojeLocal = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+  const [novaAtv, setNovaAtv] = useState({
+    tipo: 'FUP', descricao: '', dt: hojeLocal, resp: lead.resp || user.nome,
+  })
+  const [salvandoAtv, setSalvandoAtv] = useState(false)
+
+  function setAtv(k, v) { setNovaAtv(f => ({ ...f, [k]: v })) }
+
+  async function handleSaveNovaAtv() {
+    if (!novaAtv.descricao.trim()) return
+    setSalvandoAtv(true)
+    try {
+      const leadLabel = lead.conta && lead.servico
+        ? `${lead.conta} — ${lead.servico}`
+        : (lead.nome || lead.conta || '')
+      const nA = {
+        id:        `act-${Date.now()}`,
+        ok:        false,
+        criado:    hojeLocal,
+        lead:      leadLabel,
+        descricao: novaAtv.descricao.trim(),
+        dt:        novaAtv.dt,
+        resp:      novaAtv.resp,
+        tipo:      novaAtv.tipo,
+      }
+      await upsertActivity(nA)
+      // Atualiza ultima_atualizacao do lead → zera dias
+      const leadAtualizado = { ...lead, ultima_atualizacao: hojeLocal, dias: 0 }
+      await upsertLead(leadAtualizado)
+      onSave(leadAtualizado)   // atualiza estado do pai
+      // Notifica o modal via callback da mesma forma que o Chat
+      if (typeof window !== 'undefined') {
+        // Dispara atualização local das atividades via prop
+        setNovaAtv({ tipo: 'FUP', descricao: '', dt: hojeLocal, resp: lead.resp || user.nome })
+        // Volta para timeline para ver a nova atividade
+        setAbaModal('timeline')
+      }
+    } catch (e) { console.error(e) }
+    setSalvandoAtv(false)
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16, backdropFilter: 'blur(4px)' }} onClick={onClose}>
@@ -629,6 +672,77 @@ function Modal({ lead, acts, onClose, onSave, onReativar, onConcluirAct, onDelet
             </button>
           </>}
 
+          {/* ══ NOVA ATIVIDADE ══ */}
+          {abaModal === 'novaAtividade' && <>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+              {/* Tipo */}
+              <div>
+                <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 8, letterSpacing: '0.05em' }}>TIPO</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {['FUP', 'Reunião', 'Proposta', 'Jurídico', 'Fazer Contato'].map(tipo => {
+                    const cor = tipoColor(tipo)
+                    const ativo = novaAtv.tipo === tipo
+                    return (
+                      <button key={tipo} onClick={() => setAtv('tipo', tipo)}
+                        style={{ padding: '6px 14px', borderRadius: 8, border: `1px solid ${ativo ? cor : t.border}`, background: ativo ? `${cor}18` : t.surfaceInput, color: ativo ? cor : t.textMuted, fontSize: 12, fontWeight: ativo ? 700 : 400, cursor: 'pointer' }}>
+                        {ativo ? '✓ ' : ''}{tipo}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Descrição */}
+              <div>
+                <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>DESCRIÇÃO *</div>
+                <textarea
+                  value={novaAtv.descricao}
+                  onChange={e => setAtv('descricao', e.target.value)}
+                  rows={3}
+                  placeholder="Ex: Fazer FUP com o Maurício para confirmar reunião..."
+                  style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${novaAtv.descricao ? t.purple + '66' : t.border}`, borderRadius: 8, padding: '10px 12px', color: t.text, fontSize: 13, outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.5 }}
+                />
+              </div>
+
+              {/* Data + Responsável lado a lado */}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>📅 DATA PREVISTA</div>
+                  <input
+                    type="date"
+                    value={novaAtv.dt}
+                    onChange={e => setAtv('dt', e.target.value)}
+                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.purple}55`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>RESPONSÁVEL</div>
+                  <select
+                    value={novaAtv.resp}
+                    onChange={e => setAtv('resp', e.target.value)}
+                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}>
+                    {['Mike Lopes', 'Bruno Braga', 'Jardel Rocha', 'Silvio Vázquez', 'Beni Ertel', 'Alexandre Sivolella'].map(n => (
+                      <option key={n} value={n}>{n.split(' ')[0]}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Preview */}
+              {novaAtv.descricao && (
+                <div style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}22`, borderRadius: 8, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 10, color: t.purple, fontWeight: 700, marginBottom: 4, letterSpacing: '0.05em' }}>PRÉVIA</div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, color: tipoColor(novaAtv.tipo), background: `${tipoColor(novaAtv.tipo)}15`, border: `1px solid ${tipoColor(novaAtv.tipo)}33`, borderRadius: 4, padding: '1px 6px' }}>{novaAtv.tipo}</span>
+                    <span style={{ fontSize: 11, color: t.textMuted }}>📅 {formatDate(novaAtv.dt)} · 👤 {novaAtv.resp.split(' ')[0]}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: t.text }}>{novaAtv.descricao}</div>
+                </div>
+              )}
+            </div>
+          </>}
+
           {/* ══ EDITAR ══ */}
           {abaModal === 'detalhes' && <>
             {lead.off && (
@@ -724,7 +838,17 @@ function Modal({ lead, acts, onClose, onSave, onReativar, onConcluirAct, onDelet
 
         {/* ── Footer ── */}
         <div style={{ padding: '14px 24px', borderTop: `1px solid ${t.borderLight}`, flexShrink: 0 }}>
-          {abaModal === 'detalhes' ? (
+          {abaModal === 'novaAtividade' ? (
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={onClose} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
+              <button
+                onClick={handleSaveNovaAtv}
+                disabled={!novaAtv.descricao.trim() || salvandoAtv}
+                style={{ flex: 2, background: novaAtv.descricao.trim() ? 'linear-gradient(135deg,#7C3AED,#9333EA)' : t.surface, border: 'none', borderRadius: 10, color: novaAtv.descricao.trim() ? 'white' : t.textMuted, padding: '11px', fontSize: 14, fontWeight: 600, cursor: novaAtv.descricao.trim() ? 'pointer' : 'not-allowed', boxShadow: novaAtv.descricao.trim() ? '0 4px 14px rgba(124,58,237,0.3)' : 'none' }}>
+                {salvandoAtv ? '⏳ Salvando...' : '✓ Registrar Atividade'}
+              </button>
+            </div>
+          ) : abaModal === 'detalhes' ? (
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={onClose} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>Cancelar</button>
               <button onClick={() => onSave({ ...form, nome: form.conta && form.servico ? `${form.conta} — ${form.servico}` : (form.nome || form.conta || '') })}
