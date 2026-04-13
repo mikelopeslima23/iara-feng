@@ -833,15 +833,16 @@ export default function Pipeline() {
 
   async function handleSave(form) {
     const anterior = leads.find(l => l.id === form.id)
-    await upsertLead(form)
-    setLeads(prev => prev.map(l => l.id === form.id ? form : l))
+    const hoje = new Date().toISOString().split('T')[0]
+    const formAtualizado = { ...form, ultima_atualizacao: hoje, dias: 0 }
+    await upsertLead(formAtualizado)
+    setLeads(prev => prev.map(l => l.id === form.id ? formAtualizado : l))
 
     // Se "Último Movimento" mudou → registra na timeline como atividade concluída
     const movMudou  = anterior?.mov  !== form.mov  && form.mov?.trim()
     const proxMudou = anterior?.prox !== form.prox && form.prox?.trim()
 
     if (movMudou || proxMudou) {
-      const hoje = new Date().toISOString().split('T')[0]
       const descricao = [
         movMudou  ? `📝 Movimento: ${form.mov?.trim()}` : null,
         proxMudou ? `→ Próxima ação: ${form.prox?.trim()}` : null,
@@ -851,8 +852,9 @@ export default function Pipeline() {
         id: `act-edit-${Date.now()}`,
         ok: true,
         criado: hoje,
-        concluido_em: new Date().toISOString(),
-        lead: form.conta && form.servico ? `${form.conta} — ${form.servico}` : (form.nome || form.conta || ''),
+        lead: formAtualizado.conta && formAtualizado.servico
+          ? `${formAtualizado.conta} — ${formAtualizado.servico}`
+          : (formAtualizado.nome || formAtualizado.conta || ''),
         descricao,
         dt: hoje,
         resp: user.nome,
@@ -875,10 +877,22 @@ export default function Pipeline() {
   async function handleConcluirAct(act) {
     try {
       const concluida = { ...act, ok: true }
-      // Remove campos que podem não existir na tabela Supabase
       delete concluida.concluido_em
       await upsertActivity(concluida)
       setActs(prev => prev.map(a => a.id === act.id ? { ...a, ok: true } : a))
+
+      // Atualiza ultima_atualizacao do lead correspondente → zera o contador de dias
+      const hoje = new Date().toISOString().split('T')[0]
+      const leadNome = act.lead || ''
+      const leadMatch = leads.find(l =>
+        leadNome.toLowerCase().includes((l.conta || l.nome || '').toLowerCase()) ||
+        (l.conta || l.nome || '').toLowerCase().includes(leadNome.toLowerCase())
+      )
+      if (leadMatch) {
+        const atualizado = { ...leadMatch, ultima_atualizacao: hoje, dias: 0 }
+        await upsertLead(atualizado)
+        setLeads(prev => prev.map(l => l.id === leadMatch.id ? atualizado : l))
+      }
     } catch (e) {
       console.error('Erro ao concluir atividade:', e)
       alert('Erro ao concluir atividade. Tente novamente.')
