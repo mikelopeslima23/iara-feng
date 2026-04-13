@@ -563,7 +563,9 @@ function Modal({ lead, acts, onClose, onSave, onReativar, onConcluirAct, onDelet
               </div>
             )}
 
-            {lead.mov && (
+            {/* Bloco legado — exibe mov/prox apenas se não há atividade de Atualização na timeline
+                Assim registros antigos ainda têm visibilidade, mas novos ficam só no histórico */}
+            {lead.mov && !concluidas.some(a => a.tipo === 'Atualização') && (
               <div style={{ marginTop: 20, padding: '12px 14px', background: t.bg, border: `1px solid ${t.border}`, borderRadius: 10 }}>
                 <div style={{ fontSize: 10, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Último movimento registrado</div>
                 <div style={{ fontSize: 13, color: t.textSub, lineHeight: 1.5 }}>{lead.mov}</div>
