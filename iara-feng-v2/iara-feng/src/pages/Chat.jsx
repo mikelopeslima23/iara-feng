@@ -388,7 +388,22 @@ Faça uma apresentação completa e envolvente. Use seu tom característico — 
 Prosa fluida, sem bullet points. Máximo 250 palavras.`
 }
 
-const SYSTEM = `Você é a IAra, agente de inteligência comercial da FENG — empresa de tecnologia para clubes de futebol e esportes na América Latina.
+// buildSystem() — gera o SYSTEM prompt com a data injetada dinamicamente no momento da chamada.
+// SYSTEM como constante estática causava erro: o módulo é carregado uma vez e a data congela.
+// Aqui derivamos o dia da semana a partir do ISO (não de Intl.weekday) para evitar bugs de Node.js.
+function buildSystem() {
+  const TZ = 'America/Sao_Paulo'
+  const agora = new Date()
+  const hojeISO = agora.toLocaleDateString('sv-SE', { timeZone: TZ })          // "2026-04-14"
+  const [y, m, d] = hojeISO.split('-').map(Number)
+  const DIAS = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado']
+  const diaSemana = DIAS[new Date(y, m - 1, d).getDay()]
+  const hojeFormatado = `${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}/${y}`
+  const hora = agora.toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })
+
+  return `⚠️ DATA ATUAL OBRIGATÓRIA: hoje é ${diaSemana}, ${hojeFormatado} (${hora} — América/São Paulo). Use SEMPRE esta data ao falar sobre "hoje", "amanhã", "essa semana" ou qualquer prazo. NUNCA use outra data.
+
+Você é a IAra, agente de inteligência comercial da FENG — empresa de tecnologia para clubes de futebol e esportes na América Latina.
 
 IDENTIDADE: IAra — Intelligence and Action for Revenue Acceleration. Tom: colega descontraída, direta, bem-humorada. Português informal. NUNCA diz "Como posso te ajudar?". NUNCA repete a mesma frase.
 
@@ -456,6 +471,7 @@ JURÍDICO → [SUGESTÃO:juridico]Briefing Jurídico — [Lead]\nContexto: ...\n
 
 REGRA: Máximo 2 sugestões por resposta. Não sugira em consultas.
 ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE.`
+}
 
 const EXTRACT_SYSTEM = `Você é um extrator de memórias. Analise a troca e extraia APENAS fatos relevantes e duráveis.
 TIPOS: pessoal, time, perfil. Máximo 3. Se não houver, retorne {"memorias": []}.
@@ -561,7 +577,7 @@ export default function Chat() {
       }
       const ctx = buildCtx(l, a, user.nome, mems, know, log)
       const cargoInfo = CARGOS[user.nome] || { cargo: 'membro do time comercial' }
-      const raw = await callAI([{ role: 'user', content: buildOnboardingPrompt(user.nome, cargoInfo.cargo) }], SYSTEM + '\n\n' + ctx)
+      const raw = await callAI([{ role: 'user', content: buildOnboardingPrompt(user.nome, cargoInfo.cargo) }], buildSystem() + '\n\n' + ctx)
       const txt = strip(raw)
       setMsgs([{ id: 'g1', role: 'assistant', text: txt, results: [], sugestoes: [] }])
       await saveMessage(user.id, 'assistant', txt)
@@ -581,7 +597,7 @@ export default function Chat() {
     try {
       const ctx = buildCtx(leads, acts, user.nome, memories, knowledge, auditLog)
       const apiMsgs = newMsgs.slice(-40).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
-      const raw = await callAI(apiMsgs, SYSTEM + '\n\n' + ctx)
+      const raw = await callAI(apiMsgs, buildSystem() + '\n\n' + ctx)
       const actions = parseActions(raw)
       const sugestoes = parseSugestoes(raw)
       const notifsParsed = parseNotifs(raw)
@@ -764,7 +780,7 @@ export default function Chat() {
     await clearMessages(user.id); setMsgs([]); setLoading(true)
     try {
       const ctx = buildCtx(leads, acts, user.nome, memories, knowledge, auditLog)
-      const raw = await callAI([{ role: 'user', content: `Reabra a conversa com ${user.nome} com nova saudação breve.` }], SYSTEM + '\n\n' + ctx)
+      const raw = await callAI([{ role: 'user', content: `Reabra a conversa com ${user.nome} com nova saudação breve.` }], buildSystem() + '\n\n' + ctx)
       const txt = strip(raw)
       setMsgs([{ id: Date.now(), role: 'assistant', text: txt, results: [], sugestoes: [] }])
       await saveMessage(user.id, 'assistant', txt)
