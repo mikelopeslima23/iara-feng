@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  getLeads, getActivities, upsertLead, upsertActivity,
+  getLeads, getActivities, upsertLead, upsertActivity, deleteActivity,
   getContactsByConta, upsertContact, deleteContact,
   getDocumentsByConta, upsertDocument, deleteDocument,
 } from '../lib/supabase'
@@ -284,7 +284,7 @@ function ContactModalInline({ contact, defaultConta, defaultLeadId, t, onSave, o
 }
 
 // ─── MODAL PRINCIPAL ─────────────────────────────────────────────────────────
-function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConcluirAct, onDeleteAct, t }) {
+function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConcluirAct, onDeleteAct, onActivityAdded, t }) {
   const user    = JSON.parse(localStorage.getItem('iara_user') || '{}')
   const isAdmin = ['Mike Lopes', 'Bruno Braga'].includes(user.nome)
 
@@ -421,7 +421,9 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
       // Atualiza ultima_atualizacao do lead com fuso SP — zera dias
       const leadAtualizado = { ...lead, ultima_atualizacao: hojeLocal, dias: 0 }
       await upsertLead(leadAtualizado)
-      // Usa onLeadUpdate (não onSave) para evitar duplo-salvar e lógica de mov/prox
+      // Avisa o pai: nova atividade foi criada (aparece na timeline imediatamente)
+      onActivityAdded && onActivityAdded(nA)
+      // Atualiza o lead no estado do pai sem duplo-salvar
       onLeadUpdate(leadAtualizado)
     } catch (e) {
       console.error('Erro ao salvar atividade:', e)
@@ -1004,6 +1006,11 @@ export default function Pipeline() {
     setSelected(null)
   }
 
+  // Adiciona nova atividade ao estado local imediatamente — sem precisar de refresh
+  function handleActivityAdded(nA) {
+    setActs(prev => [...prev, nA])
+  }
+
   async function handleConcluirAct(act) {
     try {
       const concluida = { ...act, ok: true }
@@ -1031,10 +1038,14 @@ export default function Pipeline() {
 
   async function handleDeleteAct(act) {
     if (!confirm(`Apagar atividade "${act.descricao}"?`)) return
-    // Soft delete — marca como deletada sem remover do banco
-    const deletada = { ...act, deleted: true }
-    await upsertActivity(deletada)
-    setActs(prev => prev.filter(a => a.id !== act.id))
+    try {
+      await deleteActivity(act.id)
+      setActs(prev => prev.filter(a => a.id !== act.id))
+    } catch (e) {
+      console.error('Erro ao apagar:', e)
+      // Fallback: se deleteActivity não existir, remove só do estado local
+      setActs(prev => prev.filter(a => a.id !== act.id))
+    }
   }
 
   // ── Derived data ─────────────────────────────────────────────────────────────
@@ -1380,6 +1391,7 @@ export default function Pipeline() {
           onClose={() => setSelected(null)}
           onSave={handleSave}
           onLeadUpdate={handleLeadUpdate}
+          onActivityAdded={handleActivityAdded}
           onReativar={handleReativar}
           onConcluirAct={handleConcluirAct}
           onDeleteAct={handleDeleteAct} />
