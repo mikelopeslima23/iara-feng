@@ -772,6 +772,7 @@ export default function Pipeline() {
   const [syncing,     setSyncing]     = useState(false)
   const [selected,    setSelected]    = useState(null)
   const [filterResp,  setFilterResp]  = useState('Todos')
+  const [filterBusca, setFilterBusca] = useState('')
   const [aba,         setAba]         = useState('pipeline')
 
   function toggleTheme() {
@@ -790,6 +791,16 @@ export default function Pipeline() {
       if (!a.length) a = ACTIVITIES_INITIAL
       // Filtra atividades marcadas como deletadas (soft delete)
       a = a.filter(act => !act.deleted)
+      // Recalcula dias dinamicamente a partir de ultima_atualizacao
+      const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+      l = l.map(lead => {
+        if (lead.ultima_atualizacao) {
+          const ultima = new Date(lead.ultima_atualizacao + 'T00:00:00')
+          const diff = Math.floor((hoje - ultima) / (1000 * 60 * 60 * 24))
+          return { ...lead, dias: Math.max(0, diff) }
+        }
+        return lead
+      })
       const lAged = applyAging(l)
       setLeads(lAged); setActs(a)
       const changed = lAged.filter((nl, i) => nl.off !== l[i]?.off)
@@ -862,9 +873,16 @@ export default function Pipeline() {
   }
 
   async function handleConcluirAct(act) {
-    const concluida = { ...act, ok: true, concluido_em: new Date().toISOString() }
-    await upsertActivity(concluida)
-    setActs(prev => prev.map(a => a.id === act.id ? concluida : a))
+    try {
+      const concluida = { ...act, ok: true }
+      // Remove campos que podem não existir na tabela Supabase
+      delete concluida.concluido_em
+      await upsertActivity(concluida)
+      setActs(prev => prev.map(a => a.id === act.id ? { ...a, ok: true } : a))
+    } catch (e) {
+      console.error('Erro ao concluir atividade:', e)
+      alert('Erro ao concluir atividade. Tente novamente.')
+    }
   }
 
   async function handleDeleteAct(act) {
@@ -889,9 +907,20 @@ export default function Pipeline() {
   ))]
   const ativos    = filterResp === 'Todos' ? todosAtivos    : todosAtivos.filter(l => l.resp?.includes(filterResp))
   const geladeira = filterResp === 'Todos' ? todosGeladeira : todosGeladeira.filter(l => l.resp?.includes(filterResp))
-  const byEtapa   = ETAPAS.reduce((acc, e) => { acc[e] = ativos.filter(l => l.etapa === e); return acc }, {})
-  const riscos    = ativos.filter(l => l.risco)
-  const contasAtivas = ativos.reduce((acc, l) => {
+
+  // Filtro de busca — aplica sobre ativos já filtrados por resp
+  const busca = filterBusca.trim().toLowerCase()
+  const ativosFiltrados = busca
+    ? ativos.filter(l =>
+        (l.conta || l.nome || '').toLowerCase().includes(busca) ||
+        (l.servico || '').toLowerCase().includes(busca) ||
+        (l.resp || '').toLowerCase().includes(busca)
+      )
+    : ativos
+
+  const byEtapa   = ETAPAS.reduce((acc, e) => { acc[e] = ativosFiltrados.filter(l => l.etapa === e); return acc }, {})
+  const riscos    = ativosFiltrados.filter(l => l.risco)
+  const contasAtivas = ativosFiltrados.reduce((acc, l) => {
     const conta = l.conta || l.nome; acc[conta] = (acc[conta] || 0) + 1; return acc
   }, {})
 
@@ -947,6 +976,19 @@ export default function Pipeline() {
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', overflowX: 'auto' }}>
           <button onClick={toggleTheme} style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${t.border}`, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, flexShrink: 0 }}>{t.icon}</button>
+          {/* Busca */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: t.textHint, pointerEvents: 'none' }}>🔍</span>
+            <input
+              value={filterBusca}
+              onChange={e => setFilterBusca(e.target.value)}
+              placeholder="Buscar conta, serviço..."
+              style={{ paddingLeft: 28, paddingRight: filterBusca ? 28 : 10, height: 34, width: 190, border: `1px solid ${filterBusca ? t.purple : t.border}`, borderRadius: 20, background: t.surface, color: t.text, fontSize: 12, outline: 'none', fontFamily: 'inherit' }}
+            />
+            {filterBusca && (
+              <button onClick={() => setFilterBusca('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button>
+            )}
+          </div>
           {resps.map(r => (
             <button key={r} onClick={() => setFilterResp(r)} style={{ background: filterResp === r ? t.purple : t.surface, border: `1px solid ${filterResp === r ? t.purple : t.border}`, borderRadius: 20, padding: '4px 12px', fontSize: 11, color: filterResp === r ? '#fff' : t.textMuted, cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: filterResp === r ? 600 : 400 }}>
               {r}
