@@ -638,6 +638,29 @@ export default function Chat() {
           curL = curL.map(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()) ? { ...l, [campo]: valor, ultima_atualizacao: hoje } : l)
           const updated = curL.find(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()))
           if (updated) await upsertLead(updated)
+
+          // Quando IAra atualiza mov ou prox via chat, cria atividade na Timeline
+          // para o histórico não se perder (mesmo problema que o Jardel reportou no Pipeline)
+          if (campo === 'mov' || campo === 'prox') {
+            const leadLabel = updated?.conta && updated?.servico
+              ? `${updated.conta} — ${updated.servico}`
+              : (updated?.nome || updated?.conta || nome)
+            const actTimeline = {
+              id: `act-mov-${Date.now()}`,
+              ok: true,
+              criado: hoje,
+              lead: leadLabel,
+              descricao: campo === 'mov'
+                ? `📝 Movimento: ${valor}`
+                : `→ Próxima ação: ${valor}`,
+              dt: hoje,
+              resp: user.nome,
+              tipo: 'Atualização',
+            }
+            curA = [...curA, actTimeline]
+            await upsertActivity(actTimeline)
+          }
+
           if (campo === 'etapa') {
             await logAudit({
               evento: 'etapa_avancada',
