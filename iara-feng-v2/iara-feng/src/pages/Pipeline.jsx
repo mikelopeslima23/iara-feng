@@ -917,6 +917,7 @@ export default function Pipeline() {
         ::-webkit-scrollbar-thumb { background: ${t.scrollThumb}; border-radius: 3px; }
         .lead-card:hover   { border-color: ${t.purple} !important; transform: translateY(-1px); }
         .lead-card         { transition: all 0.15s; }
+        .lead-abandono:hover { border-color: #EF4444 !important; box-shadow: 0 4px 14px rgba(239,68,68,0.25) !important; transform: translateY(-1px); }
         .gel-card:hover    { border-color: ${t.textMuted} !important; }
         .gel-card          { transition: all 0.15s; }
         .golive-card:hover { border-color: ${t.green} !important; transform: translateY(-1px); }
@@ -1011,19 +1012,40 @@ export default function Pipeline() {
                       const contaOps = contasAtivas[l.conta || l.nome] || 1
                       const hs       = healthScore(l, acts, contactsMap)
                       const hsInfo   = healthLabel(hs)
+
+                      // Flag abandono: +15 dias sem atualização E sem nenhum FUP pendente
+                      const temFupPendente = pendLead.some(a => a.tipo === 'FUP' || a.tipo === 'Fazer Contato')
+                      const emAbandono = (l.dias || 0) > 15 && !temFupPendente
+
                       return (
-                        <div key={l.id} className="lead-card" onClick={() => setSelected(l)} style={{ background: t.surfaceInput, border: `1px solid ${l.risco ? t.orange + '44' : t.border}`, borderRadius: 10, padding: '11px 13px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 6, boxShadow: t.name === 'light' ? '0 1px 4px rgba(124,58,237,0.06)' : 'none' }}>
+                        <div
+                          key={l.id}
+                          className={emAbandono ? 'lead-card lead-abandono' : 'lead-card'}
+                          onClick={() => setSelected(l)}
+                          style={{
+                            background:   emAbandono ? 'rgba(239,68,68,0.07)' : t.surfaceInput,
+                            border:       emAbandono ? '1.5px solid rgba(239,68,68,0.7)' : `1px solid ${l.risco ? t.orange + '44' : t.border}`,
+                            borderLeft:   emAbandono ? '4px solid #EF4444' : undefined,
+                            borderRadius: 10,
+                            padding:      '11px 13px',
+                            cursor:       'pointer',
+                            display:      'flex',
+                            flexDirection:'column',
+                            gap:          6,
+                            boxShadow:    emAbandono
+                              ? '0 0 0 1px rgba(239,68,68,0.15), 0 2px 8px rgba(239,68,68,0.12)'
+                              : (t.name === 'light' ? '0 1px 4px rgba(124,58,237,0.06)' : 'none'),
+                          }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, lineHeight: 1.3 }}>{l.conta || l.nome}</div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: emAbandono ? '#EF4444' : t.text, lineHeight: 1.3 }}>{l.conta || l.nome}</div>
                               {l.servico && <div style={{ fontSize: 11, color: t.purple, marginTop: 2 }}>📦 {l.servico}</div>}
                             </div>
                             <span style={{ background: `${agColor}22`, border: `1px solid ${agColor}55`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: agColor, whiteSpace: 'nowrap', fontWeight: 600, flexShrink: 0 }}>{agLabel}</span>
                           </div>
                           <div style={{ fontSize: 11, color: t.textMuted }}>👤 {l.resp}</div>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 11, color: l.dias > 7 ? t.orange : t.textMuted }}>🕐 {l.dias}d</span>
-                            {/* Health Score */}
+                            <span style={{ fontSize: 11, color: emAbandono ? '#EF4444' : (l.dias > 7 ? t.orange : t.textMuted), fontWeight: emAbandono ? 700 : 400 }}>🕐 {l.dias}d</span>
                             <span title={`Health Score: ${hs}/100`} style={{ background: hsInfo.bg, border: `1px solid ${hsInfo.color}44`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: hsInfo.color, fontWeight: 700 }}>❤️ {hs}</span>
                             {pendLead.length > 0 && <span style={{ background: t.purpleFaint, border: `1px solid ${t.purple}44`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: t.purple }}>{pendLead.length} pend.</span>}
                             {contaOps > 1 && <span style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '1px 7px', fontSize: 10, color: '#3B82F6' }}>{contaOps} op.</span>}
@@ -1031,6 +1053,11 @@ export default function Pipeline() {
                             {l.risco && <span style={{ fontSize: 11 }}>⚠️</span>}
                             {l.g12   && <span style={{ fontSize: 11 }}>⭐</span>}
                           </div>
+                          {emAbandono && (
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 5, padding: '2px 7px', display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
+                              🚨 SEM FUP HÁ {l.dias}d
+                            </div>
+                          )}
                           <CardIndicators lead={l} acts={acts} contactsMap={contactsMap} t={t} />
                           {l.paralelo && <ParaleloBadges paralelo={l.paralelo} />}
                           {l.prox && <div style={{ fontSize: 11, color: t.textHint, borderTop: `1px solid ${t.borderLight}`, paddingTop: 6 }}>→ {l.prox}</div>}
