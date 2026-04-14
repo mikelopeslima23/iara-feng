@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   getLeads, getActivities, upsertLead, upsertActivity, deleteActivity,
   getContactsByConta, upsertContact, deleteContact,
-  getDocumentsByConta, upsertDocument, deleteDocument, deleteLead,
+  getDocumentsByConta, upsertDocument, deleteDocument,
 } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL } from '../data/pipeline'
 import { getTheme, saveTheme, THEMES } from '../lib/theme'
@@ -338,36 +338,42 @@ function NovoLeadWizard({ t, leads, user, onSave, onClose }) {
 
   async function handleFinalizar() {
     setSaving(true)
-    const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
-    const servico = skipOpp ? '' : oppForm.servico.trim()
-    const nome    = leadForm.conta && servico ? `${leadForm.conta} — ${servico}` : leadForm.conta
-    const card = {
-      conta:              leadForm.conta.trim(),
-      servico,
-      nome,
-      etapa:              skipOpp ? 'Prospecção' : (oppForm.etapa || 'Prospecção'),
-      resp:               leadForm.resp,
-      valor:              oppForm.valor || '',
-      mov:                ctxForm.mov || (skipOpp ? 'Lead cadastrado em Prospecção' : 'Nova oportunidade criada via Pipeline'),
-      prox:               ctxForm.descAtv || '',
-      dt:                 ctxForm.dtAtv   || '',
-      dias:               0,
-      aging:              'Hot',
-      op:                 false,
-      off:                false,
-      g12:                false,
-      risco:              '',
-      vencimento:         '',
-      paralelo:           '',
-      ultima_atualizacao: hoje,
+    try {
+      const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+      const servico = skipOpp ? '' : oppForm.servico.trim()
+      const nome    = leadForm.conta && servico ? `${leadForm.conta} — ${servico}` : leadForm.conta
+      const card = {
+        conta:              leadForm.conta.trim(),
+        servico,
+        nome,
+        etapa:              skipOpp ? 'Prospecção' : (oppForm.etapa || 'Prospecção'),
+        resp:               leadForm.resp,
+        valor:              oppForm.valor || '',
+        mov:                ctxForm.mov || (skipOpp ? 'Lead cadastrado em Prospecção' : 'Nova oportunidade criada via Pipeline'),
+        prox:               ctxForm.descAtv || '',
+        dt:                 ctxForm.dtAtv   || '',
+        dias:               0,
+        aging:              'Hot',
+        op:                 false,
+        off:                false,
+        g12:                false,
+        risco:              '',
+        vencimento:         '',
+        paralelo:           '',
+        ultima_atualizacao: hoje,
+      }
+      await onSave(card, ctxForm.descAtv ? {
+        tipo:      ctxForm.tipoAtv,
+        descricao: ctxForm.descAtv,
+        dt:        ctxForm.dtAtv,
+        resp:      leadForm.resp,
+      } : null)
+    } catch (e) {
+      console.error('Erro ao criar lead:', e)
+      alert('Erro ao salvar. Verifique o console e tente novamente.')
+    } finally {
+      setSaving(false)
     }
-    await onSave(card, ctxForm.descAtv ? {
-      tipo:      ctxForm.tipoAtv,
-      descricao: ctxForm.descAtv,
-      dt:        ctxForm.dtAtv,
-      resp:      leadForm.resp,
-    } : null)
-    setSaving(false)
   }
 
   const STEP_LABELS = ['Lead', 'Oportunidade', 'Contexto']
@@ -1476,9 +1482,18 @@ export default function Pipeline() {
 
   async function handleDeleteLead(lead) {
     try {
-      await deleteLead(lead.id)
-    } catch {
-      // Se deleteLead não existir no supabase.js, remove só do estado
+      // Chama diretamente via supabase client — não depende de função exportada
+      const { createClient } = await import('@supabase/supabase-js')
+      // Usa a instância já criada via import dinâmico do módulo supabase
+      const mod = await import('../lib/supabase')
+      if (mod.supabase) {
+        await mod.supabase.from('iara_leads').delete().eq('id', lead.id)
+      } else if (mod.deleteLead) {
+        await mod.deleteLead(lead.id)
+      }
+    } catch (e) {
+      console.error('Erro ao apagar lead:', e)
+      // Remove do estado mesmo se o banco falhar (útil para duplicatas)
     }
     setLeads(prev => prev.filter(l => l.id !== lead.id))
     setSelected(null)
@@ -1490,58 +1505,62 @@ export default function Pipeline() {
   }
 
   async function handleCriarOpp(form, primeiraAtv = null) {
-    const norm = s => (s || '').toLowerCase().trim()
-    const jaExiste = leads.find(l =>
-      norm(l.conta || l.nome) === norm(form.conta) &&
-      form.servico &&
-      norm(l.servico) === norm(form.servico)
-    )
-    if (jaExiste) {
-      alert(`Já existe: ${form.conta}${form.servico ? ` — ${form.servico}` : ''} no pipeline.`)
-      return
-    }
-    const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
-    const nome = form.conta && form.servico ? `${form.conta} — ${form.servico}` : form.conta
-    const nL = {
-      id:                 `opp-${Date.now()}`,
-      nome,
-      conta:              form.conta || '',
-      servico:            form.servico || '',
-      etapa:              form.etapa || 'Prospecção',
-      resp:               form.resp || user.nome,
-      dias:               0,
-      aging:              'Hot',
-      mov:                form.mov || '',
-      prox:               form.prox || '',
-      dt:                 form.dt   || '',
-      op:                 false,
-      off:                false,
-      g12:                false,
-      risco:              '',
-      vencimento:         '',
-      paralelo:           '',
-      valor:              form.valor || '',
-      ultima_atualizacao: hoje,
-    }
-    await upsertLead(nL)
-    setLeads(prev => [...prev, nL])
-    // Se veio com primeira atividade, cria junto
-    if (primeiraAtv && primeiraAtv.descricao?.trim()) {
-      const nA = {
-        id:        `act-${Date.now()}`,
-        ok:        false,
-        criado:    hoje,
-        lead:      nome,
-        descricao: primeiraAtv.descricao.trim(),
-        dt:        primeiraAtv.dt || hoje,
-        resp:      form.resp || user.nome,
-        tipo:      primeiraAtv.tipo || 'FUP',
+    try {
+      const norm = s => (s || '').toLowerCase().trim()
+      const jaExiste = leads.find(l =>
+        norm(l.conta || l.nome) === norm(form.conta) &&
+        form.servico &&
+        norm(l.servico) === norm(form.servico)
+      )
+      if (jaExiste) {
+        alert(`Já existe: ${form.conta}${form.servico ? ` — ${form.servico}` : ''} no pipeline.`)
+        return
       }
-      await upsertActivity(nA)
-      setActs(prev => [...prev, nA])
+      const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+      const nome = form.conta && form.servico ? `${form.conta} — ${form.servico}` : form.conta
+      const nL = {
+        id:                 `opp-${Date.now()}`,
+        nome,
+        conta:              form.conta || '',
+        servico:            form.servico || '',
+        etapa:              form.etapa || 'Prospecção',
+        resp:               form.resp || user.nome,
+        dias:               0,
+        aging:              'Hot',
+        mov:                form.mov || '',
+        prox:               form.prox || '',
+        dt:                 form.dt   || '',
+        op:                 false,
+        off:                false,
+        g12:                false,
+        risco:              '',
+        vencimento:         '',
+        paralelo:           '',
+        valor:              form.valor || '',
+        ultima_atualizacao: hoje,
+      }
+      await upsertLead(nL)
+      setLeads(prev => [...prev, nL])
+      if (primeiraAtv && primeiraAtv.descricao?.trim()) {
+        const nA = {
+          id:        `act-${Date.now()}`,
+          ok:        false,
+          criado:    hoje,
+          lead:      nome,
+          descricao: primeiraAtv.descricao.trim(),
+          dt:        primeiraAtv.dt || hoje,
+          resp:      form.resp || user.nome,
+          tipo:      primeiraAtv.tipo || 'FUP',
+        }
+        await upsertActivity(nA)
+        setActs(prev => [...prev, nA])
+      }
+      setShowNovaOpp(false)
+      setSelected(nL)
+    } catch (e) {
+      console.error('Erro ao criar oportunidade:', e)
+      throw e  // re-lança para o finally do handleFinalizar rodar setSaving(false)
     }
-    setShowNovaOpp(false)
-    setSelected(nL)
   }
 
   async function handleConcluirAct(act) {
