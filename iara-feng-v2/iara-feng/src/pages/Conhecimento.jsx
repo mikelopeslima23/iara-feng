@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getKnowledge, saveKnowledge, deleteKnowledge } from '../lib/supabase'
+import { useState as useSidebarState } from 'react'
+import { SidebarDrawer, HamburgerBtn, LogoPill, D } from './Sidebar'
 
 const CATEGORIAS = [
   { id: 'produto', label: '📦 Produto/Serviço', color: '#A855F7' },
@@ -172,45 +174,46 @@ TAGS:
   }, {})
 
   return (
-    <div style={{ minHeight: '100dvh', background: '#0D0A14', color: '#F0E8FF', fontFamily: "'Inter',system-ui,sans-serif" }}>
+    <div style={{ minHeight: '100dvh', background: D.bg, color: D.t1, fontFamily: "'Inter',system-ui,sans-serif" }}>
       <style>{`
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { height: 3px; width: 3px; }
-        ::-webkit-scrollbar-track { background: #0D0A14; }
-        ::-webkit-scrollbar-thumb { background: #2D1F45; border-radius: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #3D3860; border-radius: 3px; }
         .item-card:hover { border-color: #7C3AED !important; }
         .item-card { transition: all 0.15s; }
         input, textarea, select { color-scheme: dark; }
       `}</style>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: '1px solid #1E1433', background: 'linear-gradient(180deg,#0F0B1A,#0A0810)', position: 'sticky', top: 0, zIndex: 10, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => navigate('/chat')} style={{ background: 'none', border: '1px solid #2D1F45', borderRadius: 8, color: '#6B5A90', padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>← Chat</button>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#F0E8FF' }}>🧠 Base de Conhecimento</div>
-            <div style={{ fontSize: 10, color: '#6B5A90' }}>{items.length} documentos · IAra aprende com cada um</div>
-          </div>
+      <SidebarDrawer open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} />
+
+      {/* ── TOPBAR ── */}
+      <div style={{ height: 52, background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 10 }}>
+        <HamburgerBtn open={sidebarOpen} onClick={() => setSidebarOpen(o => !o)} />
+        <LogoPill />
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: D.t1 }}>Base de Conhecimento</div>
+          <div style={{ fontSize: 10, color: D.t3 }}>{items.length} documentos · IAra aprende com cada um</div>
         </div>
         {isAdmin && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={() => { setModal('upload'); setStep('') }} style={{ background: 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 8, color: 'white', padding: '8px 16px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
-              📎 Upload documento
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button onClick={() => { setModal('upload'); setStep('') }} style={{ background: D.p, border: 'none', borderRadius: 8, color: 'white', padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+              📎 Upload
             </button>
-            <button onClick={() => { setModal('manual'); setStep('') }} style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid #7C3AED66', borderRadius: 8, color: '#A855F7', padding: '8px 16px', fontSize: 12, cursor: 'pointer' }}>
-              ✏️ Inserir manual
+            <button onClick={() => { setModal('manual'); setStep('') }} style={{ background: D.pf, border: `1px solid ${D.p}66`, borderRadius: 8, color: D.p2, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>
+              ✏️ Manual
             </button>
           </div>
         )}
       </div>
 
       {/* Filtros por categoria */}
-      <div style={{ padding: '16px 20px 0', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button onClick={() => setFilterCat('todos')} style={{ background: filterCat === 'todos' ? '#7C3AED' : '#130F1E', border: `1px solid ${filterCat === 'todos' ? '#7C3AED' : '#2D1F45'}`, borderRadius: 20, padding: '5px 14px', fontSize: 12, color: filterCat === 'todos' ? '#fff' : '#6B5A90', cursor: 'pointer', fontWeight: filterCat === 'todos' ? 600 : 400 }}>
+      <div style={{ padding: '10px 16px 0', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: `1px solid ${D.border}` }}>
+        <button onClick={() => setFilterCat('todos')} style={{ background: filterCat === 'todos' ? D.p : D.bg3, border: `1px solid ${filterCat === 'todos' ? D.p : D.border}`, borderRadius: 20, padding: '4px 12px', fontSize: 11, color: filterCat === 'todos' ? '#fff' : D.t3, cursor: 'pointer', fontWeight: filterCat === 'todos' ? 600 : 400 }}>
           Todos ({items.length})
         </button>
         {CATEGORIAS.map(c => (
-          <button key={c.id} onClick={() => setFilterCat(c.id)} style={{ background: filterCat === c.id ? `${c.color}22` : '#130F1E', border: `1px solid ${filterCat === c.id ? c.color : '#2D1F45'}`, borderRadius: 20, padding: '5px 14px', fontSize: 12, color: filterCat === c.id ? c.color : '#6B5A90', cursor: 'pointer', fontWeight: filterCat === c.id ? 600 : 400 }}>
+          <button key={c.id} onClick={() => setFilterCat(c.id)} style={{ background: filterCat === c.id ? `${c.color}22` : D.bg3, border: `1px solid ${filterCat === c.id ? c.color : D.border}`, borderRadius: 20, padding: '4px 12px', fontSize: 11, color: filterCat === c.id ? c.color : D.t3, cursor: 'pointer', fontWeight: filterCat === c.id ? 600 : 400 }}>
             {c.label} ({catCounts[c.id] || 0})
           </button>
         ))}
