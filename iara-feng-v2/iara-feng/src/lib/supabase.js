@@ -190,3 +190,13 @@ export async function getAuditLog(limit = 40) {
 export async function deleteActivity(id) {
   await supabase.from('iara_activities').delete().eq('id', id)
 }
+// Adicione esta função no seu src/lib/supabase.js
+// junto com as outras funções de delete (deleteContact, deleteDocument, etc.)
+
+export async function deleteLead(id) {
+  const { error } = await supabase
+    .from('iara_leads')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
