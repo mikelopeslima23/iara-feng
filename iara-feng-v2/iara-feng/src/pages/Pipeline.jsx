@@ -2032,7 +2032,7 @@ export default function Pipeline() {
           { path: '/radar',    icon: 'M18 20V10M12 20V4M6 20v-6', label: 'Relatórios', active: false },
         ].map(item => (
           <div key={item.path} className="ni-btn"
-            onClick={() => { navigate(item.path); setSidebarOpen(false) }}
+            onClick={() => { window.location.href = item.path }}
             title={item.label}
             style={{ width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', background: item.active ? D.pf : 'transparent' }}>
             {item.active && <div style={{ position: 'absolute', left: 0, width: 2, height: 18, background: D.p, borderRadius: '0 2px 2px 0', marginLeft: -1 }} />}
@@ -2052,7 +2052,7 @@ export default function Pipeline() {
         </div>
 
         <div style={{ marginTop: 'auto', width: 30, height: 30, borderRadius: '50%', background: D.o, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'white', cursor: 'pointer', flexShrink: 0 }}
-          onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}
+          onClick={() => { localStorage.removeItem('iara_user'); window.location.href = '/login' }}
           title={`${user.nome} — sair`}>
           {avInit(user.nome)}
         </div>
