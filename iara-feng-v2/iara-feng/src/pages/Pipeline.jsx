@@ -284,190 +284,375 @@ function ContactModalInline({ contact, defaultConta, defaultLeadId, t, onSave, o
 }
 
 // ─── NOVA OPORTUNIDADE MODAL ──────────────────────────────────────────────────
-function NovaOppModal({ t, leads, user, onSave, onClose }) {
+// ─── WIZARD NOVO LEAD / OPORTUNIDADE ─────────────────────────────────────────
+const PAISES = ['Brasil','Argentina','Colômbia','Peru','Chile','Equador','Uruguai','Paraguai','Bolívia','Venezuela','México','EUA','Outros']
+const SERVICOS_FENG = ['ST Completo','Sócio Torcedor','DataLake','CRM','Mídia Paga','Estratégia','BI','Redes Sociais','Site Institucional','Loyalty','Atendimento','SSO','Gestão Financeira','Ativação Digital','Match Day','App Oficial','Projeto Especial']
+const USERS_FENG = ['Mike Lopes','Bruno Braga','Jardel Rocha','Silvio Vázquez','Beni Ertel','Alexandre Sivolella']
+
+function NovoLeadWizard({ t, leads, user, onSave, onClose }) {
   const norm = s => (s || '').toLowerCase().trim()
-  const [form, setForm] = useState({
-    conta: '', servico: '', etapa: 'Prospecção', resp: user.nome || '', mov: '',
-  })
-  const [contaInput, setContaInput] = useState('')
-  const [showSuggestions, setShowSuggestions] = useState(false)
-  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+  const [step, setStep] = useState(1)  // 1=Lead 2=Oportunidade 3=Contexto
 
-  // Lista de contas únicas já existentes no pipeline
+  // Step 1 — Lead
+  const [contaInput,   setContaInput]   = useState('')
+  const [showSugg,     setShowSugg]     = useState(false)
+  const [isNovoLead,   setIsNovoLead]   = useState(false)
+  const [leadForm,     setLeadForm]     = useState({ conta: '', pais: 'Brasil', resp: user.nome || 'Jardel Rocha' })
+  function setLF(k, v) { setLeadForm(f => ({ ...f, [k]: v })) }
+
+  // Step 2 — Oportunidade (opcional)
+  const [oppForm, setOppForm] = useState({ servico: '', etapa: 'Prospecção', valor: '', contatoPrincipal: '' })
+  function setOF(k, v) { setOppForm(f => ({ ...f, [k]: v })) }
+  const [skipOpp, setSkipOpp] = useState(false)
+
+  // Step 3 — Contexto (opcional)
+  const [ctxForm, setCtxForm] = useState({ mov: '', tipoAtv: 'FUP', descAtv: '', dtAtv: new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) })
+  function setCF(k, v) { setCtxForm(f => ({ ...f, [k]: v })) }
+  const [saving, setSaving] = useState(false)
+
+  // Contas existentes para autocomplete
   const contasExistentes = [...new Set(leads.map(l => l.conta || l.nome).filter(Boolean))].sort()
-
-  // Sugestões: mostra todas ao focar (campo vazio), filtra ao digitar
-  const sugestoes = showSuggestions
+  const sugestoes = showSugg
     ? (contaInput.trim().length === 0
-        ? contasExistentes.slice(0, 10)   // top 10 ao abrir
-        : contasExistentes.filter(c => c.toLowerCase().includes(contaInput.toLowerCase())).slice(0, 8)
-      )
+        ? contasExistentes.slice(0, 10)
+        : contasExistentes.filter(c => c.toLowerCase().includes(contaInput.toLowerCase())).slice(0, 8))
     : []
 
-  function selecionarConta(conta) {
-    setContaInput(conta)
-    set('conta', conta)
-    setShowSuggestions(false)
-    // Preenche responsável com o da conta existente
-    const leadExistente = leads.find(l => (l.conta || l.nome) === conta)
-    if (leadExistente) set('resp', leadExistente.resp || form.resp)
+  // Lead selecionado existente
+  const leadExistente = leads.find(l => norm(l.conta || l.nome) === norm(leadForm.conta))
+  const oppsDestaConta = leads.filter(l => norm(l.conta || l.nome) === norm(leadForm.conta))
+
+  // Duplicata de oportunidade
+  const dupOpp = !skipOpp && leadForm.conta && oppForm.servico && leads.find(l =>
+    norm(l.conta || l.nome) === norm(leadForm.conta) && norm(l.servico) === norm(oppForm.servico)
+  )
+
+  function selecionarConta(c) {
+    setContaInput(c); setLF('conta', c); setShowSugg(false); setIsNovoLead(false)
+    const ex = leads.find(l => (l.conta || l.nome) === c)
+    if (ex) setLF('resp', ex.resp || user.nome)
   }
 
-  // Opps já existentes para esta conta (mostra serviços já cadastrados)
-  const oppsDestaConta = leads.filter(l => norm(l.conta || l.nome) === norm(form.conta))
+  const step1Valido = leadForm.conta.trim()
+  const step2Valido = skipOpp || (oppForm.servico.trim() && !dupOpp)
 
-  // Detecta duplicata em tempo real enquanto digita
-  const duplicata = form.conta.trim() && form.servico.trim() && leads.find(l =>
-    norm(l.conta || l.nome) === norm(form.conta) && norm(l.servico) === norm(form.servico)
-  )
-  const valido = form.conta.trim() && form.servico.trim() && !duplicata
+  async function handleFinalizar() {
+    setSaving(true)
+    const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+    const servico = skipOpp ? '' : oppForm.servico.trim()
+    const nome    = leadForm.conta && servico ? `${leadForm.conta} — ${servico}` : leadForm.conta
+    const card = {
+      conta:              leadForm.conta.trim(),
+      servico,
+      nome,
+      etapa:              skipOpp ? 'Prospecção' : (oppForm.etapa || 'Prospecção'),
+      resp:               leadForm.resp,
+      valor:              oppForm.valor || '',
+      mov:                ctxForm.mov || (skipOpp ? 'Lead cadastrado em Prospecção' : 'Nova oportunidade criada via Pipeline'),
+      prox:               ctxForm.descAtv || '',
+      dt:                 ctxForm.dtAtv   || '',
+      dias:               0,
+      aging:              'Hot',
+      op:                 false,
+      off:                false,
+      g12:                false,
+      risco:              '',
+      vencimento:         '',
+      paralelo:           '',
+      ultima_atualizacao: hoje,
+    }
+    await onSave(card, ctxForm.descAtv ? {
+      tipo:      ctxForm.tipoAtv,
+      descricao: ctxForm.descAtv,
+      dt:        ctxForm.dtAtv,
+      resp:      leadForm.resp,
+    } : null)
+    setSaving(false)
+  }
+
+  const STEP_LABELS = ['Lead', 'Oportunidade', 'Contexto']
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16, backdropFilter: 'blur(4px)' }} onClick={onClose}>
-      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 18, width: '100%', maxWidth: 480, boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 18, width: '100%', maxWidth: 500, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
 
-        {/* Header */}
-        <div style={{ padding: '20px 24px 16px', borderBottom: `1px solid ${t.borderLight}` }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: t.text }}>➕ Nova Oportunidade</div>
-              <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>Preencha os dados para criar o card no pipeline</div>
-            </div>
+        {/* Header com steps */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: `1px solid ${t.borderLight}`, flexShrink: 0 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: t.text }}>+ Novo Lead</div>
             <button onClick={onClose} style={{ background: 'none', border: 'none', color: t.textMuted, fontSize: 20, cursor: 'pointer' }}>✕</button>
+          </div>
+          {/* Step indicators */}
+          <div style={{ display: 'flex', gap: 0 }}>
+            {STEP_LABELS.map((label, i) => {
+              const s = i + 1
+              const done    = step > s
+              const current = step === s
+              return (
+                <div key={s} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, position: 'relative' }}>
+                  {i > 0 && <div style={{ position: 'absolute', left: 0, top: 12, width: '50%', height: 2, background: done || current ? t.purple : t.border }} />}
+                  {i < 2 && <div style={{ position: 'absolute', right: 0, top: 12, width: '50%', height: 2, background: done ? t.purple : t.border }} />}
+                  <div style={{ width: 26, height: 26, borderRadius: '50%', background: done ? t.purple : current ? t.purple : t.surfaceInput, border: `2px solid ${done || current ? t.purple : t.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: done || current ? 'white' : t.textMuted, zIndex: 1 }}>
+                    {done ? '✓' : s}
+                  </div>
+                  <div style={{ fontSize: 10, color: current ? t.purple : t.textMuted, fontWeight: current ? 700 : 400 }}>{label}</div>
+                  {s === 2 && <div style={{ fontSize: 9, color: t.textHint }}>(opcional)</div>}
+                  {s === 3 && <div style={{ fontSize: 9, color: t.textHint }}>(opcional)</div>}
+                </div>
+              )
+            })}
           </div>
         </div>
 
         {/* Body */}
-        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
 
-          {/* Conta + Serviço */}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ flex: 1, position: 'relative' }}>
-              <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>CONTA *</div>
+          {/* ── STEP 1: LEAD ── */}
+          {step === 1 && <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 12, color: t.textMuted, background: t.bg, borderRadius: 8, padding: '8px 12px' }}>
+              Selecione um lead já existente ou crie um novo. Um lead é o clube ou empresa — as oportunidades são os serviços dentro dele.
+            </div>
+
+            {/* Conta com autocomplete */}
+            <div style={{ position: 'relative' }}>
+              <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>CONTA / CLUBE *</div>
               <input
                 value={contaInput}
-                onChange={e => {
-                  setContaInput(e.target.value)
-                  set('conta', e.target.value)
-                  setShowSuggestions(true)
-                }}
-                onFocus={() => setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                placeholder="Clique para ver contas existentes..."
+                onChange={e => { setContaInput(e.target.value); setLF('conta', e.target.value); setShowSugg(true); setIsNovoLead(true) }}
+                onFocus={() => setShowSugg(true)}
+                onBlur={() => setTimeout(() => setShowSugg(false), 150)}
+                placeholder="Clique para ver leads existentes..."
                 autoFocus
-                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${form.conta ? t.purple + '55' : t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}
+                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${leadForm.conta ? t.purple + '55' : t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}
               />
-              {/* Sugestões de contas existentes */}
-              {showSuggestions && sugestoes.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 50, maxHeight: 180, overflowY: 'auto', marginTop: 2 }}>
+              {showSugg && sugestoes.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 50, maxHeight: 200, overflowY: 'auto', marginTop: 2 }}>
                   {sugestoes.map(c => {
-                    const oppsCount = leads.filter(l => norm(l.conta || l.nome) === norm(c)).length
+                    const n = leads.filter(l => norm(l.conta || l.nome) === norm(c)).length
+                    const ex = leads.find(l => norm(l.conta || l.nome) === norm(c))
                     return (
                       <div key={c} onMouseDown={() => selecionarConta(c)}
-                        style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: t.text, borderBottom: `1px solid ${t.borderLight}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                        style={{ padding: '9px 12px', cursor: 'pointer', fontSize: 13, color: t.text, borderBottom: `1px solid ${t.borderLight}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                         onMouseEnter={e => e.currentTarget.style.background = t.purpleFaint}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                        <span>{c}</span>
-                        <span style={{ fontSize: 10, color: t.purple, background: t.purpleFaint, borderRadius: 4, padding: '1px 6px' }}>{oppsCount} opp</span>
+                        <div>
+                          <div style={{ fontWeight: 500 }}>{c}</div>
+                          <div style={{ fontSize: 10, color: t.textHint }}>{ex?.pais || ''}</div>
+                        </div>
+                        <span style={{ fontSize: 10, color: t.purple, background: t.purpleFaint, borderRadius: 4, padding: '2px 7px' }}>{n} opp</span>
                       </div>
                     )
                   })}
-                  <div onMouseDown={() => { setShowSuggestions(false) }}
-                    style={{ padding: '7px 12px', fontSize: 11, color: t.textHint, borderTop: `1px solid ${t.borderLight}`, cursor: 'default' }}>
-                    {contaInput ? `+ Criar nova conta: "${contaInput}"` : `${contasExistentes.length} contas no pipeline — digite para filtrar`}
+                  <div style={{ padding: '7px 12px', fontSize: 11, color: t.textHint, borderTop: `1px solid ${t.borderLight}` }}>
+                    {contaInput ? `+ Criar novo lead: "${contaInput}"` : `${contasExistentes.length} leads cadastrados — digite para filtrar`}
                   </div>
                 </div>
               )}
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>SERVIÇO *</div>
-              <input
-                value={form.servico}
-                onChange={e => set('servico', e.target.value)}
-                placeholder="Ex: Sócio Torcedor"
-                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}
-              />
-            </div>
-          </div>
 
-          {/* Oportunidades já existentes para esta conta */}
-          {oppsDestaConta.length > 0 && (
-            <div style={{ background: t.bg, border: `1px solid ${t.purple}22`, borderRadius: 8, padding: '8px 12px' }}>
-              <div style={{ fontSize: 10, color: t.purple, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>SERVIÇOS JÁ NO PIPELINE PARA {form.conta.toUpperCase()}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {oppsDestaConta.map(o => (
-                  <span key={o.id} style={{ fontSize: 11, background: t.purpleFaint, border: `1px solid ${t.purple}33`, borderRadius: 5, padding: '2px 8px', color: t.purple }}>
-                    {o.servico || '—'} · {o.etapa}
-                  </span>
-                ))}
+            {/* Opps existentes para info */}
+            {oppsDestaConta.length > 0 && (
+              <div style={{ background: t.bg, border: `1px solid ${t.purple}22`, borderRadius: 8, padding: '8px 12px' }}>
+                <div style={{ fontSize: 10, color: t.purple, fontWeight: 700, marginBottom: 6 }}>OPORTUNIDADES JÁ CADASTRADAS</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                  {oppsDestaConta.map(o => (
+                    <span key={o.id} style={{ fontSize: 11, background: t.purpleFaint, border: `1px solid ${t.purple}33`, borderRadius: 5, padding: '2px 8px', color: t.purple }}>
+                      {o.servico || 'Sem serviço'} · {o.etapa}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Campos adicionais para novo lead */}
+            {isNovoLead && leadForm.conta && !leadExistente && (
+              <div style={{ background: `${t.green}08`, border: `1px solid ${t.green}33`, borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ fontSize: 11, color: t.green, fontWeight: 700 }}>✦ Novo lead — preencha os dados</div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 4 }}>PAÍS</div>
+                    <select value={leadForm.pais} onChange={e => setLF('pais', e.target.value)}
+                      style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 7, padding: '8px 10px', color: t.text, fontSize: 12, outline: 'none' }}>
+                      {PAISES.map(p => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 4 }}>RESPONSÁVEL</div>
+                    <select value={leadForm.resp} onChange={e => setLF('resp', e.target.value)}
+                      style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 7, padding: '8px 10px', color: t.text, fontSize: 12, outline: 'none' }}>
+                      {USERS_FENG.map(n => <option key={n} value={n}>{n.split(' ')[0]}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Responsável para lead existente */}
+            {leadExistente && (
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 4 }}>RESPONSÁVEL</div>
+                  <select value={leadForm.resp} onChange={e => setLF('resp', e.target.value)}
+                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 7, padding: '8px 10px', color: t.text, fontSize: 12, outline: 'none' }}>
+                    {USERS_FENG.map(n => <option key={n} value={n}>{n.split(' ')[0]}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>}
+
+          {/* ── STEP 2: OPORTUNIDADE ── */}
+          {step === 2 && <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            {/* Toggle pular */}
+            <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', background: skipOpp ? `${t.green}0A` : t.bg, border: `1px solid ${skipOpp ? t.green + '33' : t.border}`, borderRadius: 10, padding: '10px 14px', userSelect: 'none' }}>
+              <input type="checkbox" checked={skipOpp} onChange={e => setSkipOpp(e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: t.green, cursor: 'pointer', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: skipOpp ? t.green : t.text }}>Ainda não sei o serviço</div>
+                <div style={{ fontSize: 11, color: t.textMuted }}>Lead vai para Prospecção sem oportunidade definida</div>
+              </div>
+            </label>
+
+            {!skipOpp && <>
+              {/* Serviço */}
+              <div>
+                <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 6, letterSpacing: '0.05em' }}>SERVIÇO *</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                  {SERVICOS_FENG.map(s => {
+                    const ativo = oppForm.servico === s
+                    const jaExiste = leads.find(l => norm(l.conta || l.nome) === norm(leadForm.conta) && norm(l.servico) === norm(s))
+                    return (
+                      <button key={s} onClick={() => !jaExiste && setOF('servico', ativo ? '' : s)}
+                        disabled={!!jaExiste}
+                        title={jaExiste ? 'Já existe no pipeline' : ''}
+                        style={{ padding: '5px 12px', borderRadius: 7, border: `1px solid ${ativo ? t.purple : jaExiste ? t.border : t.border}`, background: ativo ? t.purpleFaint : jaExiste ? t.bg : t.surfaceInput, color: ativo ? t.purple : jaExiste ? t.textHint : t.textMuted, fontSize: 12, fontWeight: ativo ? 700 : 400, cursor: jaExiste ? 'not-allowed' : 'pointer', opacity: jaExiste ? 0.5 : 1 }}>
+                        {ativo ? '✓ ' : ''}{s}{jaExiste ? ' ✓' : ''}
+                      </button>
+                    )
+                  })}
+                </div>
+                {/* Campo livre se não está na lista */}
+                <input value={SERVICOS_FENG.includes(oppForm.servico) ? '' : oppForm.servico}
+                  onChange={e => setOF('servico', e.target.value)}
+                  placeholder="Ou digite um serviço personalizado..."
+                  style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.text, fontSize: 12, outline: 'none' }} />
+              </div>
+
+              {dupOpp && (
+                <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#EF4444' }}>
+                  ⚠️ Já existe: <strong>{dupOpp.nome}</strong> na etapa {dupOpp.etapa}
+                </div>
+              )}
+
+              {/* Etapa + Valor */}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 4 }}>ETAPA</div>
+                  <select value={oppForm.etapa} onChange={e => setOF('etapa', e.target.value)}
+                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 7, padding: '8px 10px', color: t.text, fontSize: 12, outline: 'none' }}>
+                    {ETAPAS.filter(e => e !== 'Operação / Go-Live').map(e => <option key={e} value={e}>{e}</option>)}
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 4 }}>💰 VALOR ESTIMADO (R$)</div>
+                  <input type="number" value={oppForm.valor} onChange={e => setOF('valor', e.target.value)} placeholder="0"
+                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 7, padding: '8px 10px', color: t.text, fontSize: 12, outline: 'none' }} />
+                </div>
+              </div>
+
+              {/* Contato principal da oportunidade */}
+              <div>
+                <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 4 }}>CONTATO PRINCIPAL <span style={{ fontWeight: 400, color: t.textHint }}>(opcional)</span></div>
+                <input value={oppForm.contatoPrincipal} onChange={e => setOF('contatoPrincipal', e.target.value)}
+                  placeholder="Nome do stakeholder chave desta oportunidade..."
+                  style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 7, padding: '8px 10px', color: t.text, fontSize: 12, outline: 'none' }} />
+              </div>
+
+              {/* Preview */}
+              {oppForm.servico && !dupOpp && (
+                <div style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}22`, borderRadius: 8, padding: '8px 12px', fontSize: 12, color: t.purple, fontWeight: 500 }}>
+                  📋 {leadForm.conta} — {oppForm.servico} · {oppForm.etapa}
+                  {oppForm.valor > 0 && ` · ${formatValor(oppForm.valor)}`}
+                </div>
+              )}
+            </>}
+          </div>}
+
+          {/* ── STEP 3: CONTEXTO ── */}
+          {step === 3 && <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 12, color: t.textMuted, background: t.bg, borderRadius: 8, padding: '8px 12px' }}>
+              Opcional — mas registrar o contexto inicial e a primeira atividade já deixa o lead ativo e sem alertas de abandono.
+            </div>
+
+            {/* Contexto inicial */}
+            <div>
+              <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 4 }}>COMO CHEGOU / CONTEXTO INICIAL</div>
+              <textarea value={ctxForm.mov} onChange={e => setCF('mov', e.target.value)} rows={2}
+                placeholder="Ex: Indicação do Silvio, clube demonstrou interesse após evento de março..."
+                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.5 }} />
+            </div>
+
+            {/* Primeira atividade */}
+            <div style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 10, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ fontSize: 11, color: t.purple, fontWeight: 700 }}>📌 Primeira atividade</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {['FUP','Reunião','Fazer Contato','Proposta'].map(tipo => {
+                  const cor = tipoColor(tipo)
+                  const ativo = ctxForm.tipoAtv === tipo
+                  return (
+                    <button key={tipo} onClick={() => setCF('tipoAtv', tipo)}
+                      style={{ padding: '5px 12px', borderRadius: 7, border: `1px solid ${ativo ? cor : t.border}`, background: ativo ? `${cor}18` : t.surfaceInput, color: ativo ? cor : t.textMuted, fontSize: 12, fontWeight: ativo ? 700 : 400, cursor: 'pointer' }}>
+                      {ativo ? '✓ ' : ''}{tipo}
+                    </button>
+                  )
+                })}
+              </div>
+              <textarea value={ctxForm.descAtv} onChange={e => setCF('descAtv', e.target.value)} rows={2}
+                placeholder="Descrição da atividade (deixe em branco para pular)..."
+                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${ctxForm.descAtv ? t.purple + '55' : t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 12, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
+              <div>
+                <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 4 }}>📅 DATA PREVISTA</div>
+                <input type="date" value={ctxForm.dtAtv} onChange={e => setCF('dtAtv', e.target.value)}
+                  style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.purple}44`, borderRadius: 7, padding: '8px 10px', color: t.text, fontSize: 12, outline: 'none' }} />
               </div>
             </div>
-          )}
-
-          {/* Alerta de duplicata */}
-          {duplicata && (
-            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#EF4444', display: 'flex', alignItems: 'center', gap: 6 }}>
-              ⚠️ Já existe: <strong>{duplicata.nome}</strong> — etapa {duplicata.etapa}
-            </div>
-          )}
-
-          {/* Preview do nome */}
-          {form.conta && form.servico && !duplicata && (
-            <div style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}22`, borderRadius: 8, padding: '7px 12px', fontSize: 12, color: t.purple, fontWeight: 500 }}>
-              📋 {form.conta} — {form.servico}
-            </div>
-          )}
-
-          {/* Etapa + Responsável */}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>ETAPA INICIAL</div>
-              <select
-                value={form.etapa}
-                onChange={e => set('etapa', e.target.value)}
-                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}>
-                {ETAPAS.filter(e => e !== 'Operação / Go-Live').map(e => (
-                  <option key={e} value={e}>{e}</option>
-                ))}
-              </select>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>RESPONSÁVEL</div>
-              <select
-                value={form.resp}
-                onChange={e => set('resp', e.target.value)}
-                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}>
-                {['Mike Lopes', 'Bruno Braga', 'Jardel Rocha', 'Silvio Vázquez', 'Beni Ertel', 'Alexandre Sivolella'].map(n => (
-                  <option key={n} value={n}>{n}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Primeiro movimento — opcional */}
-          <div>
-            <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>CONTEXTO INICIAL <span style={{ fontWeight: 400, color: t.textHint }}>(opcional)</span></div>
-            <textarea
-              value={form.mov}
-              onChange={e => set('mov', e.target.value)}
-              rows={2}
-              placeholder="Como esse lead chegou, o que já foi conversado..."
-              style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.5 }}
-            />
-          </div>
+          </div>}
         </div>
 
         {/* Footer */}
-        <div style={{ padding: '14px 24px', borderTop: `1px solid ${t.borderLight}`, display: 'flex', gap: 10 }}>
-          <button onClick={onClose} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>
-            Cancelar
-          </button>
-          <button
-            onClick={() => valido && onSave(form)}
-            disabled={!valido}
-            style={{ flex: 2, background: valido ? 'linear-gradient(135deg,#7C3AED,#9333EA)' : t.surface, border: 'none', borderRadius: 10, color: valido ? 'white' : t.textMuted, padding: '11px', fontSize: 14, fontWeight: 600, cursor: valido ? 'pointer' : 'not-allowed', boxShadow: valido ? '0 4px 14px rgba(124,58,237,0.3)' : 'none' }}>
-            Criar Oportunidade
-          </button>
+        <div style={{ padding: '14px 24px', borderTop: `1px solid ${t.borderLight}`, display: 'flex', gap: 8, flexShrink: 0 }}>
+          {step > 1 && (
+            <button onClick={() => setStep(s => s - 1)}
+              style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>
+              ← Voltar
+            </button>
+          )}
+          {step < 1 && (
+            <button onClick={onClose}
+              style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>
+              Cancelar
+            </button>
+          )}
+          {step === 1 && (
+            <button onClick={onClose}
+              style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>
+              Cancelar
+            </button>
+          )}
+
+          {step < 3 ? (
+            <button onClick={() => step1Valido && (step === 1 || step2Valido) && setStep(s => s + 1)}
+              disabled={step === 1 ? !step1Valido : !step2Valido}
+              style={{ flex: 2, background: (step === 1 ? step1Valido : step2Valido) ? 'linear-gradient(135deg,#7C3AED,#9333EA)' : t.surface, border: 'none', borderRadius: 10, color: (step === 1 ? step1Valido : step2Valido) ? 'white' : t.textMuted, padding: '11px', fontSize: 14, fontWeight: 600, cursor: (step === 1 ? step1Valido : step2Valido) ? 'pointer' : 'not-allowed', boxShadow: (step === 1 ? step1Valido : step2Valido) ? '0 4px 14px rgba(124,58,237,0.3)' : 'none' }}>
+              Próximo →
+            </button>
+          ) : (
+            <button onClick={handleFinalizar} disabled={saving}
+              style={{ flex: 2, background: saving ? t.surface : 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 10, color: saving ? t.textMuted : 'white', padding: '11px', fontSize: 14, fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', boxShadow: saving ? 'none' : '0 4px 14px rgba(124,58,237,0.3)' }}>
+              {saving ? '⏳ Salvando...' : '✓ Criar Lead'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -995,28 +1180,30 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
                 ⚡ Reativar Oportunidade
               </button>
             )}
+            <div style={{ fontSize: 11, color: t.textMuted, background: t.bg, borderRadius: 8, padding: '8px 12px', marginBottom: 4 }}>
+              Dados estruturais do card. Para registrar movimentos e atividades, use a aba <strong>+ Atividade</strong>.
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>CONTA</div>
-                <input value={form.conta || ''} onChange={e => set('conta', e.target.value)}
-                  style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }} />
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>SERVIÇO</div>
-                <input value={form.servico || ''} onChange={e => {
-                  set('servico', e.target.value)
-                  const c = form.conta || lead.conta || ''
-                  if (c && e.target.value) set('nome', `${c} — ${e.target.value}`)
-                }} style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.purple}55`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }} />
-                {form.conta && form.servico && (
-                  <div style={{ fontSize: 11, color: t.textHint, marginTop: 4 }}>Oportunidade: {form.conta} — {form.servico}</div>
-                )}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>CONTA</div>
+                  <input value={form.conta || ''} onChange={e => set('conta', e.target.value)}
+                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>SERVIÇO</div>
+                  <input value={form.servico || ''} onChange={e => {
+                    set('servico', e.target.value)
+                    const c = form.conta || lead.conta || ''
+                    if (c && e.target.value) set('nome', `${c} — ${e.target.value}`)
+                  }} style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.purple}55`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
+                </div>
               </div>
               {!lead.op && (
                 <div>
                   <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>ETAPA PRINCIPAL</div>
                   <select value={form.etapa || ''} onChange={e => set('etapa', e.target.value)}
-                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }}>
+                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}>
                     {ETAPAS.map(e => <option key={e} value={e}>{e}</option>)}
                   </select>
                 </div>
@@ -1040,42 +1227,45 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
                   </div>
                 </div>
               )}
-              <div>
-                <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>💰 VALOR ESTIMADO (R$)</div>
-                <input type="number" value={form.valor || ''} onChange={e => set('valor', e.target.value)} placeholder="0"
-                  style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }} />
-                {form.valor > 0 && <div style={{ fontSize: 11, color: t.purple, marginTop: 4 }}>{formatValor(form.valor)}</div>}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>💰 VALOR ESTIMADO (R$)</div>
+                  <input type="number" value={form.valor || ''} onChange={e => set('valor', e.target.value)} placeholder="0"
+                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
+                  {form.valor > 0 && <div style={{ fontSize: 11, color: t.purple, marginTop: 4 }}>{formatValor(form.valor)}</div>}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>RESPONSÁVEL</div>
+                  <select value={form.resp || ''} onChange={e => set('resp', e.target.value)}
+                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}>
+                    {['Mike Lopes','Bruno Braga','Jardel Rocha','Silvio Vázquez','Beni Ertel','Alexandre Sivolella'].map(n => (
+                      <option key={n} value={n}>{n.split(' ')[0]}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>RESPONSÁVEL</div>
-                <input value={form.resp || ''} onChange={e => set('resp', e.target.value)}
-                  style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }} />
-              </div>
+              {!lead.op && (
+                <div>
+                  <div style={{ fontSize: 11, color: t.orange, marginBottom: 5, fontWeight: 600 }}>⚠️ RISCO</div>
+                  <input value={form.risco || ''} onChange={e => set('risco', e.target.value)} placeholder="Descreva o risco se houver..."
+                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.orange}33`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
+                </div>
+              )}
               {lead.op && (
                 <div>
                   <div style={{ fontSize: 11, color: t.green, marginBottom: 5, fontWeight: 600 }}>📅 VENCIMENTO DO CONTRATO</div>
                   <input type="date" value={form.vencimento || ''} onChange={e => set('vencimento', e.target.value)}
-                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${vencLabel && diasVenc <= 90 ? '#F59E0B' : t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }} />
+                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${vencLabel && diasVenc <= 90 ? '#F59E0B' : t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
                   {vencLabel && <div style={{ fontSize: 12, color: vencLabel.color, marginTop: 6, fontWeight: 500 }}>{vencLabel.label}</div>}
                   {!form.vencimento && <div style={{ fontSize: 11, color: t.textHint, marginTop: 4 }}>Preencha para alertas de renovação</div>}
                 </div>
               )}
-              <div>
-                <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>ÚLTIMO MOVIMENTO</div>
-                <textarea value={form.mov || ''} onChange={e => set('mov', e.target.value)} rows={3}
-                  style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none', resize: 'none', fontFamily: 'inherit' }} />
-              </div>
-              <div>
-                <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>PRÓXIMA AÇÃO</div>
-                <input value={form.prox || ''} onChange={e => set('prox', e.target.value)}
-                  style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }} />
-              </div>
-              {!lead.op && (
-                <div>
-                  <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>RISCO</div>
-                  <input value={form.risco || ''} onChange={e => set('risco', e.target.value)} placeholder="Descreva o risco se houver..."
-                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.orange}33`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 14, outline: 'none' }} />
-                </div>
+              {/* Enviar para Geladeira */}
+              {!lead.off && !lead.op && (
+                <button onClick={() => { if (confirm('Enviar para a Geladeira?')) onSave({ ...form, off: true }) }}
+                  style={{ width: '100%', background: 'none', border: `1px solid ${t.border}`, borderRadius: 9, color: t.textMuted, padding: '10px', fontSize: 13, cursor: 'pointer', marginTop: 4 }}>
+                  🧊 Enviar para a Geladeira
+                </button>
               )}
             </div>
           </>}
@@ -1277,18 +1467,19 @@ export default function Pipeline() {
     setActs(prev => [...prev, nA])
   }
 
-  async function handleCriarOpp(form) {
+  async function handleCriarOpp(form, primeiraAtv = null) {
     const norm = s => (s || '').toLowerCase().trim()
     const jaExiste = leads.find(l =>
-      norm(l.conta) === norm(form.conta) &&
+      norm(l.conta || l.nome) === norm(form.conta) &&
+      form.servico &&
       norm(l.servico) === norm(form.servico)
     )
     if (jaExiste) {
-      alert(`Já existe uma oportunidade "${form.conta} — ${form.servico}" no pipeline.\n\nAbra o card existente para editá-lo.`)
+      alert(`Já existe: ${form.conta}${form.servico ? ` — ${form.servico}` : ''} no pipeline.`)
       return
     }
     const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
-    const nome = form.conta && form.servico ? `${form.conta} — ${form.servico}` : (form.conta || 'Nova oportunidade')
+    const nome = form.conta && form.servico ? `${form.conta} — ${form.servico}` : form.conta
     const nL = {
       id:                 `opp-${Date.now()}`,
       nome,
@@ -1299,20 +1490,36 @@ export default function Pipeline() {
       dias:               0,
       aging:              'Hot',
       mov:                form.mov || '',
-      prox:               '',
-      dt:                 '',
+      prox:               form.prox || '',
+      dt:                 form.dt   || '',
       op:                 false,
       off:                false,
       g12:                false,
       risco:              '',
       vencimento:         '',
       paralelo:           '',
+      valor:              form.valor || '',
       ultima_atualizacao: hoje,
     }
     await upsertLead(nL)
     setLeads(prev => [...prev, nL])
+    // Se veio com primeira atividade, cria junto
+    if (primeiraAtv && primeiraAtv.descricao?.trim()) {
+      const nA = {
+        id:        `act-${Date.now()}`,
+        ok:        false,
+        criado:    hoje,
+        lead:      nome,
+        descricao: primeiraAtv.descricao.trim(),
+        dt:        primeiraAtv.dt || hoje,
+        resp:      form.resp || user.nome,
+        tipo:      primeiraAtv.tipo || 'FUP',
+      }
+      await upsertActivity(nA)
+      setActs(prev => [...prev, nA])
+    }
     setShowNovaOpp(false)
-    setSelected(nL)   // abre o card recém-criado
+    setSelected(nL)
   }
 
   async function handleConcluirAct(act) {
@@ -1435,7 +1642,7 @@ export default function Pipeline() {
           <button
             onClick={() => setShowNovaOpp(true)}
             style={{ background: 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 8, color: 'white', padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
-            + Nova Oportunidade
+            + Novo Lead
           </button>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', overflowX: 'auto' }}>
@@ -1693,7 +1900,7 @@ export default function Pipeline() {
       </div>
 
       {/* ── Modal Nova Oportunidade ── */}
-      {showNovaOpp && <NovaOppModal t={t} leads={leads} user={user} onSave={handleCriarOpp} onClose={() => setShowNovaOpp(false)} />}
+      {showNovaOpp && <NovoLeadWizard t={t} leads={leads} user={user} onSave={handleCriarOpp} onClose={() => setShowNovaOpp(false)} />}
 
       {selected && (
         <Modal
