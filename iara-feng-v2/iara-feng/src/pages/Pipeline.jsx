@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   getLeads, getActivities, upsertLead, upsertActivity, deleteActivity,
   getContactsByConta, upsertContact, deleteContact,
-  getDocumentsByConta, upsertDocument, deleteDocument,
+  getDocumentsByConta, upsertDocument, deleteDocument, deleteLead,
 } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL } from '../data/pipeline'
 import { getTheme, saveTheme, THEMES } from '../lib/theme'
@@ -660,7 +660,7 @@ function NovoLeadWizard({ t, leads, user, onSave, onClose }) {
 }
 
 // ─── MODAL PRINCIPAL ─────────────────────────────────────────────────────────
-function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConcluirAct, onDeleteAct, onActivityAdded, t }) {
+function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConcluirAct, onDeleteAct, onActivityAdded, onDeleteLead, t }) {
   const user    = JSON.parse(localStorage.getItem('iara_user') || '{}')
   const isAdmin = ['Mike Lopes', 'Bruno Braga'].includes(user.nome)
 
@@ -1267,6 +1267,18 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
                   🧊 Enviar para a Geladeira
                 </button>
               )}
+              {/* Apagar card — só admin */}
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    if (confirm(`⚠️ Apagar o card "${lead.conta || lead.nome}" permanentemente?\n\nEssa ação não pode ser desfeita.`)) {
+                      onDeleteLead && onDeleteLead(lead)
+                    }
+                  }}
+                  style={{ width: '100%', marginTop: 4, background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 9, color: '#EF4444', padding: '10px', fontSize: 13, cursor: 'pointer', fontWeight: 600 }}>
+                  🗑 Apagar este card permanentemente
+                </button>
+              )}
             </div>
           </>}
         </div>
@@ -1459,6 +1471,16 @@ export default function Pipeline() {
   // Usado pelo handleSaveNovaAtv do Modal para não duplo-salvar
   function handleLeadUpdate(leadAtualizado) {
     setLeads(prev => prev.map(l => l.id === leadAtualizado.id ? leadAtualizado : l))
+    setSelected(null)
+  }
+
+  async function handleDeleteLead(lead) {
+    try {
+      await deleteLead(lead.id)
+    } catch {
+      // Se deleteLead não existir no supabase.js, remove só do estado
+    }
+    setLeads(prev => prev.filter(l => l.id !== lead.id))
     setSelected(null)
   }
 
@@ -1913,7 +1935,8 @@ export default function Pipeline() {
           onActivityAdded={handleActivityAdded}
           onReativar={handleReativar}
           onConcluirAct={handleConcluirAct}
-          onDeleteAct={handleDeleteAct} />
+          onDeleteAct={handleDeleteAct}
+          onDeleteLead={handleDeleteLead} />
       )}
     </div>
   )
