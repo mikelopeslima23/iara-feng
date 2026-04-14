@@ -1165,22 +1165,25 @@ export default function Pipeline() {
       a = a.filter(act => !act.deleted)
       // Recalcula dias dinamicamente — usa a data mais recente entre:
       // ultima_atualizacao do lead OU data da atividade mais recente (criado ou dt)
-      // Isso garante que atividades importadas via SQL também atualizam o contador
+      // Indexa por nome completo E por conta (antes do " — ") para cobrir formatos diferentes
       const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
 
-      // Mapa: nome do lead (lowercase) → data mais recente de atividade
       const latestActDate = a.reduce((acc, act) => {
-        const key = (act.lead || '').toLowerCase().trim()
         const dt  = (act.criado || act.dt || '').slice(0, 10)
-        if (dt && (!acc[key] || dt > acc[key])) acc[key] = dt
+        if (!dt) return acc
+        const leadFull  = (act.lead || '').toLowerCase().trim()
+        const leadConta = leadFull.split(' — ')[0].trim()
+        if (!acc[leadFull]  || dt > acc[leadFull])  acc[leadFull]  = dt
+        if (!acc[leadConta] || dt > acc[leadConta]) acc[leadConta] = dt
         return acc
       }, {})
 
       l = l.map(lead => {
-        const key       = (lead.nome || '').toLowerCase().trim()
-        const fromAct   = latestActDate[key] || ''
-        const fromLead  = (lead.ultima_atualizacao || '').slice(0, 10)
-        // Pega a mais recente das duas fontes
+        const keyFull  = (lead.nome  || '').toLowerCase().trim()
+        const keyConta = (lead.conta || lead.nome || '').toLowerCase().trim().split(' — ')[0].trim()
+        // Tenta match pelo nome completo primeiro, depois só pela conta
+        const fromAct  = latestActDate[keyFull] || latestActDate[keyConta] || ''
+        const fromLead = (lead.ultima_atualizacao || '').slice(0, 10)
         const effective = fromAct > fromLead ? fromAct : fromLead
         if (effective) {
           const ultima = new Date(effective + 'T00:00:00')
