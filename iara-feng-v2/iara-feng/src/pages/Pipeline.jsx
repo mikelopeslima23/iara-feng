@@ -289,11 +289,33 @@ function NovaOppModal({ t, leads, user, onSave, onClose }) {
   const [form, setForm] = useState({
     conta: '', servico: '', etapa: 'Prospecção', resp: user.nome || '', mov: '',
   })
+  const [contaInput, setContaInput] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  // Lista de contas únicas já existentes no pipeline
+  const contasExistentes = [...new Set(leads.map(l => l.conta || l.nome).filter(Boolean))].sort()
+
+  // Sugestões filtradas pelo que está digitando
+  const sugestoes = contaInput.trim().length >= 2
+    ? contasExistentes.filter(c => c.toLowerCase().includes(contaInput.toLowerCase())).slice(0, 6)
+    : []
+
+  function selecionarConta(conta) {
+    setContaInput(conta)
+    set('conta', conta)
+    setShowSuggestions(false)
+    // Preenche responsável com o da conta existente
+    const leadExistente = leads.find(l => (l.conta || l.nome) === conta)
+    if (leadExistente) set('resp', leadExistente.resp || form.resp)
+  }
+
+  // Opps já existentes para esta conta (mostra serviços já cadastrados)
+  const oppsDestaConta = leads.filter(l => norm(l.conta || l.nome) === norm(form.conta))
 
   // Detecta duplicata em tempo real enquanto digita
   const duplicata = form.conta.trim() && form.servico.trim() && leads.find(l =>
-    norm(l.conta) === norm(form.conta) && norm(l.servico) === norm(form.servico)
+    norm(l.conta || l.nome) === norm(form.conta) && norm(l.servico) === norm(form.servico)
   )
   const valido = form.conta.trim() && form.servico.trim() && !duplicata
 
@@ -317,15 +339,42 @@ function NovaOppModal({ t, leads, user, onSave, onClose }) {
 
           {/* Conta + Serviço */}
           <div style={{ display: 'flex', gap: 10 }}>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, position: 'relative' }}>
               <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>CONTA *</div>
               <input
-                value={form.conta}
-                onChange={e => set('conta', e.target.value)}
+                value={contaInput}
+                onChange={e => {
+                  setContaInput(e.target.value)
+                  set('conta', e.target.value)
+                  setShowSuggestions(true)
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                 placeholder="Ex: Flamengo"
                 autoFocus
-                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}
+                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${form.conta ? t.purple + '55' : t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}
               />
+              {/* Sugestões de contas existentes */}
+              {showSuggestions && sugestoes.length > 0 && (
+                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 50, maxHeight: 180, overflowY: 'auto', marginTop: 2 }}>
+                  {sugestoes.map(c => {
+                    const oppsCount = leads.filter(l => norm(l.conta || l.nome) === norm(c)).length
+                    return (
+                      <div key={c} onMouseDown={() => selecionarConta(c)}
+                        style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 13, color: t.text, borderBottom: `1px solid ${t.borderLight}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                        onMouseEnter={e => e.currentTarget.style.background = t.purpleFaint}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <span>{c}</span>
+                        <span style={{ fontSize: 10, color: t.purple, background: t.purpleFaint, borderRadius: 4, padding: '1px 6px' }}>{oppsCount} opp</span>
+                      </div>
+                    )
+                  })}
+                  <div onMouseDown={() => { setShowSuggestions(false) }}
+                    style={{ padding: '7px 12px', fontSize: 12, color: t.textHint, fontStyle: 'italic', cursor: 'default' }}>
+                    + Nova conta: {contaInput}
+                  </div>
+                </div>
+              )}
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>SERVIÇO *</div>
@@ -337,6 +386,20 @@ function NovaOppModal({ t, leads, user, onSave, onClose }) {
               />
             </div>
           </div>
+
+          {/* Oportunidades já existentes para esta conta */}
+          {oppsDestaConta.length > 0 && (
+            <div style={{ background: t.bg, border: `1px solid ${t.purple}22`, borderRadius: 8, padding: '8px 12px' }}>
+              <div style={{ fontSize: 10, color: t.purple, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>SERVIÇOS JÁ NO PIPELINE PARA {form.conta.toUpperCase()}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {oppsDestaConta.map(o => (
+                  <span key={o.id} style={{ fontSize: 11, background: t.purpleFaint, border: `1px solid ${t.purple}33`, borderRadius: 5, padding: '2px 8px', color: t.purple }}>
+                    {o.servico || '—'} · {o.etapa}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Alerta de duplicata */}
           {duplicata && (
