@@ -706,24 +706,39 @@ export default function Chat() {
         } else if (act.type === 'CRIAR_OPP') {
           const { conta, servico, etapa, resp } = act.data
           const nome = conta && servico ? `${conta} — ${servico}` : (conta || servico || 'Nova oportunidade')
-          const nL = {
-            id: `opp-${Date.now()}`, nome, conta: conta || '', servico: servico || '',
-            etapa: etapa || 'Prospecção', resp: resp || user.nome, dias: 0, aging: 'Hot',
-            mov: 'Nova oportunidade criada via IAra', prox: '', dt: '',
-            op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: '',
-            ultima_atualizacao: new Date().toISOString().split('T')[0],
+
+          // Verifica se já existe card com mesma conta + servico (ativo ou na geladeira)
+          // Comparação normalizada: lowercase, sem espaços extras, ignora acentos simples
+          const norm = s => (s || '').toLowerCase().trim()
+          const jaExiste = curL.find(l =>
+            norm(l.conta) === norm(conta) &&
+            norm(l.servico) === norm(servico)
+          )
+
+          if (jaExiste) {
+            // Card já existe — não cria duplicata, apenas informa
+            results.push(`⚠️ Oportunidade já existe: ${nome} (id: ${jaExiste.id}) — use UPDATE_LEAD para atualizar`)
+          } else {
+            const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+            const nL = {
+              id: `opp-${Date.now()}`, nome, conta: conta || '', servico: servico || '',
+              etapa: etapa || 'Prospecção', resp: resp || user.nome, dias: 0, aging: 'Hot',
+              mov: 'Nova oportunidade criada via IAra', prox: '', dt: '',
+              op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: '',
+              ultima_atualizacao: hoje,
+            }
+            curL = [...curL, nL]; await upsertLead(nL)
+            await logAudit({
+              evento: 'oportunidade_criada',
+              conta: conta || '',
+              servico: servico || '',
+              lead_nome: nome,
+              detalhe: `Etapa: ${etapa || 'Prospecção'} | Resp: ${resp || user.nome}`,
+              feito_por: user.nome,
+            })
+            auditUpdated = true
+            results.push(`✅ Oportunidade criada: ${nome}`)
           }
-          curL = [...curL, nL]; await upsertLead(nL)
-          await logAudit({
-            evento: 'oportunidade_criada',
-            conta: conta || '',
-            servico: servico || '',
-            lead_nome: nome,
-            detalhe: `Etapa: ${etapa || 'Prospecção'} | Resp: ${resp || user.nome}`,
-            feito_por: user.nome,
-          })
-          auditUpdated = true
-          results.push(`✅ Oportunidade criada: ${nome}`)
         } else if (act.type === 'CRIAR_CONTATO') {
           const contato = {
             id: `ct-${Date.now()}`,
