@@ -1377,10 +1377,12 @@ export default function Pipeline() {
   const [loading,     setLoading]     = useState(true)
   const [syncing,     setSyncing]     = useState(false)
   const [selected,    setSelected]    = useState(null)
-  const [filterResp,  setFilterResp]  = useState('Todos')
-  const [filterBusca, setFilterBusca] = useState('')
-  const [aba,         setAba]         = useState('pipeline')
-  const [showNovaOpp, setShowNovaOpp] = useState(false)
+  const [filterResp,   setFilterResp]   = useState('Todos')
+  const [filterBusca,  setFilterBusca]  = useState('')
+  const [filterEstado, setFilterEstado] = useState(null)  // null | 'atrasados' | 'sem_fup' | 'sem_contato' | 'abandono' | 'hoje'
+  const [focoConta,    setFocoConta]    = useState(null)  // conta em foco (highlight)
+  const [aba,          setAba]          = useState('pipeline')
+  const [showNovaOpp,  setShowNovaOpp]  = useState(false)
 
   function toggleTheme() {
     const next = t.name === 'dark' ? THEMES.light : THEMES.dark
@@ -1644,13 +1646,58 @@ export default function Pipeline() {
 
   // Filtro de busca — aplica sobre ativos já filtrados por resp
   const busca = filterBusca.trim().toLowerCase()
-  const ativosFiltrados = busca
+  const ativosBusca = busca
     ? ativos.filter(l =>
         (l.conta || l.nome || '').toLowerCase().includes(busca) ||
         (l.servico || '').toLowerCase().includes(busca) ||
         (l.resp || '').toLowerCase().includes(busca)
       )
     : ativos
+
+  // Filtro por estado do card
+  const hojeISO = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+  const ativosFiltrados = (() => {
+    if (!filterEstado) return ativosBusca
+    return ativosBusca.filter(l => {
+      const contaKey = (l.conta || l.nome || '').toLowerCase()
+      const servKey  = (l.servico || '').toLowerCase()
+      const nomeKey  = (l.nome || '').toLowerCase()
+      const pendL = acts.filter(a => {
+        if (a.ok) return false
+        const al = (a.lead || '').toLowerCase()
+        if (nomeKey && al === nomeKey) return true
+        if (servKey) return al.includes(contaKey) && al.includes(servKey)
+        return al.includes(contaKey) && !al.includes(' — ')
+      })
+      const contaContacts = contactsMap[(l.conta || l.nome || '').toLowerCase()] || []
+      switch (filterEstado) {
+        case 'atrasados':
+          return pendL.some(a => a.dt && a.dt < hojeISO)
+        case 'sem_fup':
+          return pendL.length === 0
+        case 'sem_contato':
+          return !contaContacts.some(c => c.tipo === 'contato')
+        case 'abandono':
+          return (l.dias || 0) > 15 && !pendL.some(a => a.tipo === 'FUP' || a.tipo === 'Fazer Contato')
+        case 'hoje': {
+          const nome = user.nome || ''
+          return pendL.some(a => a.resp?.includes(nome.split(' ')[0]) && (a.dt === hojeISO || (a.dt && a.dt < hojeISO)))
+        }
+        default: return true
+      }
+    })
+  })()
+
+  // Go-Live ordenado por urgência de renovação
+  const goLiveOrdenado = [...goLive].sort((a, b) => {
+    const da = diasParaVencer(a.vencimento)
+    const db = diasParaVencer(b.vencimento)
+    // Vencidos (negativo) primeiro, depois menor prazo, depois sem data
+    if (da !== null && db !== null) return da - db
+    if (da !== null) return -1
+    if (db !== null) return 1
+    return 0
+  })
 
   const byEtapa   = ETAPAS.reduce((acc, e) => { acc[e] = ativosFiltrados.filter(l => l.etapa === e); return acc }, {})
   const riscos    = ativosFiltrados.filter(l => l.risco)
@@ -1749,6 +1796,45 @@ export default function Pipeline() {
         ))}
       </div>
 
+      {/* ── Filtros rápidos por estado (só no pipeline) ── */}
+      {aba === 'pipeline' && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '8px 20px', background: t.bgAlt, borderBottom: `1px solid ${t.borderLight}`, overflowX: 'auto', flexWrap: 'nowrap' }}>
+          <span style={{ fontSize: 11, color: t.textHint, flexShrink: 0 }}>Filtrar:</span>
+          {[
+            { id: 'hoje',        label: `⚡ Minha lista hoje`,  color: t.purple },
+            { id: 'atrasados',   label: `⏰ Com atrasadas`,      color: '#EF4444' },
+            { id: 'abandono',    label: `🚨 Em abandono`,        color: '#EF4444' },
+            { id: 'sem_fup',     label: `📭 Sem próx. atividade`,color: t.orange  },
+            { id: 'sem_contato', label: `👤 Sem contato`,        color: '#F59E0B' },
+          ].map(f => {
+            const ativo = filterEstado === f.id
+            return (
+              <button key={f.id}
+                onClick={() => setFilterEstado(ativo ? null : f.id)}
+                style={{ flexShrink: 0, padding: '4px 12px', borderRadius: 20, border: `1px solid ${ativo ? f.color : t.border}`, background: ativo ? `${f.color}18` : t.surface, color: ativo ? f.color : t.textMuted, fontSize: 11, fontWeight: ativo ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s' }}>
+                {f.label}
+                {ativo && ' ✕'}
+              </button>
+            )
+          })}
+          {focoConta && (
+            <button onClick={() => setFocoConta(null)}
+              style={{ flexShrink: 0, padding: '4px 12px', borderRadius: 20, border: `1px solid ${t.purple}`, background: t.purpleFaint, color: t.purple, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+              🔍 {focoConta} ✕
+            </button>
+          )}
+          {(filterEstado || focoConta) && (
+            <button onClick={() => { setFilterEstado(null); setFocoConta(null) }}
+              style={{ flexShrink: 0, padding: '4px 10px', borderRadius: 20, border: `1px solid ${t.border}`, background: 'none', color: t.textMuted, fontSize: 11, cursor: 'pointer' }}>
+              Limpar tudo
+            </button>
+          )}
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: t.textHint, flexShrink: 0 }}>
+            {ativosFiltrados.length} cards
+          </span>
+        </div>
+      )}
+
       <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
         {/* ══ PIPELINE ══ */}
@@ -1783,6 +1869,20 @@ export default function Pipeline() {
                     {totalValor > 0 && (
                       <div style={{ fontSize: 10, color: t.textHint, marginTop: 3 }}>💰 {formatValor(totalValor)}</div>
                     )}
+                    {/* Mini heatbar: proporção saudáveis vs em risco */}
+                    {cards.length > 0 && (() => {
+                      const saudaveis = cards.filter(c => healthScore(c, acts, contactsMap) >= 70).length
+                      const atencao   = cards.filter(c => { const s = healthScore(c, acts, contactsMap); return s >= 40 && s < 70 }).length
+                      const criticos  = cards.length - saudaveis - atencao
+                      const w = n => `${Math.round((n / cards.length) * 100)}%`
+                      return (
+                        <div style={{ display: 'flex', height: 3, borderRadius: 2, overflow: 'hidden', marginTop: 6, gap: 1 }}>
+                          {saudaveis > 0 && <div style={{ width: w(saudaveis), background: '#10B981', borderRadius: 2 }} title={`${saudaveis} saudáveis`} />}
+                          {atencao   > 0 && <div style={{ width: w(atencao),   background: '#F59E0B', borderRadius: 2 }} title={`${atencao} atenção`} />}
+                          {criticos  > 0 && <div style={{ width: w(criticos),  background: '#EF4444', borderRadius: 2 }} title={`${criticos} críticos`} />}
+                        </div>
+                      )
+                    })()}
                   </div>
                   {/* Cards */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: t.bgAlt, border: `1px solid ${t.border}`, borderTop: 'none', borderRadius: '0 0 12px 12px', padding: 10, minHeight: 80 }}>
@@ -1806,36 +1906,39 @@ export default function Pipeline() {
                       // Flag abandono: +15 dias sem atualização E sem nenhum FUP pendente
                       const temFupPendente = pendLead.some(a => a.tipo === 'FUP' || a.tipo === 'Fazer Contato')
                       const emAbandono = (l.dias || 0) > 15 && !temFupPendente
+                      const emFoco     = focoConta ? (l.conta || l.nome) === focoConta : true
+                      const dimmed     = focoConta && !emFoco
 
                       return (
                         <div
                           key={l.id}
-                          className={emAbandono ? 'lead-card lead-abandono' : 'lead-card'}
+                          className={emAbandono && emFoco ? 'lead-card lead-abandono' : 'lead-card'}
                           onClick={() => setSelected(l)}
                           style={{
-                            background:   emAbandono ? 'rgba(239,68,68,0.07)' : t.surfaceInput,
-                            border:       emAbandono ? '1.5px solid rgba(239,68,68,0.7)' : `1px solid ${l.risco ? t.orange + '44' : t.border}`,
-                            borderLeft:   emAbandono ? '4px solid #EF4444' : undefined,
-                            borderRadius: 10,
-                            padding:      '11px 13px',
-                            cursor:       'pointer',
-                            display:      'flex',
-                            flexDirection:'column',
-                            gap:          6,
-                            boxShadow:    emAbandono
-                              ? '0 0 0 1px rgba(239,68,68,0.15), 0 2px 8px rgba(239,68,68,0.12)'
-                              : (t.name === 'light' ? '0 1px 4px rgba(124,58,237,0.06)' : 'none'),
+                            background:   emAbandono && emFoco ? 'rgba(239,68,68,0.07)' : t.surfaceInput,
+                            border:       emAbandono && emFoco ? '1.5px solid rgba(239,68,68,0.7)' : focoConta && emFoco ? `2px solid ${t.purple}` : `1px solid ${l.risco ? t.orange + '44' : t.border}`,
+                            borderLeft:   emAbandono && emFoco ? '4px solid #EF4444' : focoConta && emFoco ? `4px solid ${t.purple}` : undefined,
+                            borderRadius: 10, padding: '11px 13px', cursor: 'pointer',
+                            display: 'flex', flexDirection: 'column', gap: 6,
+                            opacity:      dimmed ? 0.25 : 1,
+                            transition:   'opacity 0.2s, border 0.2s',
+                            boxShadow:    emAbandono && emFoco ? '0 0 0 1px rgba(239,68,68,0.15)' : focoConta && emFoco ? `0 0 0 2px ${t.purple}22` : (t.name === 'light' ? '0 1px 4px rgba(124,58,237,0.06)' : 'none'),
                           }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: emAbandono ? '#EF4444' : t.text, lineHeight: 1.3 }}>{l.conta || l.nome}</div>
+                              <div
+                                onClick={e => { e.stopPropagation(); setFocoConta(prev => prev === (l.conta || l.nome) ? null : (l.conta || l.nome)) }}
+                                title="Clique para focar neste lead"
+                                style={{ fontSize: 13, fontWeight: 600, color: emAbandono && emFoco ? '#EF4444' : focoConta && emFoco ? t.purple : t.text, lineHeight: 1.3, cursor: 'pointer', display: 'inline-block' }}>
+                                {l.conta || l.nome}
+                              </div>
                               {l.servico && <div style={{ fontSize: 11, color: t.purple, marginTop: 2 }}>📦 {l.servico}</div>}
                             </div>
                             <span style={{ background: `${agColor}22`, border: `1px solid ${agColor}55`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: agColor, whiteSpace: 'nowrap', fontWeight: 600, flexShrink: 0 }}>{agLabel}</span>
                           </div>
                           <div style={{ fontSize: 11, color: t.textMuted }}>👤 {l.resp}</div>
                           <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 11, color: emAbandono ? '#EF4444' : (l.dias > 7 ? t.orange : t.textMuted), fontWeight: emAbandono ? 700 : 400 }}>🕐 {l.dias}d</span>
+                            <span style={{ fontSize: 11, color: emAbandono && emFoco ? '#EF4444' : (l.dias > 7 ? t.orange : t.textMuted), fontWeight: emAbandono && emFoco ? 700 : 400 }}>🕐 {l.dias}d</span>
                             <span title={`Health Score: ${hs}/100`} style={{ background: hsInfo.bg, border: `1px solid ${hsInfo.color}44`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: hsInfo.color, fontWeight: 700 }}>❤️ {hs}</span>
                             {pendLead.length > 0 && <span style={{ background: t.purpleFaint, border: `1px solid ${t.purple}44`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: t.purple }}>{pendLead.length} pend.</span>}
                             {contaOps > 1 && <span style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '1px 7px', fontSize: 10, color: '#3B82F6' }}>{contaOps} op.</span>}
@@ -1861,7 +1964,7 @@ export default function Pipeline() {
 
             {/* ── Coluna GO-LIVE inline no kanban ── */}
             {(() => {
-              const goLiveVisiveis = goLive.filter(l =>
+              const goLiveVisiveis = goLiveOrdenado.filter(l =>
                 (filterResp === 'Todos' || l.resp?.includes(filterResp)) &&
                 (!busca || (l.conta || l.nome || '').toLowerCase().includes(busca) || (l.servico || '').toLowerCase().includes(busca))
               )
@@ -1880,9 +1983,10 @@ export default function Pipeline() {
                       const vl        = vencimentoLabel(diasVenc)
                       const alerta120 = diasVenc !== null && diasVenc <= 120 && diasVenc > 0
                       const renovando = (l.paralelo || '').toLowerCase().includes('renovação') || (l.risco || '').toLowerCase().includes('renov')
+                      const dimmedGL  = focoConta && (l.conta || l.nome) !== focoConta
                       return (
                         <div key={l.id} className="golive-card" onClick={() => setSelected(l)}
-                          style={{ background: t.surfaceInput, border: `1px solid ${alerta120 ? '#F59E0B55' : t.green + '33'}`, borderLeft: alerta120 ? '4px solid #F59E0B' : `4px solid ${t.green}`, borderRadius: '0 10px 10px 0', padding: '10px 13px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          style={{ background: t.surfaceInput, border: `1px solid ${alerta120 ? '#F59E0B55' : t.green + '33'}`, borderLeft: alerta120 ? '4px solid #F59E0B' : `4px solid ${t.green}`, borderRadius: '0 10px 10px 0', padding: '10px 13px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 5, opacity: dimmedGL ? 0.25 : 1, transition: 'opacity 0.2s' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ fontSize: 13, fontWeight: 600, color: t.text, lineHeight: 1.3 }}>{l.conta || l.nome}</div>
