@@ -2,7 +2,54 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getLeads, getActivities, saveRadarSnapshot, getRadarSnapshots } from '../lib/supabase'
 import { useState } from 'react'
-import { SidebarDrawer, HamburgerBtn, LogoPill, D } from './Sidebar'
+import { useLocation } from 'react-router-dom'
+
+// ── Dark tokens + nav inline ─────────────────────────────────────────────────
+const _D = {
+  bg:'#0D0B14',bg2:'#13111E',bg3:'#1A1729',border:'#2A2640',border2:'#3D3860',
+  p:'#9D5CF6',p2:'#C4A7FF',pf:'rgba(157,92,246,.15)',
+  g:'#10B981',gf:'rgba(16,185,129,.12)',g2:'#6EE7B7',
+  o:'#FF6B1A',r:'#EF4444',rf:'rgba(239,68,68,.12)',r2:'#FCA5A5',
+  y:'#F59E0B',yf:'rgba(245,158,11,.12)',y2:'#FCD34D',
+  b:'#60A5FA',bf:'rgba(96,165,250,.12)',t1:'#EEEAF8',t2:'#B8B2D4',t3:'#8A84AA',
+}
+const _NAV=[
+  {path:'/pipeline',label:'Pipeline',d:'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'},
+  {path:'/chat',label:'Chat IAra',d:'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'},
+  {path:'/contatos',label:'Contatos',d:'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'},
+  {path:'/radar',label:'Relatórios',d:'M18 20V10M12 20V4M6 20v-6'},
+]
+function _avInit(n){const p=(n||'').split(' ');return(p[0]?.[0]||'')+(p[1]?.[0]||'')}
+function _SidebarNav({open,onClose,currentPath,onLogout,userNome}){
+  const _navigate=useNavigate()
+  if(!open)return null
+  return(<>
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:18,backdropFilter:'blur(2px)'}}/>
+    <div style={{position:'fixed',left:0,top:0,bottom:0,width:52,background:_D.bg2,borderRight:`1px solid ${_D.border}`,display:'flex',flexDirection:'column',alignItems:'center',padding:'14px 0',gap:2,zIndex:20}}>
+      <div onClick={onClose} style={{width:32,height:32,background:_D.p,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:14,cursor:'pointer',flexShrink:0}}>
+        <span style={{fontSize:12,fontWeight:800,color:'white',letterSpacing:'-.5px'}}>IA</span>
+      </div>
+      {_NAV.map(item=>{const active=currentPath===item.path;return(
+        <div key={item.path} onClick={()=>{_navigate(item.path);onClose()}} title={item.label}
+          style={{width:38,height:38,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',position:'relative',background:active?_D.pf:'transparent'}}>
+          {active&&<div style={{position:'absolute',left:0,width:2,height:18,background:_D.p,borderRadius:'0 2px 2px 0',marginLeft:-1}}/>}
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={active?_D.p2:_D.t3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            {item.d.split('M').filter(Boolean).map((s,i)=><path key={i} d={`M${s}`}/>)}
+          </svg>
+        </div>
+      )})}
+      <div style={{width:26,height:1,background:_D.border,margin:'6px 0'}}/>
+      <div style={{marginTop:'auto',width:30,height:30,borderRadius:'50%',background:_D.o,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:'white',cursor:'pointer',flexShrink:0}}
+        onClick={onLogout} title="Sair">{_avInit(userNome)}</div>
+    </div>
+  </>)
+}
+function _HamburgerBtn({open,onClick}){
+  return(<button onClick={onClick} style={{width:34,height:34,borderRadius:8,background:open?_D.pf:'transparent',border:`1px solid ${open?_D.p:_D.border}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0}}>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={open?_D.p2:_D.t2} strokeWidth="2" strokeLinecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+  </button>)
+}
+
 
 const ETAPA_COLORS = {
   'Prospecção':        '#B5D4F4',
@@ -240,12 +287,12 @@ export default function Radar() {
   return (
     <div style={{ minHeight: '100vh', background: D.bg, fontFamily: "'Inter',system-ui,sans-serif" }}>
 
-      <SidebarDrawer open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} />
+      <_SidebarNav open={_sidebarOpen} onClose={()=>_setSidebarOpen(false)} currentPath={_location.pathname} onLogout={()=>{localStorage.removeItem("iara_user");navigate("/login")}} userNome={user.nome}/>
 
       {/* ── TOPBAR ── */}
       <div style={{ height: 52, background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 10 }}>
-        <HamburgerBtn open={sidebarOpen} onClick={() => setSidebarOpen(o => !o)} />
-        <LogoPill />
+        <_HamburgerBtn open={_sidebarOpen} onClick={()=>_setSidebarOpen(o=>!o)}/>
+        <div style={{width:28,height:28,background:_D.p,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:11,fontWeight:800,color:"white",letterSpacing:"-.5px"}}>IA</span></div>
         <span style={{ fontSize: 14, fontWeight: 700, color: D.t1 }}>Relatórios</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
