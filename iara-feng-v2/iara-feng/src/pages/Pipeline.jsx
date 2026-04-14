@@ -2010,8 +2010,6 @@ export default function Pipeline() {
                       const agLabel    = agDias <= 3 ? 'Ativo' : agDias <= 7 ? 'Atenção' : agDias <= 30 ? 'Frio' : 'Crítico'
                       const cc         = contactsMap[(l.conta || l.nome || '').toLowerCase()] || []
                       const atrasadas  = pendLead.filter(a => a.dt && a.dt < hojeISO)
-                      const cc         = contactsMap[(l.conta || l.nome || '').toLowerCase()] || []
-                      const atrasadas  = pendLead.filter(a => a.dt && a.dt < hojeISO)
 
                       return (
                         <div key={l.id}
