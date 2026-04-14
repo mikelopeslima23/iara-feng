@@ -23,7 +23,8 @@ function App() {
         <Route path="/pipeline" element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
         <Route path="/conhecimento" element={<ProtectedRoute><Conhecimento /></ProtectedRoute>} />
         <Route path="/contatos" element={<ProtectedRoute><Contatos /></ProtectedRoute>} />
-        <Route path="*" element={<Navigate to="/login" />} />
+        <Route path="/" element={<Navigate to="/pipeline" replace />} />
+        <Route path="*" element={<Navigate to="/pipeline" replace />} />
       </Routes>
     </BrowserRouter>
   )
