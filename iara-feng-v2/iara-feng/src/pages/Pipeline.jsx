@@ -2248,7 +2248,7 @@ export default function Pipeline() {
           onDeleteAct={handleDeleteAct}
           onDeleteLead={handleDeleteLead} />
       )}
-    </div>{/* main */}
-  </div>{/* shell */}
+    </div>
+  </div>
   )
 }
