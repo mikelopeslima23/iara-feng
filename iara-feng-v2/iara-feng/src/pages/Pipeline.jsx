@@ -1713,247 +1713,358 @@ export default function Pipeline() {
   const valorTotal = Object.values(valorByEtapa).reduce((s, v) => s + v, 0)
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: t.bg, color: t.purple, fontSize: 14 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0D0B14', color: '#9D5CF6', fontSize: 14, fontFamily: "'Inter',system-ui,sans-serif" }}>
       Carregando pipeline...
     </div>
   )
 
+  // ── Dark design tokens ──────────────────────────────────────────────────────
+  const D = {
+    bg:       '#0D0B14', bg2: '#13111E', bg3: '#1A1729', bg4: '#201D2E',
+    border:   '#2A2640', border2: '#3D3860',
+    p:        '#9D5CF6', p2: '#C4A7FF', pf: 'rgba(157,92,246,.15)',
+    g:        '#10B981', gf: 'rgba(16,185,129,.12)', g2: '#6EE7B7',
+    o:        '#FF6B1A', of: 'rgba(255,107,26,.12)',
+    r:        '#EF4444', rf: 'rgba(239,68,68,.12)', r2: '#FCA5A5',
+    y:        '#F59E0B', yf: 'rgba(245,158,11,.12)', y2: '#FCD34D',
+    b:        '#60A5FA', bf: 'rgba(96,165,250,.12)',
+    t1:       '#EEEAF8',  // texto primário
+    t2:       '#B8B2D4',  // texto secundário
+    t3:       '#8A84AA',  // texto hint — nunca abaixo disso
+  }
+
+  // Cor por etapa
+  const etapaCor = {
+    'Prospecção':        { text: D.t2,  bg: 'rgba(255,255,255,.04)', ct: 'rgba(255,255,255,.06)' },
+    'Oportunidade':      { text: D.p2,  bg: D.pf,                    ct: 'rgba(157,92,246,.2)'  },
+    'Proposta':          { text: '#A78BFA', bg: 'rgba(167,139,250,.1)', ct: 'rgba(167,139,250,.2)' },
+    'Negociação':        { text: D.y2,  bg: D.yf,                    ct: 'rgba(245,158,11,.2)'  },
+    'Jurídico':          { text: D.b,   bg: D.bf,                    ct: 'rgba(96,165,250,.2)'  },
+    'Operação / Go-Live':{ text: D.g2,  bg: D.gf,                    ct: 'rgba(16,185,129,.2)'  },
+  }
+
+  // Avatar color por pessoa
+  const avatarCor = {
+    'Mike':    '#1e3a5f', 'Bruno': '#1e3a2f',
+    'Jardel':  '#0C447C', 'Silvio': '#3b1f6e',
+    'Beni':    '#7c2d12', 'Alexandre': '#1f2937',
+  }
+  function avCor(nome) { return avatarCor[nome?.split(' ')[0]] || '#3b1f6e' }
+  function avInit(nome) { const p = nome?.split(' ') || []; return (p[0]?.[0] || '') + (p[1]?.[0] || '') }
+
+  // SVG icons inline
+  const Icon = ({ d, size = 18, color = D.t3, stroke = 1.8 }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+      <path d={d} />
+    </svg>
+  )
+
   return (
-    <div style={{ minHeight: '100dvh', background: t.bg, color: t.text, fontFamily: "'Inter',system-ui,sans-serif", transition: 'background 0.3s' }}>
+    <div style={{ display: 'flex', height: '100dvh', background: D.bg, fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden' }}>
       <style>{`
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { height: 3px; width: 3px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: ${t.scrollThumb}; border-radius: 3px; }
-        .lead-card:hover   { border-color: ${t.purple} !important; transform: translateY(-1px); }
-        .lead-card         { transition: all 0.15s; }
-        .lead-abandono:hover { border-color: #EF4444 !important; box-shadow: 0 4px 14px rgba(239,68,68,0.25) !important; transform: translateY(-1px); }
-        .gel-card:hover    { border-color: ${t.textMuted} !important; }
-        .gel-card          { transition: all 0.15s; }
-        .golive-card:hover { border-color: ${t.green} !important; transform: translateY(-1px); }
-        .golive-card       { transition: all 0.15s; }
+        ::-webkit-scrollbar-thumb { background: ${D.border2}; border-radius: 3px; }
+        .lc { transition: all 0.15s; cursor: pointer; }
+        .lc:hover { border-color: ${D.border2} !important; transform: translateY(-1px); }
+        .lc-ab:hover { border-color: ${D.r} !important; }
+        .lc-foc:hover { border-color: ${D.p} !important; }
+        .ni-btn { transition: all 0.15s; }
+        .ni-btn:hover { background: rgba(255,255,255,.06) !important; }
+        .rp-btn { transition: all 0.15s; }
+        .rp-btn:hover { border-color: ${D.border2} !important; color: ${D.t2} !important; }
+        .fp-btn { transition: all 0.15s; }
+        .fp-btn:hover { border-color: ${D.border2} !important; color: ${D.t2} !important; }
       `}</style>
 
-      {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderBottom: `1px solid ${t.borderLight}`, background: t.header, boxShadow: t.name === 'light' ? '0 2px 8px rgba(124,58,237,0.08)' : '0 2px 12px rgba(0,0,0,0.4)', position: 'sticky', top: 0, zIndex: 10, flexWrap: 'wrap', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => navigate('/chat')} style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 8, color: t.textMuted, padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>← Chat</button>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: t.text }}>Pipeline</div>
-            <div style={{ fontSize: 10, color: t.textMuted }}>
-              <span style={{ color: t.purple, fontWeight: 600 }}>{ativos.length}</span> oportunidades ·{' '}
-              <span style={{ color: t.purple, fontWeight: 600 }}>{Object.keys(contasAtivas).length}</span> contas ·{' '}
-              <span style={{ color: t.green,  fontWeight: 600 }}>🏭 {goLive.length}</span> go-live ·{' '}
-              <span style={{ color: t.textHint, fontWeight: 600 }}>🧊 {todosGeladeira.length}</span> geladeira
-              {valorTotal > 0 && <span style={{ color: t.purple, fontWeight: 600 }}> · 💰 {formatValor(valorTotal)}</span>}
-              {renovacoes.length > 0 && <span style={{ color: t.red, fontWeight: 600 }}> · ⚠️ {renovacoes.length} renovação</span>}
-            </div>
-          </div>
-          {isAdmin && (
-            <button onClick={handleSync} disabled={syncing} style={{ background: syncing ? t.surface : t.purpleFaint2, border: `1px solid ${t.purple}66`, borderRadius: 8, color: syncing ? t.textMuted : t.purple, padding: '6px 12px', fontSize: 11, cursor: syncing ? 'not-allowed' : 'pointer', fontWeight: 500 }}>
-              {syncing ? '⏳ Sincronizando...' : '🔄 Sincronizar'}
-            </button>
-          )}
-          <button
-            onClick={() => setShowNovaOpp(true)}
-            style={{ background: 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 8, color: 'white', padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
-            + Novo Lead
-          </button>
+      {/* ══ SIDEBAR ══ */}
+      <div style={{ width: 52, background: D.bg2, borderRight: `1px solid ${D.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '14px 0', gap: 2, flexShrink: 0, zIndex: 20 }}>
+        {/* Logo */}
+        <div style={{ width: 32, height: 32, background: D.p, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, flexShrink: 0, cursor: 'pointer' }}>
+          <span style={{ fontSize: 12, fontWeight: 800, color: 'white', letterSpacing: '-.5px' }}>IA</span>
         </div>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', overflowX: 'auto' }}>
-          <button onClick={toggleTheme} style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${t.border}`, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, flexShrink: 0 }}>{t.icon}</button>
-          {/* Busca */}
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: t.textHint, pointerEvents: 'none' }}>🔍</span>
-            <input
-              value={filterBusca}
-              onChange={e => setFilterBusca(e.target.value)}
-              placeholder="Buscar conta, serviço..."
-              style={{ paddingLeft: 28, paddingRight: filterBusca ? 28 : 10, height: 34, width: 190, border: `1px solid ${filterBusca ? t.purple : t.border}`, borderRadius: 20, background: t.surface, color: t.text, fontSize: 12, outline: 'none', fontFamily: 'inherit' }}
-            />
-            {filterBusca && (
-              <button onClick={() => setFilterBusca('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: t.textMuted, cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1 }}>✕</button>
-            )}
+
+        {/* Nav items */}
+        {[
+          { path: '/pipeline', icon: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z', label: 'Pipeline',    active: true  },
+          { path: '/chat',     icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z', label: 'Chat IAra', active: false },
+          { path: '/contatos', icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75', label: 'Contatos',   active: false },
+          { path: '/radar',    icon: 'M18 20V10M12 20V4M6 20v-6', label: 'Relatórios',  active: false },
+        ].map(item => (
+          <div key={item.path} className="ni-btn"
+            onClick={() => navigate(item.path)}
+            title={item.label}
+            style={{ width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', background: item.active ? D.pf : 'transparent' }}>
+            {item.active && <div style={{ position: 'absolute', left: 0, width: 2, height: 18, background: D.p, borderRadius: '0 2px 2px 0', marginLeft: -1 }} />}
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={item.active ? D.p2 : D.t3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              {item.icon.split('M').filter(Boolean).map((seg, i) => <path key={i} d={`M${seg}`} />)}
+            </svg>
           </div>
-          {resps.map(r => (
-            <button key={r} onClick={() => setFilterResp(r)} style={{ background: filterResp === r ? t.purple : t.surface, border: `1px solid ${filterResp === r ? t.purple : t.border}`, borderRadius: 20, padding: '4px 12px', fontSize: 11, color: filterResp === r ? '#fff' : t.textMuted, cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: filterResp === r ? 600 : 400 }}>
-              {r}
+        ))}
+
+        <div style={{ width: 26, height: 1, background: D.border, margin: '6px 0' }} />
+
+        <div className="ni-btn" title="Conhecimento" onClick={() => navigate('/conhecimento')}
+          style={{ width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={D.t3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
+          </svg>
+        </div>
+        <div className="ni-btn" title="Configurações"
+          style={{ width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={D.t3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </div>
+
+        {/* Avatar */}
+        <div style={{ marginTop: 'auto', width: 30, height: 30, borderRadius: '50%', background: D.o, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'white', cursor: 'pointer', flexShrink: 0 }}
+          onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}
+          title={`${user.nome} — sair`}>
+          {avInit(user.nome)}
+        </div>
+      </div>
+
+      {/* ══ MAIN ══ */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+
+        {/* ── TOPBAR ── */}
+        <div style={{ height: 52, background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, flexShrink: 0 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: D.t1, letterSpacing: '-.2px' }}>Pipeline</span>
+
+          {/* Métricas como chips */}
+          {[
+            { n: ativos.length,           l: 'oport.',  c: D.p  },
+            { n: goLive.length,           l: 'go-live', c: D.g  },
+            { n: Object.keys(contasAtivas).length, l: 'contas', c: D.t3 },
+            ...(renovacoes.length > 0 ? [{ n: renovacoes.length, l: 'renov.', c: D.y }] : []),
+          ].map((m, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', background: D.bg3, border: `1px solid ${D.border}`, borderRadius: 7 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: m.c, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: m.c === D.t3 ? D.t2 : m.c }}>{m.n}</span>
+              <span style={{ fontSize: 10, color: D.t3 }}>{m.l}</span>
+            </div>
+          ))}
+
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Busca */}
+            <div style={{ position: 'relative' }}>
+              <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', opacity: .4 }} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={D.t1} strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input value={filterBusca} onChange={e => setFilterBusca(e.target.value)}
+                placeholder="Buscar conta, serviço..."
+                style={{ paddingLeft: 30, paddingRight: filterBusca ? 28 : 10, height: 32, width: 210, background: D.bg3, border: `1px solid ${filterBusca ? D.p : D.border}`, borderRadius: 8, color: D.t1, fontSize: 12, outline: 'none', fontFamily: 'inherit' }} />
+              {filterBusca && <button onClick={() => setFilterBusca('')} style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: D.t3, cursor: 'pointer', fontSize: 14, padding: 0 }}>✕</button>}
+            </div>
+
+            {/* Notificações */}
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: D.bg3, border: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', color: D.t2, fontSize: 13 }}>
+              🔔
+              <div style={{ position: 'absolute', top: 6, right: 6, width: 5, height: 5, borderRadius: '50%', background: D.r, border: `1.5px solid ${D.bg2}` }} />
+            </div>
+
+            {/* Sincronizar (só admin) */}
+            {isAdmin && (
+              <button onClick={handleSync} disabled={syncing}
+                style={{ height: 32, padding: '0 12px', background: D.bg3, border: `1px solid ${D.border}`, borderRadius: 8, color: syncing ? D.t3 : D.t2, fontSize: 11, cursor: syncing ? 'not-allowed' : 'pointer', fontWeight: 500 }}>
+                {syncing ? '⏳' : '🔄'}
+              </button>
+            )}
+
+            {/* Novo Lead */}
+            <button onClick={() => setShowNovaOpp(true)}
+              style={{ height: 32, padding: '0 14px', background: D.p, border: 'none', borderRadius: 8, color: 'white', fontSize: 12, cursor: 'pointer', fontWeight: 600, letterSpacing: '-.1px' }}>
+              + Novo Lead
+            </button>
+
+            {/* Toggle tema */}
+            <button onClick={() => { const next = t.name === 'dark' ? THEMES.light : THEMES.dark; saveTheme(next.name); window.location.reload() }}
+              style={{ width: 32, height: 32, borderRadius: 8, background: D.bg3, border: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, color: D.t2 }}>
+              {t.name === 'dark' ? '☀️' : '🌙'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── SUBNAV ── */}
+        <div style={{ height: 40, background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 20px', gap: 2, flexShrink: 0 }}>
+          {[
+            { id: 'pipeline',  label: 'Pipeline',  ct: ativos.length,         ctc: D.pf, ctk: D.p2  },
+            { id: 'golive',    label: 'Go-Live',   ct: goLive.length,         ctc: D.gf, ctk: D.g2, warn: renovacoes.length > 0 },
+            { id: 'geladeira', label: 'Geladeira', ct: geladeira.length,      ctc: 'rgba(255,255,255,.06)', ctk: D.t2 },
+          ].map(tab => (
+            <button key={tab.id} onClick={() => setAba(tab.id)}
+              style={{ height: 40, padding: '0 13px', background: 'none', border: 'none', borderBottom: aba === tab.id ? `2px solid ${D.p}` : '2px solid transparent', color: aba === tab.id ? D.p2 : D.t3, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: aba === tab.id ? 600 : 500, transition: 'all .15s' }}>
+              {tab.label}
+              {tab.warn && <span style={{ fontSize: 9, color: D.y }}>⚠</span>}
+              <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: tab.ctc, color: tab.ctk }}>{tab.ct}</span>
             </button>
           ))}
-        </div>
-      </div>
 
-      {/* ── Abas principais ── */}
-      <div style={{ display: 'flex', borderBottom: `1px solid ${t.borderLight}`, background: t.bgAlt, padding: '0 20px' }}>
-        {[
-          { id: 'pipeline',  label: `📋 Pipeline (${ativos.length})`,                                        color: t.purple },
-          { id: 'golive',    label: `🏭 Go-Live (${goLive.length})${renovacoes.length > 0 ? ' ⚠️' : ''}`,  color: t.green  },
-          { id: 'geladeira', label: `🧊 Geladeira (${geladeira.length})`,                                    color: t.textMuted },
-        ].map(tab => (
-          <button key={tab.id} onClick={() => setAba(tab.id)} style={{ background: 'none', border: 'none', borderBottom: aba === tab.id ? `2px solid ${tab.color}` : '2px solid transparent', color: aba === tab.id ? tab.color : t.textMuted, padding: '12px 16px', fontSize: 13, cursor: 'pointer', fontWeight: aba === tab.id ? 600 : 400, transition: 'all 0.15s' }}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Filtros rápidos por estado (só no pipeline) ── */}
-      {aba === 'pipeline' && (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '8px 20px', background: t.bgAlt, borderBottom: `1px solid ${t.borderLight}`, overflowX: 'auto', flexWrap: 'nowrap' }}>
-          <span style={{ fontSize: 11, color: t.textHint, flexShrink: 0 }}>Filtrar:</span>
-          {[
-            { id: 'hoje',        label: `⚡ Minha lista hoje`,  color: t.purple },
-            { id: 'atrasados',   label: `⏰ Com atrasadas`,      color: '#EF4444' },
-            { id: 'abandono',    label: `🚨 Em abandono`,        color: '#EF4444' },
-            { id: 'sem_fup',     label: `📭 Sem próx. atividade`,color: t.orange  },
-            { id: 'sem_contato', label: `👤 Sem contato`,        color: '#F59E0B' },
-          ].map(f => {
-            const ativo = filterEstado === f.id
-            return (
-              <button key={f.id}
-                onClick={() => setFilterEstado(ativo ? null : f.id)}
-                style={{ flexShrink: 0, padding: '4px 12px', borderRadius: 20, border: `1px solid ${ativo ? f.color : t.border}`, background: ativo ? `${f.color}18` : t.surface, color: ativo ? f.color : t.textMuted, fontSize: 11, fontWeight: ativo ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s' }}>
-                {f.label}
-                {ativo && ' ✕'}
+          {/* Filtros de responsável no lado direito */}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+            {resps.map(r => (
+              <button key={r} className="rp-btn" onClick={() => setFilterResp(r)}
+                style={{ height: 26, padding: '0 10px', background: filterResp === r ? D.pf : 'transparent', border: `1px solid ${filterResp === r ? D.p : D.border}`, borderRadius: 20, fontSize: 11, color: filterResp === r ? D.p2 : D.t3, cursor: 'pointer', fontWeight: filterResp === r ? 600 : 400 }}>
+                {r}
               </button>
-            )
-          })}
-          {focoConta && (
-            <button onClick={() => setFocoConta(null)}
-              style={{ flexShrink: 0, padding: '4px 12px', borderRadius: 20, border: `1px solid ${t.purple}`, background: t.purpleFaint, color: t.purple, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
-              🔍 {focoConta} ✕
-            </button>
-          )}
-          {(filterEstado || focoConta) && (
-            <button onClick={() => { setFilterEstado(null); setFocoConta(null) }}
-              style={{ flexShrink: 0, padding: '4px 10px', borderRadius: 20, border: `1px solid ${t.border}`, background: 'none', color: t.textMuted, fontSize: 11, cursor: 'pointer' }}>
-              Limpar tudo
-            </button>
-          )}
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: t.textHint, flexShrink: 0 }}>
-            {ativosFiltrados.length} cards
-          </span>
+            ))}
+          </div>
         </div>
-      )}
 
-      <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* ── FILTER BAR ── */}
+        {aba === 'pipeline' && (
+          <div style={{ height: 38, background: D.bg, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 20px', gap: 5, flexShrink: 0, overflowX: 'auto' }}>
+            {[
+              { id: 'hoje',        label: '⚡ Minha lista hoje',   ac: D.p,  af: D.pf  },
+              { id: 'atrasados',   label: '⏰ Com atrasadas',       ac: D.r,  af: D.rf  },
+              { id: 'abandono',    label: '🚨 Em abandono',         ac: D.r,  af: D.rf  },
+              { id: 'sem_fup',     label: '📭 Sem próx. atividade', ac: D.y,  af: D.yf  },
+              { id: 'sem_contato', label: '👤 Sem contato',         ac: D.y,  af: D.yf  },
+            ].map(f => {
+              const on = filterEstado === f.id
+              return (
+                <button key={f.id} className="fp-btn" onClick={() => setFilterEstado(on ? null : f.id)}
+                  style={{ flexShrink: 0, height: 24, padding: '0 10px', background: on ? f.af : 'transparent', border: `1px solid ${on ? f.ac : D.border}`, borderRadius: 20, fontSize: 10, color: on ? f.ac : D.t3, cursor: 'pointer', fontWeight: on ? 700 : 400 }}>
+                  {f.label}{on ? ' ✕' : ''}
+                </button>
+              )
+            })}
+            {focoConta && (
+              <button onClick={() => setFocoConta(null)}
+                style={{ flexShrink: 0, height: 24, padding: '0 10px', background: D.pf, border: `1px solid ${D.p}`, borderRadius: 20, fontSize: 10, color: D.p2, cursor: 'pointer', fontWeight: 700 }}>
+                🔍 {focoConta} ✕
+              </button>
+            )}
+            {(filterEstado || focoConta) && (
+              <button onClick={() => { setFilterEstado(null); setFocoConta(null) }}
+                style={{ flexShrink: 0, height: 24, padding: '0 10px', border: `1px solid ${D.border}`, borderRadius: 20, background: 'none', color: D.t3, fontSize: 10, cursor: 'pointer' }}>
+                Limpar
+              </button>
+            )}
+            <span style={{ marginLeft: 'auto', fontSize: 10, color: D.t3, flexShrink: 0 }}>
+              {ativosFiltrados.length} cards
+            </span>
+          </div>
+        )}
+
+      <div style={{ flex: 1, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 16, overflow: 'hidden' }}>
 
         {/* ══ PIPELINE ══ */}
         {aba === 'pipeline' && <>
           {riscos.length > 0 && (
-            <div style={{ background: `${t.orange}0F`, border: `1px solid ${t.orange}33`, borderRadius: 12, padding: '12px 16px' }}>
-              <div style={{ fontSize: 12, color: t.orange, fontWeight: 700, marginBottom: 8 }}>⚠️ OPORTUNIDADES EM RISCO ({riscos.length})</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ background: `${D.y}10`, border: `1px solid ${D.y}33`, borderRadius: 10, padding: '10px 16px', flexShrink: 0 }}>
+              <div style={{ fontSize: 11, color: D.y, fontWeight: 700, marginBottom: 6 }}>⚠ OPORTUNIDADES EM RISCO ({riscos.length})</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {riscos.map(l => (
-                  <div key={l.id} onClick={() => setSelected(l)} style={{ background: t.surfaceInput, border: `1px solid ${t.orange}44`, borderRadius: 8, padding: '6px 12px', fontSize: 12, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    <span style={{ color: t.text, fontWeight: 600 }}>{l.conta || l.nome}</span>
-                    {l.servico && <span style={{ color: t.purple, fontSize: 10 }}>📦 {l.servico}</span>}
-                    <span style={{ color: t.orange, fontSize: 11 }}>{l.risco}</span>
+                  <div key={l.id} onClick={() => setSelected(l)} style={{ background: D.bg3, border: `1px solid ${D.y}33`, borderRadius: 7, padding: '5px 10px', fontSize: 11, cursor: 'pointer' }}>
+                    <span style={{ color: D.t1, fontWeight: 600 }}>{l.conta || l.nome}</span>
+                    {l.servico && <span style={{ color: D.p, fontSize: 10, marginLeft: 5 }}>📦 {l.servico}</span>}
+                    {l.risco && <div style={{ color: D.y, fontSize: 10, marginTop: 2 }}>{l.risco}</div>}
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8, WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', flex: 1, paddingBottom: 8, WebkitOverflowScrolling: 'touch' }}>
             {ETAPAS.filter(e => e !== 'Operação / Go-Live').map(etapa => {
-              const cards = byEtapa[etapa] || []
+              const cards      = byEtapa[etapa] || []
               const totalValor = valorByEtapa[etapa] || 0
+              const ec         = etapaCor[etapa] || { text: D.t2, ct: 'rgba(255,255,255,.08)' }
               return (
-                <div key={etapa} style={{ minWidth: 240, maxWidth: 260, flexShrink: 0 }}>
-                  {/* Column header */}
-                  <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: '12px 12px 0 0', padding: '10px 14px' }}>
+                <div key={etapa} style={{ minWidth: 210, maxWidth: 220, flexShrink: 0 }}>
+                  <div style={{ background: D.bg2, border: `1px solid ${D.border}`, borderRadius: '10px 10px 0 0', padding: '10px 12px 8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: etapa === 'Jurídico' ? '#3B82F6' : t.purple, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{etapa}</span>
-                      <span style={{ background: etapa === 'Jurídico' ? 'rgba(59,130,246,0.12)' : t.purpleFaint, borderRadius: 20, padding: '1px 8px', fontSize: 11, color: etapa === 'Jurídico' ? '#3B82F6' : t.purple, fontWeight: 600 }}>{cards.length}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: ec.text, textTransform: 'uppercase', letterSpacing: '.06em' }}>{etapa}</span>
+                      <span style={{ background: ec.ct, borderRadius: 20, padding: '1px 7px', fontSize: 10, color: ec.text, fontWeight: 700 }}>{cards.length}</span>
                     </div>
-                    {totalValor > 0 && (
-                      <div style={{ fontSize: 10, color: t.textHint, marginTop: 3 }}>💰 {formatValor(totalValor)}</div>
-                    )}
-                    {/* Mini heatbar: proporção saudáveis vs em risco */}
+                    {totalValor > 0 && <div style={{ fontSize: 10, color: D.t3, marginTop: 2 }}>💰 {formatValor(totalValor)}</div>}
                     {cards.length > 0 && (() => {
-                      const saudaveis = cards.filter(c => healthScore(c, acts, contactsMap) >= 70).length
-                      const atencao   = cards.filter(c => { const s = healthScore(c, acts, contactsMap); return s >= 40 && s < 70 }).length
-                      const criticos  = cards.length - saudaveis - atencao
+                      const s = cards.filter(c => healthScore(c, acts, contactsMap) >= 70).length
+                      const a = cards.filter(c => { const sc = healthScore(c, acts, contactsMap); return sc >= 40 && sc < 70 }).length
+                      const r = cards.length - s - a
                       const w = n => `${Math.round((n / cards.length) * 100)}%`
                       return (
-                        <div style={{ display: 'flex', height: 3, borderRadius: 2, overflow: 'hidden', marginTop: 6, gap: 1 }}>
-                          {saudaveis > 0 && <div style={{ width: w(saudaveis), background: '#10B981', borderRadius: 2 }} title={`${saudaveis} saudáveis`} />}
-                          {atencao   > 0 && <div style={{ width: w(atencao),   background: '#F59E0B', borderRadius: 2 }} title={`${atencao} atenção`} />}
-                          {criticos  > 0 && <div style={{ width: w(criticos),  background: '#EF4444', borderRadius: 2 }} title={`${criticos} críticos`} />}
+                        <div style={{ display: 'flex', height: 2, borderRadius: 2, overflow: 'hidden', marginTop: 6, gap: 1 }}>
+                          {s > 0 && <div style={{ width: w(s), background: D.g }} />}
+                          {a > 0 && <div style={{ width: w(a), background: D.y }} />}
+                          {r > 0 && <div style={{ width: w(r), background: D.r }} />}
                         </div>
                       )
                     })()}
                   </div>
-                  {/* Cards */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: t.bgAlt, border: `1px solid ${t.border}`, borderTop: 'none', borderRadius: '0 0 12px 12px', padding: 10, minHeight: 80 }}>
-                    {cards.length === 0 && <div style={{ textAlign: 'center', color: t.border, fontSize: 12, padding: '20px 0' }}>vazio</div>}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: `${D.bg3}80`, border: `1px solid ${D.border}`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: 7, minHeight: 60 }}>
+                    {cards.length === 0 && <div style={{ textAlign: 'center', color: D.border, fontSize: 11, padding: '16px 0' }}>vazio</div>}
                     {cards.map(l => {
-                      const { label: agLabel, color: agColor } = agingLabel(l.dias || 0)
-                      const nomeL  = (l.nome  || '').toLowerCase()
-                      const contaL = (l.conta || l.nome || '').toLowerCase()
-                      const servL  = (l.servico || '').toLowerCase()
                       const pendLead = acts.filter(a => {
                         if (a.ok) return false
-                        const actLead = (a.lead || '').toLowerCase()
-                        if (nomeL && actLead === nomeL) return true
-                        if (servL) return actLead.includes(contaL) && actLead.includes(servL)
-                        return actLead.includes(contaL) && !actLead.includes(' — ')
+                        const al = (a.lead || '').toLowerCase()
+                        const nomeL = (l.nome || '').toLowerCase()
+                        const contaL = (l.conta || l.nome || '').toLowerCase()
+                        const servL = (l.servico || '').toLowerCase()
+                        if (nomeL && al === nomeL) return true
+                        if (servL) return al.includes(contaL) && al.includes(servL)
+                        return al.includes(contaL) && !al.includes(' — ')
                       })
-                      const contaOps = contasAtivas[l.conta || l.nome] || 1
-                      const hs       = healthScore(l, acts, contactsMap)
-                      const hsInfo   = healthLabel(hs)
-
-                      // Flag abandono: +15 dias sem atualização E sem nenhum FUP pendente
-                      const temFupPendente = pendLead.some(a => a.tipo === 'FUP' || a.tipo === 'Fazer Contato')
-                      const emAbandono = (l.dias || 0) > 15 && !temFupPendente
+                      const contaOps   = contasAtivas[l.conta || l.nome] || 1
+                      const hs         = healthScore(l, acts, contactsMap)
+                      const temFup     = pendLead.some(a => a.tipo === 'FUP' || a.tipo === 'Fazer Contato')
+                      const emAbandono = (l.dias || 0) > 15 && !temFup
                       const emFoco     = focoConta ? (l.conta || l.nome) === focoConta : true
                       const dimmed     = focoConta && !emFoco
+                      const agDias     = l.dias || 0
+                      const agColor    = agDias <= 3 ? D.g : agDias <= 7 ? D.y2 : agDias <= 30 ? D.o : D.r
+                      const agLabel    = agDias <= 3 ? 'Hot' : agDias <= 7 ? 'Morno' : agDias <= 30 ? 'Frio' : `${agDias}d`
+                      const cc         = contactsMap[(l.conta || l.nome || '').toLowerCase()] || []
+                      const atrasadas  = pendLead.filter(a => a.dt && a.dt < hojeISO)
 
                       return (
-                        <div
-                          key={l.id}
-                          className={emAbandono && emFoco ? 'lead-card lead-abandono' : 'lead-card'}
+                        <div key={l.id}
                           onClick={() => setSelected(l)}
                           style={{
-                            background:   emAbandono && emFoco ? 'rgba(239,68,68,0.07)' : t.surfaceInput,
-                            border:       emAbandono && emFoco ? '1.5px solid rgba(239,68,68,0.7)' : focoConta && emFoco ? `2px solid ${t.purple}` : `1px solid ${l.risco ? t.orange + '44' : t.border}`,
-                            borderLeft:   emAbandono && emFoco ? '4px solid #EF4444' : focoConta && emFoco ? `4px solid ${t.purple}` : undefined,
-                            borderRadius: 10, padding: '11px 13px', cursor: 'pointer',
-                            display: 'flex', flexDirection: 'column', gap: 6,
-                            opacity:      dimmed ? 0.25 : 1,
-                            transition:   'opacity 0.2s, border 0.2s',
-                            boxShadow:    emAbandono && emFoco ? '0 0 0 1px rgba(239,68,68,0.15)' : focoConta && emFoco ? `0 0 0 2px ${t.purple}22` : (t.name === 'light' ? '0 1px 4px rgba(124,58,237,0.06)' : 'none'),
+                            background:   emAbandono && emFoco ? `${D.r}0A` : D.bg2,
+                            border:       emAbandono && emFoco ? `1px solid ${D.r}55` : focoConta && emFoco ? `1px solid ${D.p}66` : `1px solid ${D.border}`,
+                            borderLeft:   emAbandono && emFoco ? `3px solid ${D.r}` : focoConta && emFoco ? `3px solid ${D.p}` : `3px solid ${agColor}`,
+                            borderRadius: '0 8px 8px 0', padding: '10px 11px', cursor: 'pointer',
+                            opacity: dimmed ? 0.2 : 1, transition: 'opacity .2s, border-color .15s',
                           }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div
-                                onClick={e => { e.stopPropagation(); setFocoConta(prev => prev === (l.conta || l.nome) ? null : (l.conta || l.nome)) }}
-                                title="Clique para focar neste lead"
-                                style={{ fontSize: 13, fontWeight: 600, color: emAbandono && emFoco ? '#EF4444' : focoConta && emFoco ? t.purple : t.text, lineHeight: 1.3, cursor: 'pointer', display: 'inline-block' }}>
+                              <div onClick={e => { e.stopPropagation(); setFocoConta(p => p === (l.conta || l.nome) ? null : (l.conta || l.nome)) }}
+                                style={{ fontSize: 12, fontWeight: 600, color: emAbandono && emFoco ? D.r2 : focoConta && emFoco ? D.p2 : D.t1, lineHeight: 1.3, cursor: 'pointer' }}>
                                 {l.conta || l.nome}
                               </div>
-                              {l.servico && <div style={{ fontSize: 11, color: t.purple, marginTop: 2 }}>📦 {l.servico}</div>}
+                              {l.servico && <div style={{ fontSize: 10, color: D.p, marginTop: 2 }}>{l.servico}</div>}
                             </div>
-                            <span style={{ background: `${agColor}22`, border: `1px solid ${agColor}55`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: agColor, whiteSpace: 'nowrap', fontWeight: 600, flexShrink: 0 }}>{agLabel}</span>
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4, background: `${agColor}18`, color: agColor, flexShrink: 0 }}>{agLabel}</span>
                           </div>
-                          <div style={{ fontSize: 11, color: t.textMuted }}>👤 {l.resp}</div>
-                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: 11, color: emAbandono && emFoco ? '#EF4444' : (l.dias > 7 ? t.orange : t.textMuted), fontWeight: emAbandono && emFoco ? 700 : 400 }}>🕐 {l.dias}d</span>
-                            <span title={`Health Score: ${hs}/100`} style={{ background: hsInfo.bg, border: `1px solid ${hsInfo.color}44`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: hsInfo.color, fontWeight: 700 }}>❤️ {hs}</span>
-                            {pendLead.length > 0 && <span style={{ background: t.purpleFaint, border: `1px solid ${t.purple}44`, borderRadius: 6, padding: '1px 7px', fontSize: 10, color: t.purple }}>{pendLead.length} pend.</span>}
-                            {contaOps > 1 && <span style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', borderRadius: 6, padding: '1px 7px', fontSize: 10, color: '#3B82F6' }}>{contaOps} op.</span>}
-                            {l.valor > 0 && <span style={{ fontSize: 10, color: t.textHint }}>💰 {formatValor(l.valor)}</span>}
-                            {l.risco && <span style={{ fontSize: 11 }}>⚠️</span>}
-                            {l.g12   && <span style={{ fontSize: 11 }}>⭐</span>}
+                          <div style={{ fontSize: 10, color: D.t2, marginTop: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <div style={{ width: 14, height: 14, borderRadius: '50%', background: avCor(l.resp), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 6, fontWeight: 700, color: 'white', flexShrink: 0 }}>{avInit(l.resp)}</div>
+                            <span>{l.resp?.split(' ')[0]}</span>
+                            <span style={{ color: D.t3 }}>·</span>
+                            <span style={{ color: emAbandono && emFoco ? D.r2 : agDias > 7 ? D.y : D.t3 }}>{agDias}d</span>
+                            <span style={{ color: D.t3 }}>·</span>
+                            <span style={{ color: hs >= 70 ? D.g : hs >= 40 ? D.y : D.r, fontWeight: 600 }}>❤ {hs}</span>
                           </div>
-                          {emAbandono && (
-                            <div style={{ fontSize: 10, fontWeight: 700, color: '#EF4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 5, padding: '2px 7px', display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}>
-                              🚨 SEM FUP HÁ {l.dias}d
-                            </div>
-                          )}
-                          <CardIndicators lead={l} acts={acts} contactsMap={contactsMap} t={t} />
+                          {(() => {
+                            const tags = []
+                            if (atrasadas.length > 0) tags.push({ label: `⏰ ${atrasadas.length} atrasada${atrasadas.length > 1 ? 's' : ''}`, c: D.r2, bg: D.rf })
+                            else if (pendLead.length === 0) tags.push({ label: '⚡ Sem próx.', c: D.p2, bg: D.pf })
+                            if (!cc.some(c => c.tipo === 'contato')) tags.push({ label: '👤 Sem contato', c: D.y2, bg: D.yf })
+                            if (emAbandono && emFoco) tags.push({ label: `🚨 ${agDias}d sem FUP`, c: D.r2, bg: D.rf })
+                            if (contaOps > 1) tags.push({ label: `${contaOps} op.`, c: D.b, bg: D.bf })
+                            if (l.g12) tags.push({ label: '⭐ G12', c: D.y2, bg: D.yf })
+                            if (!tags.length) return null
+                            return (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 6 }}>
+                                {tags.map((tg, i) => (
+                                  <span key={i} style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: tg.bg, color: tg.c }}>{tg.label}</span>
+                                ))}
+                              </div>
+                            )
+                          })()}
                           {l.paralelo && <ParaleloBadges paralelo={l.paralelo} />}
-                          {l.prox && <div style={{ fontSize: 11, color: t.textHint, borderTop: `1px solid ${t.borderLight}`, paddingTop: 6 }}>→ {l.prox}</div>}
+                          {l.prox && <div style={{ fontSize: 10, color: D.t3, borderTop: `1px solid ${D.border}`, paddingTop: 5, marginTop: 4 }}>→ {l.prox}</div>}
                         </div>
                       )
                     })}
@@ -1962,7 +2073,7 @@ export default function Pipeline() {
               )
             })}
 
-            {/* ── Coluna GO-LIVE inline no kanban ── */}
+            {/* ── Go-Live inline ── */}
             {(() => {
               const goLiveVisiveis = goLiveOrdenado.filter(l =>
                 (filterResp === 'Todos' || l.resp?.includes(filterResp)) &&
@@ -1970,42 +2081,38 @@ export default function Pipeline() {
               )
               if (goLiveVisiveis.length === 0) return null
               return (
-                <div style={{ minWidth: 240, maxWidth: 260, flexShrink: 0 }}>
-                  <div style={{ background: t.surface, border: `1px solid ${t.green}55`, borderRadius: '12px 12px 0 0', padding: '10px 14px' }}>
+                <div style={{ minWidth: 190, maxWidth: 200, flexShrink: 0 }}>
+                  <div style={{ background: D.bg2, border: `1px solid ${D.g}44`, borderRadius: '10px 10px 0 0', padding: '10px 12px 8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: 12, fontWeight: 700, color: t.green, textTransform: 'uppercase', letterSpacing: '0.05em' }}>🏭 Go-Live</span>
-                      <span style={{ background: `${t.green}18`, borderRadius: 20, padding: '1px 8px', fontSize: 11, color: t.green, fontWeight: 600 }}>{goLiveVisiveis.length}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: D.g2, textTransform: 'uppercase', letterSpacing: '.06em' }}>Go-Live</span>
+                      <span style={{ background: D.gf, borderRadius: 20, padding: '1px 7px', fontSize: 10, color: D.g2, fontWeight: 700 }}>{goLiveVisiveis.length}</span>
                     </div>
+                    <div style={{ height: 2, borderRadius: 2, marginTop: 6, background: D.g, opacity: .35 }} />
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: t.bgAlt, border: `1px solid ${t.green}33`, borderTop: 'none', borderRadius: '0 0 12px 12px', padding: 10, minHeight: 80 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5, background: `${D.bg3}80`, border: `1px solid ${D.g}33`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: 7 }}>
                     {goLiveVisiveis.map(l => {
                       const diasVenc  = diasParaVencer(l.vencimento)
                       const vl        = vencimentoLabel(diasVenc)
                       const alerta120 = diasVenc !== null && diasVenc <= 120 && diasVenc > 0
+                      const expirado  = diasVenc !== null && diasVenc < 0
                       const renovando = (l.paralelo || '').toLowerCase().includes('renovação') || (l.risco || '').toLowerCase().includes('renov')
                       const dimmedGL  = focoConta && (l.conta || l.nome) !== focoConta
+                      const borderC   = expirado ? D.r : alerta120 ? D.y : D.g
                       return (
-                        <div key={l.id} className="golive-card" onClick={() => setSelected(l)}
-                          style={{ background: t.surfaceInput, border: `1px solid ${alerta120 ? '#F59E0B55' : t.green + '33'}`, borderLeft: alerta120 ? '4px solid #F59E0B' : `4px solid ${t.green}`, borderRadius: '0 10px 10px 0', padding: '10px 13px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 5, opacity: dimmedGL ? 0.25 : 1, transition: 'opacity 0.2s' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, lineHeight: 1.3 }}>{l.conta || l.nome}</div>
-                              {l.servico && <div style={{ fontSize: 11, color: t.green, marginTop: 1 }}>📦 {l.servico}</div>}
-                            </div>
-                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: t.green, boxShadow: `0 0 6px ${t.green}`, flexShrink: 0, marginTop: 4 }} />
+                        <div key={l.id} onClick={() => setSelected(l)}
+                          style={{ background: expirado ? `${D.r}06` : alerta120 ? `${D.y}06` : D.bg2, border: `1px solid ${borderC}33`, borderLeft: `3px solid ${borderC}`, borderRadius: '0 8px 8px 0', padding: '9px 10px', cursor: 'pointer', opacity: dimmedGL ? 0.2 : 1, transition: 'opacity .2s' }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: D.t1 }}>{l.conta || l.nome}</div>
+                          {l.servico && <div style={{ fontSize: 10, color: D.g2, marginTop: 1 }}>{l.servico}</div>}
+                          <div style={{ fontSize: 10, color: D.t2, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <div style={{ width: 12, height: 12, borderRadius: '50%', background: avCor(l.resp), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 6, fontWeight: 700, color: 'white' }}>{avInit(l.resp)}</div>
+                            {l.resp?.split(' ')[0]}
                           </div>
-                          <div style={{ fontSize: 11, color: t.textMuted }}>👤 {l.resp}</div>
-                          {alerta120 && (
-                            <div style={{ fontSize: 10, fontWeight: 700, color: '#F59E0B', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 5, padding: '2px 7px', display: 'inline-flex', alignItems: 'center', gap: 3, alignSelf: 'flex-start' }}>
-                              ⚠️ Renovar em {diasVenc}d
+                          {(vl || renovando) && (
+                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 5 }}>
+                              {vl && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: expirado ? D.rf : alerta120 ? D.yf : D.gf, color: expirado ? D.r2 : alerta120 ? D.y2 : D.g2 }}>{vl.label}</span>}
+                              {renovando && <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: D.pf, color: D.p2 }}>🔄 Renov.</span>}
                             </div>
                           )}
-                          {renovando && (
-                            <div style={{ fontSize: 10, fontWeight: 700, color: t.purple, background: t.purpleFaint, border: `1px solid ${t.purple}33`, borderRadius: 5, padding: '2px 7px', display: 'inline-flex', alignItems: 'center', gap: 3, alignSelf: 'flex-start' }}>
-                              🔄 Renovação iniciada
-                            </div>
-                          )}
-                          {vl && <div style={{ fontSize: 11, color: vl.color, fontWeight: 500, marginTop: 2 }}>{vl.label}</div>}
                         </div>
                       )
                     })}
@@ -2016,31 +2123,31 @@ export default function Pipeline() {
           </div>
         </>}
 
-        {/* ══ GO-LIVE ══ */}
+        {/* ══ GO-LIVE ══}
         {aba === 'golive' && <>
 
           {/* NPS — Em breve */}
-          <div style={{ background: `linear-gradient(135deg, ${t.purpleFaint2}, ${t.purpleFaint})`, border: `1px dashed ${t.purple}55`, borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: t.purpleFaint, border: `1px solid ${t.purple}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>📊</div>
+          <div style={{ background: `linear-gradient(135deg, ${D.pf}, ${D.pf})`, border: `1px dashed ${D.p}44`, borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: D.pf, border: `1px solid ${D.p}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>📊</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: t.purple }}>NPS — Pesquisa de Satisfação</div>
-              <div style={{ fontSize: 12, color: t.textMuted, marginTop: 3, lineHeight: 1.5 }}>Envio automático de pesquisas para clientes em Go-Live. Acompanhe o índice de satisfação direto no IAra.</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: D.p2 }}>NPS — Pesquisa de Satisfação</div>
+              <div style={{ fontSize: 12, color: D.t2, marginTop: 3, lineHeight: 1.5 }}>Envio automático de pesquisas para clientes em Go-Live. Acompanhe o índice de satisfação direto no IAra.</div>
             </div>
             <span style={{ background: 'linear-gradient(135deg,#7C3AED,#9333EA)', color: 'white', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>Em breve ✨</span>
           </div>
 
           {renovacoes.length > 0 && (
-            <div style={{ background: `${t.red}0A`, border: `1px solid ${t.red}33`, borderRadius: 12, padding: '14px 16px' }}>
-              <div style={{ fontSize: 12, color: t.red, fontWeight: 700, marginBottom: 10 }}>🔔 RENOVAÇÕES URGENTES ({renovacoes.length})</div>
+            <div style={{ background: D.rf, border: `1px solid ${t.red}33`, borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ fontSize: 12, color: D.r2, fontWeight: 700, marginBottom: 10 }}>🔔 RENOVAÇÕES URGENTES ({renovacoes.length})</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {renovacoes.map(l => {
                   const vl = vencimentoLabel(diasParaVencer(l.vencimento))
                   return (
-                    <div key={l.id} onClick={() => setSelected(l)} style={{ background: t.surfaceInput, border: `1px solid ${vl.color}44`, borderRadius: 8, padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div key={l.id} onClick={() => setSelected(l)} style={{ background: D.bg2, border: `1px solid ${vl.color}44`, borderRadius: 8, padding: '10px 14px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: t.text }}>{l.conta || l.nome}</div>
-                        {l.servico && <div style={{ fontSize: 11, color: t.purple, marginTop: 1 }}>📦 {l.servico}</div>}
-                        <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>👤 {l.resp}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: D.t1 }}>{l.conta || l.nome}</div>
+                        {l.servico && <div style={{ fontSize: 11, color: D.p2, marginTop: 1 }}>📦 {l.servico}</div>}
+                        <div style={{ fontSize: 11, color: D.t2, marginTop: 2 }}>👤 {l.resp}</div>
                       </div>
                       <span style={{ fontSize: 12, color: vl.color, fontWeight: 600, background: `${vl.color}15`, border: `1px solid ${vl.color}44`, borderRadius: 6, padding: '3px 10px', whiteSpace: 'nowrap' }}>{vl.label}</span>
                     </div>
@@ -2051,13 +2158,13 @@ export default function Pipeline() {
           )}
 
           {semData.length > 0 && (
-            <div style={{ background: t.purpleFaint2, border: `1px solid ${t.border}`, borderRadius: 12, padding: '14px 16px' }}>
-              <div style={{ fontSize: 12, color: t.textMuted, fontWeight: 700, marginBottom: 10 }}>📅 SEM DATA DE VENCIMENTO ({semData.length}) — clique para preencher</div>
+            <div style={{ background: D.pf, border: `1px solid ${D.border}`, borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ fontSize: 12, color: D.t2, fontWeight: 700, marginBottom: 10 }}>📅 SEM DATA DE VENCIMENTO ({semData.length}) — clique para preencher</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {semData.map(l => (
-                  <div key={l.id} onClick={() => setSelected(l)} style={{ background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: t.textMuted, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <div key={l.id} onClick={() => setSelected(l)} style={{ background: D.bg2, border: `1px solid ${D.border}`, borderRadius: 8, padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: D.t2, display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <span>{l.conta || l.nome}</span>
-                    {l.servico && <span style={{ fontSize: 10, color: t.textHint }}>📦 {l.servico}</span>}
+                    {l.servico && <span style={{ fontSize: 10, color: D.t3 }}>📦 {l.servico}</span>}
                   </div>
                 ))}
               </div>
@@ -2066,17 +2173,17 @@ export default function Pipeline() {
 
           {goLive.filter(l => l.vencimento && diasParaVencer(l.vencimento) > 90).length > 0 && (
             <div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: t.green, marginBottom: 10 }}>✅ CONTRATOS OK</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: D.g2, marginBottom: 10 }}>✅ CONTRATOS OK</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {goLive.filter(l => l.vencimento && diasParaVencer(l.vencimento) > 90).map(l => {
                   const vl = vencimentoLabel(diasParaVencer(l.vencimento))
                   return (
-                    <div key={l.id} className="golive-card" onClick={() => setSelected(l)} style={{ background: t.surfaceInput, border: `1px solid ${t.green}33`, borderRadius: 12, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: t.green, boxShadow: `0 0 6px ${t.green}`, flexShrink: 0 }} />
+                    <div key={l.id} className="golive-card" onClick={() => setSelected(l)} style={{ background: D.bg2, border: `1px solid ${D.g}33`, borderRadius: 12, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: D.g, boxShadow: 'none', flexShrink: 0 }} />
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>{l.conta || l.nome}</div>
-                        {l.servico && <div style={{ fontSize: 11, color: t.purple, marginTop: 1 }}>📦 {l.servico}</div>}
-                        <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>👤 {l.resp}</div>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: D.t1 }}>{l.conta || l.nome}</div>
+                        {l.servico && <div style={{ fontSize: 11, color: D.p2, marginTop: 1 }}>📦 {l.servico}</div>}
+                        <div style={{ fontSize: 11, color: D.t2, marginTop: 2 }}>👤 {l.resp}</div>
                       </div>
                       <span style={{ fontSize: 11, color: vl.color, fontWeight: 500, whiteSpace: 'nowrap' }}>{vl.label}</span>
                     </div>
@@ -2089,11 +2196,11 @@ export default function Pipeline() {
 
         {/* ══ GELADEIRA ══ */}
         {aba === 'geladeira' && <>
-          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ background: D.bg2, border: `1px solid ${D.border}`, borderRadius: 12, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 20 }}>🧊</span>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: t.textMuted }}>{geladeira.length} oportunidades sem contato há mais de 90 dias</div>
-              <div style={{ fontSize: 11, color: t.textHint, marginTop: 2 }}>Clique para ver o histórico e reativar</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: D.t2 }}>{geladeira.length} oportunidades sem contato há mais de 90 dias</div>
+              <div style={{ fontSize: 11, color: D.t3, marginTop: 2 }}>Clique para ver o histórico e reativar</div>
             </div>
           </div>
           {[
@@ -2105,21 +2212,21 @@ export default function Pipeline() {
             if (items.length === 0) return null
             return (
               <div key={grupo.label}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: t.textMuted, marginBottom: 10 }}>{grupo.label} — {items.length} oportunidades</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: D.t2, marginBottom: 10 }}>{grupo.label} — {items.length} oportunidades</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {items.map(l => (
-                    <div key={l.id} className="gel-card" onClick={() => setSelected(l)} style={{ background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 12, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <div style={{ minWidth: 52, textAlign: 'center', background: t.surface, borderRadius: 8, padding: '6px 4px', border: `1px solid ${t.border}` }}>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: t.textMuted }}>{l.dias}</div>
-                        <div style={{ fontSize: 9, color: t.textHint }}>dias</div>
+                    <div key={l.id} className="gel-card" onClick={() => setSelected(l)} style={{ background: D.bg2, border: `1px solid ${D.border}`, borderRadius: 12, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14 }}>
+                      <div style={{ minWidth: 52, textAlign: 'center', background: D.bg2, borderRadius: 8, padding: '6px 4px', border: `1px solid ${D.border}` }}>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: D.t2 }}>{l.dias}</div>
+                        <div style={{ fontSize: 9, color: D.t3 }}>dias</div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: t.textMuted }}>{l.conta || l.nome}</div>
-                        {l.servico && <div style={{ fontSize: 11, color: t.textHint, marginTop: 1 }}>📦 {l.servico}</div>}
-                        <div style={{ fontSize: 11, color: t.textHint, marginTop: 3 }}>{l.etapa} · 👤 {l.resp}</div>
-                        {l.mov && <div style={{ fontSize: 11, color: t.textHint, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Último: {l.mov.slice(0, 80)}</div>}
+                        <div style={{ fontSize: 14, fontWeight: 600, color: D.t2 }}>{l.conta || l.nome}</div>
+                        {l.servico && <div style={{ fontSize: 11, color: D.t3, marginTop: 1 }}>📦 {l.servico}</div>}
+                        <div style={{ fontSize: 11, color: D.t3, marginTop: 3 }}>{l.etapa} · 👤 {l.resp}</div>
+                        {l.mov && <div style={{ fontSize: 11, color: D.t3, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Último: {l.mov.slice(0, 80)}</div>}
                       </div>
-                      <button onClick={e => { e.stopPropagation(); handleReativar(l) }} style={{ background: t.greenFaint, border: `1px solid ${t.green}33`, borderRadius: 8, color: t.green, padding: '6px 12px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                      <button onClick={e => { e.stopPropagation(); handleReativar(l) }} style={{ background: D.gf, border: `1px solid ${D.g}33`, borderRadius: 8, color: D.g2, padding: '6px 12px', fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: 600 }}>
                         ⚡ Reativar
                       </button>
                     </div>
@@ -2131,7 +2238,6 @@ export default function Pipeline() {
         </>}
       </div>
 
-      {/* ── Modal Nova Oportunidade ── */}
       {showNovaOpp && <NovoLeadWizard t={t} leads={leads} user={user} onSave={handleCriarOpp} onClose={() => setShowNovaOpp(false)} />}
 
       {selected && (
@@ -2148,6 +2254,7 @@ export default function Pipeline() {
           onDeleteAct={handleDeleteAct}
           onDeleteLead={handleDeleteLead} />
       )}
-    </div>
+    </div>{/* main */}
+  </div>{/* shell */}
   )
 }
