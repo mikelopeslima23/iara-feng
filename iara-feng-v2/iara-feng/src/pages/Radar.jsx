@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getLeads, getActivities, saveRadarSnapshot, getRadarSnapshots } from '../lib/supabase'
+import { useState } from 'react'
+import { SidebarDrawer, HamburgerBtn, LogoPill, D } from './Sidebar'
 
 const ETAPA_COLORS = {
   'Prospecção':        '#B5D4F4',
@@ -150,6 +152,7 @@ export default function Radar() {
   const [generating, setGenerating] = useState(false)
   const [snapshots,  setSnapshots]  = useState([])
   const [saving,     setSaving]     = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [editIdx,    setEditIdx]    = useState(null)   // índice em edição
   const [addingRow,  setAddingRow]  = useState(false)  // formulário de novo risco
 
@@ -235,39 +238,37 @@ export default function Radar() {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: '#0D0A14', fontFamily: "'Inter',system-ui,sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: D.bg, fontFamily: "'Inter',system-ui,sans-serif" }}>
 
-      {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', background: '#0A0810', borderBottom: '1px solid #1E1433', flexWrap: 'wrap', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button
-            onClick={() => navigate('/chat')}
-            style={{ background: 'none', border: '1px solid #2D1F45', borderRadius: 6, color: '#6B5A90', padding: '4px 10px', fontSize: 12, cursor: 'pointer' }}>
-            ← Chat
-          </button>
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#F0E8FF' }}>📊 Radar Pipeline Comercial</span>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <SidebarDrawer open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} />
+
+      {/* ── TOPBAR ── */}
+      <div style={{ height: 52, background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 10 }}>
+        <HamburgerBtn open={sidebarOpen} onClick={() => setSidebarOpen(o => !o)} />
+        <LogoPill />
+        <span style={{ fontSize: 14, fontWeight: 700, color: D.t1 }}>Relatórios</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             value={semana}
             onChange={e => setSemana(e.target.value)}
-            style={{ fontSize: 12, padding: '4px 8px', border: '0.5px solid #2D1F45', borderRadius: 6, background: '#130F1E', color: '#F0E8FF', width: 220 }}
+            style={{ fontSize: 11, padding: '4px 10px', border: `1px solid ${D.border}`, borderRadius: 6, background: D.bg3, color: D.t1, width: 200 }}
           />
+
           <button
             onClick={generateResumo}
             disabled={generating}
-            style={{ padding: '6px 14px', background: '#7C3AED', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer', opacity: generating ? 0.6 : 1 }}>
+            style={{ padding: '5px 12px', background: D.p, color: 'white', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer', opacity: generating ? 0.6 : 1 }}>
             {generating ? 'Gerando...' : '✨ Gerar Resumo com IA'}
           </button>
           <button
             onClick={saveSnapshot}
             disabled={saving}
-            style={{ padding: '6px 14px', background: '#1D9E75', color: 'white', border: 'none', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
+            style={{ padding: '5px 12px', background: D.g, color: 'white', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>
             💾 Salvar Snapshot
           </button>
           <button
             onClick={() => window.print()}
-            style={{ padding: '6px 14px', background: '#130F1E', color: '#C084FC', border: '1px solid #2D1F45', borderRadius: 6, fontSize: 12, cursor: 'pointer' }}>
+            style={{ padding: '5px 12px', background: D.bg3, color: D.p2, border: `1px solid ${D.border}`, borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>
             🖨 Imprimir / PDF
           </button>
         </div>
