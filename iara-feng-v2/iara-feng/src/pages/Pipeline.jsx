@@ -1379,10 +1379,11 @@ export default function Pipeline() {
   const [selected,    setSelected]    = useState(null)
   const [filterResp,   setFilterResp]   = useState('Todos')
   const [filterBusca,  setFilterBusca]  = useState('')
-  const [filterEstado, setFilterEstado] = useState(null)  // null | 'atrasados' | 'sem_fup' | 'sem_contato' | 'abandono' | 'hoje'
-  const [focoConta,    setFocoConta]    = useState(null)  // conta em foco (highlight)
+  const [filterEstado, setFilterEstado] = useState(null)
+  const [focoConta,    setFocoConta]    = useState(null)
   const [aba,          setAba]          = useState('pipeline')
   const [showNovaOpp,  setShowNovaOpp]  = useState(false)
+  const [sidebarOpen,  setSidebarOpen]  = useState(false)
 
   function toggleTheme() {
     const next = t.name === 'dark' ? THEMES.light : THEMES.dark
@@ -1760,7 +1761,7 @@ export default function Pipeline() {
   )
 
   return (
-    <div style={{ display: 'flex', height: '100dvh', background: D.bg, fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden' }}>
+    <div style={{ display: 'flex', height: '100dvh', background: D.bg, fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden', position: 'relative' }}>
       <style>{`
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { height: 3px; width: 3px; }
@@ -1776,24 +1777,41 @@ export default function Pipeline() {
         .rp-btn:hover { border-color: ${D.border2} !important; color: ${D.t2} !important; }
         .fp-btn { transition: all 0.15s; }
         .fp-btn:hover { border-color: ${D.border2} !important; color: ${D.t2} !important; }
+        .sb-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 18; backdrop-filter: blur(2px); }
+        .sb-drawer { transition: transform 0.2s ease; }
+        @media (max-width: 768px) {
+          .kanban-col { min-width: calc(85vw) !important; max-width: calc(90vw) !important; }
+          .golive-col { min-width: calc(85vw) !important; max-width: calc(90vw) !important; }
+          .topbar-search { display: none !important; }
+          .topbar-metrics { display: none !important; }
+        }
       `}</style>
 
-      {/* ══ SIDEBAR ══ */}
-      <div style={{ width: 52, background: D.bg2, borderRight: `1px solid ${D.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '14px 0', gap: 2, flexShrink: 0, zIndex: 20 }}>
+      {/* ══ SIDEBAR OVERLAY ══ */}
+      {sidebarOpen && (
+        <div className="sb-overlay" onClick={() => setSidebarOpen(false)} />
+      )}
+      <div className="sb-drawer" style={{
+        position: 'fixed', left: 0, top: 0, bottom: 0, width: 52,
+        background: D.bg2, borderRight: `1px solid ${D.border}`,
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        padding: '14px 0', gap: 2, zIndex: 20,
+        transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+      }}>
         {/* Logo */}
-        <div style={{ width: 32, height: 32, background: D.p, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, flexShrink: 0, cursor: 'pointer' }}>
+        <div style={{ width: 32, height: 32, background: D.p, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14, flexShrink: 0, cursor: 'pointer' }}
+          onClick={() => setSidebarOpen(false)}>
           <span style={{ fontSize: 12, fontWeight: 800, color: 'white', letterSpacing: '-.5px' }}>IA</span>
         </div>
 
-        {/* Nav items */}
         {[
-          { path: '/pipeline', icon: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z', label: 'Pipeline',    active: true  },
+          { path: '/pipeline', icon: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z', label: 'Pipeline',   active: true  },
           { path: '/chat',     icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z', label: 'Chat IAra', active: false },
-          { path: '/contatos', icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75', label: 'Contatos',   active: false },
-          { path: '/radar',    icon: 'M18 20V10M12 20V4M6 20v-6', label: 'Relatórios',  active: false },
+          { path: '/contatos', icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75', label: 'Contatos',  active: false },
+          { path: '/radar',    icon: 'M18 20V10M12 20V4M6 20v-6', label: 'Relatórios', active: false },
         ].map(item => (
           <div key={item.path} className="ni-btn"
-            onClick={() => navigate(item.path)}
+            onClick={() => { navigate(item.path); setSidebarOpen(false) }}
             title={item.label}
             style={{ width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', background: item.active ? D.pf : 'transparent' }}>
             {item.active && <div style={{ position: 'absolute', left: 0, width: 2, height: 18, background: D.p, borderRadius: '0 2px 2px 0', marginLeft: -1 }} />}
@@ -1805,12 +1823,6 @@ export default function Pipeline() {
 
         <div style={{ width: 26, height: 1, background: D.border, margin: '6px 0' }} />
 
-        <div className="ni-btn" title="Conhecimento" onClick={() => navigate('/conhecimento')}
-          style={{ width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={D.t3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/><path d="M12 16v-4"/><path d="M12 8h.01"/>
-          </svg>
-        </div>
         <div className="ni-btn" title="Configurações"
           style={{ width: 38, height: 38, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={D.t3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -1818,7 +1830,6 @@ export default function Pipeline() {
           </svg>
         </div>
 
-        {/* Avatar */}
         <div style={{ marginTop: 'auto', width: 30, height: 30, borderRadius: '50%', background: D.o, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'white', cursor: 'pointer', flexShrink: 0 }}
           onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}
           title={`${user.nome} — sair`}>
@@ -1827,11 +1838,23 @@ export default function Pipeline() {
       </div>
 
       {/* ══ MAIN ══ */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden', width: '100%' }}>
 
         {/* ── TOPBAR ── */}
-        <div style={{ height: 52, background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 20px', gap: 12, flexShrink: 0 }}>
-          <span style={{ fontSize: 15, fontWeight: 700, color: D.t1, letterSpacing: '-.2px' }}>Pipeline</span>
+        <div style={{ height: 52, background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, flexShrink: 0 }}>
+          {/* Hamburger */}
+          <button onClick={() => setSidebarOpen(o => !o)}
+            style={{ width: 34, height: 34, borderRadius: 8, background: sidebarOpen ? D.pf : 'transparent', border: `1px solid ${sidebarOpen ? D.p : D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, gap: 0 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={sidebarOpen ? D.p2 : D.t2} strokeWidth="2" strokeLinecap="round">
+              <path d="M3 12h18M3 6h18M3 18h18"/>
+            </svg>
+          </button>
+
+          {/* Logo + título */}
+          <div style={{ width: 28, height: 28, background: D.p, borderRadius: 7, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: 'white', letterSpacing: '-.5px' }}>IA</span>
+          </div>
+          <span style={{ fontSize: 15, fontWeight: 700, color: D.t1, letterSpacing: '-.2px', flexShrink: 0 }}>Pipeline</span>
 
           {/* Métricas como chips */}
           {[
@@ -1959,13 +1982,13 @@ export default function Pipeline() {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', flex: 1, paddingBottom: 8, WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', flex: 1, paddingBottom: 8, padding: '0 16px 16px', WebkitOverflowScrolling: 'touch', scrollSnapType: 'x mandatory' }}>
             {ETAPAS.filter(e => e !== 'Operação / Go-Live').map(etapa => {
               const cards      = byEtapa[etapa] || []
               const totalValor = valorByEtapa[etapa] || 0
               const ec         = etapaCor[etapa] || { text: D.t2, ct: 'rgba(255,255,255,.08)' }
               return (
-                <div key={etapa} style={{ minWidth: 210, maxWidth: 220, flexShrink: 0 }}>
+                <div key={etapa} className="kanban-col" style={{ minWidth: 280, maxWidth: 300, flexShrink: 0, scrollSnapAlign: 'start' }}>
                   <div style={{ background: D.bg2, border: `1px solid ${D.border}`, borderRadius: '10px 10px 0 0', padding: '10px 12px 8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 10, fontWeight: 700, color: ec.text, textTransform: 'uppercase', letterSpacing: '.06em' }}>{etapa}</span>
@@ -2024,7 +2047,7 @@ export default function Pipeline() {
                           {/* L1: Nome + aging */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
                             <div onClick={e => { e.stopPropagation(); setFocoConta(p => p === (l.conta || l.nome) ? null : (l.conta || l.nome)) }}
-                              style={{ fontSize: 12, fontWeight: 600, color: emAbandono && emFoco ? D.r2 : focoConta && emFoco ? D.p2 : D.t1, lineHeight: 1.3, cursor: 'pointer', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              style={{ fontSize: 13, fontWeight: 600, color: emAbandono && emFoco ? D.r2 : focoConta && emFoco ? D.p2 : D.t1, lineHeight: 1.3, cursor: 'pointer', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {l.conta || l.nome}
                             </div>
                             <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: `${agColor}18`, color: agColor, flexShrink: 0 }}>{agLabel}</span>
@@ -2082,7 +2105,7 @@ export default function Pipeline() {
               )
               if (goLiveVisiveis.length === 0) return null
               return (
-                <div style={{ minWidth: 190, maxWidth: 200, flexShrink: 0 }}>
+                <div className="golive-col" style={{ minWidth: 260, maxWidth: 280, flexShrink: 0, scrollSnapAlign: 'start' }}>
                   <div style={{ background: D.bg2, border: `1px solid ${D.g}44`, borderRadius: '10px 10px 0 0', padding: '10px 12px 8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: 10, fontWeight: 700, color: D.g2, textTransform: 'uppercase', letterSpacing: '.06em' }}>Go-Live</span>
