@@ -666,6 +666,159 @@ function NovoLeadWizard({ t, leads, user, onSave, onClose }) {
   )
 }
 
+
+// ─── RANKING DE PENDÊNCIAS ────────────────────────────────────────────────────
+const TEAM_RANK = ['Mike Lopes','Bruno Braga','Jardel Rocha','Silvio Vázquez','Beni Ertel','Alexandre Sivolella']
+const CATS_RANK = [
+  { id:'semContato',    titulo:'👤 Sem contato cadastrado',   subtitulo:'Árbitro apitou falta — você nem sabe quem ligar!',  cor:'#EF4444',
+    motivacao:(n,nome)=>n===0?`✅ ${nome.split(' ')[0]} tá limpo! Goleiro de ferro.`:n===1?`${nome.split(' ')[0]} tem ${n} card descoberto. Rápido!`:`${nome.split(' ')[0]} tem ${n} cards sem contato. Tá jogando no escuro!` },
+  { id:'semAtividade',  titulo:'📭 Sem próxima atividade',    subtitulo:'Time parado não marca gol. Cadê o próximo passo?',  cor:'#F59E0B',
+    motivacao:(n,nome)=>n===0?`✅ ${nome.split(' ')[0]} tem tudo agendado! Craque!`:n===1?`${nome.split(' ')[0]} tem ${n} card sem atividade. Agenda!`:`${nome.split(' ')[0]} tem ${n} cards parados. O técnico tá olhando...` },
+  { id:'atrasadas',     titulo:'⏰ Atividades atrasadas',     subtitulo:'Perdeu o prazo, perdeu o jogo. Olha o cronômetro!', cor:'#9D5CF6',
+    motivacao:(n,nome)=>n===0?`✅ ${nome.split(' ')[0]} em dia! Lateral disciplinado.`:n===1?`${nome.split(' ')[0]} tem ${n} atividade vencida.`:`${nome.split(' ')[0]} tem ${n} atividades atrasadas. VAR vai pegar!` },
+]
+
+function RankingModal({ leads, acts, contactsMap, onClose }) {
+  const hojeISO = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+  const stats = TEAM_RANK.map(nome => {
+    const fn = nome.split(' ')[0]
+    const ml = leads.filter(l => !l.off && !l.op && l.resp?.includes(fn))
+    let semContato=0, semAtividade=0, atrasadas=0
+    ml.forEach(l => {
+      const ck=(l.conta||l.nome||'').toLowerCase(), nk=(l.nome||'').toLowerCase(), sk=(l.servico||'').toLowerCase()
+      const cc=contactsMap[ck]||[]
+      if(!cc.some(c=>c.tipo==='contato')) semContato++
+      const pend=acts.filter(a=>{
+        if(a.ok)return false; const al=(a.lead||'').toLowerCase()
+        if(nk&&al===nk)return true
+        if(sk)return al.includes(ck)&&al.includes(sk)
+        return al.includes(ck)&&!al.includes(' — ')
+      })
+      if(pend.length===0) semAtividade++
+      if(pend.some(a=>a.dt&&a.dt<hojeISO)) atrasadas++
+    })
+    return { nome, fn, semContato, semAtividade, atrasadas, total:semContato+semAtividade+atrasadas, cards:ml.length }
+  }).filter(s=>s.cards>0)
+
+  const D2={bg:'#0D0B14',bg2:'#13111E',bg3:'#1A1729',border:'#2A2640',p:'#9D5CF6',p2:'#C4A7FF',pf:'rgba(157,92,246,.15)',t1:'#EEEAF8',t2:'#B8B2D4',t3:'#8A84AA',r:'#EF4444',rf:'rgba(239,68,68,.12)',r2:'#FCA5A5',g:'#10B981',y:'#F59E0B'}
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.75)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,padding:16,backdropFilter:'blur(8px)'}} onClick={onClose}>
+      <div style={{background:D2.bg2,border:`1px solid ${D2.border}`,borderRadius:20,width:'100%',maxWidth:580,maxHeight:'88vh',display:'flex',flexDirection:'column',boxShadow:'0 32px 100px rgba(0,0,0,.5)'}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:'20px 24px 16px',borderBottom:`1px solid ${D2.border}`,display:'flex',justifyContent:'space-between',alignItems:'flex-start',flexShrink:0}}>
+          <div>
+            <div style={{fontSize:16,fontWeight:700,color:D2.t1}}>🏆 Ranking de Pendências</div>
+            <div style={{fontSize:11,color:D2.t3,marginTop:3}}>Quem tá jogando mal essa semana? Veja o placar do time comercial.</div>
+          </div>
+          <button onClick={onClose} style={{background:'none',border:'none',color:D2.t3,fontSize:20,cursor:'pointer'}}>✕</button>
+        </div>
+        <div style={{overflowY:'auto',padding:'16px 24px',display:'flex',flexDirection:'column',gap:24}}>
+          {CATS_RANK.map(cat=>{
+            const ranked=[...stats].sort((a,b)=>b[cat.id]-a[cat.id])
+            return(
+              <div key={cat.id}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                  <div style={{flex:1,height:1,background:`${cat.cor}33`}}/>
+                  <span style={{fontSize:11,fontWeight:700,color:cat.cor,letterSpacing:'.05em'}}>{cat.titulo}</span>
+                  <div style={{flex:1,height:1,background:`${cat.cor}33`}}/>
+                </div>
+                <div style={{fontSize:10,color:D2.t3,marginBottom:10,fontStyle:'italic'}}>{cat.subtitulo}</div>
+                <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  {ranked.map((s,idx)=>{
+                    const n=s[cat.id], isWorst=idx===0&&n>0, isClean=n===0
+                    return(
+                      <div key={s.nome} style={{display:'flex',alignItems:'center',gap:10,background:isWorst?`${cat.cor}10`:D2.bg,border:`1px solid ${isWorst?cat.cor+'44':D2.border}`,borderRadius:10,padding:'9px 12px'}}>
+                        <div style={{width:22,flexShrink:0,textAlign:'center',fontSize:14}}>{isClean?'✅':idx===0?'🏴':idx===1?'🥈':idx===2?'🥉':`${idx+1}.`}</div>
+                        <div style={{width:28,height:28,borderRadius:'50%',background:isClean?D2.g:isWorst?cat.cor:'#3D3860',display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:'white',flexShrink:0}}>
+                          {s.nome.split(' ').map(p=>p[0]).join('').slice(0,2)}
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontSize:12,fontWeight:600,color:isClean?'#6EE7B7':isWorst?D2.t1:D2.t2}}>
+                            {s.fn}{isWorst&&<span style={{marginLeft:6,fontSize:9,background:`${cat.cor}22`,color:cat.cor,borderRadius:4,padding:'1px 6px',fontWeight:700}}>PIOR</span>}
+                          </div>
+                          <div style={{fontSize:10,color:D2.t3,marginTop:1}}>{cat.motivacao(n,s.nome)}</div>
+                        </div>
+                        <div style={{fontSize:18,fontWeight:800,color:isClean?D2.g:n>5?cat.cor:D2.t2,flexShrink:0,minWidth:28,textAlign:'right'}}>{n}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+          <div style={{borderTop:`1px solid ${D2.border}`,paddingTop:16}}>
+            <div style={{fontSize:11,fontWeight:700,color:D2.p2,letterSpacing:'.05em',marginBottom:10}}>🏆 PLACAR GERAL</div>
+            <div style={{display:'flex',flexDirection:'column',gap:5}}>
+              {[...stats].sort((a,b)=>b.total-a.total).map((s,idx)=>{
+                const pct=Math.max(0,s.total/(Math.max(...stats.map(x=>x.total))||1)*100)
+                return(
+                  <div key={s.nome} style={{display:'flex',alignItems:'center',gap:10}}>
+                    <div style={{fontSize:11,color:D2.t3,width:16,textAlign:'right',flexShrink:0}}>{idx+1}</div>
+                    <div style={{fontSize:11,color:D2.t2,width:60,flexShrink:0}}>{s.fn}</div>
+                    <div style={{flex:1,height:6,background:'#1A1729',borderRadius:3,overflow:'hidden'}}>
+                      <div style={{width:`${pct}%`,height:'100%',background:s.total===0?D2.g:s.total>10?D2.r:D2.y,borderRadius:3,transition:'width .4s ease'}}/>
+                    </div>
+                    <div style={{fontSize:12,fontWeight:700,color:s.total===0?D2.g:D2.t1,width:24,textAlign:'right',flexShrink:0}}>{s.total}</div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+        <div style={{padding:'14px 24px',borderTop:`1px solid ${D2.border}`,flexShrink:0}}>
+          <button onClick={onClose} style={{width:'100%',background:'#9D5CF6',border:'none',borderRadius:10,color:'white',padding:'11px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+            Entendido! Vou resolver 💪
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── DAILY BRIEFING MODAL ─────────────────────────────────────────────────────
+function DailyBriefingModal({ briefing, onNext, onClose }) {
+  if (!briefing) return null
+  const { alertas, idx } = briefing
+  const alerta = alertas[idx]
+  if (!alerta) return null
+  const isLast = idx === alertas.length - 1
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,padding:20,backdropFilter:'blur(6px)'}}>
+      <div style={{background:'#13111E',border:`1px solid ${alerta.cor}55`,borderRadius:20,width:'100%',maxWidth:420,overflow:'hidden',boxShadow:`0 24px 80px ${alerta.cor}22`}}>
+        <div style={{height:3,background:'#2A2640',display:'flex'}}>
+          {alertas.map((_,i)=>(<div key={i} style={{flex:1,background:i<=idx?alerta.cor:'transparent',margin:'0 1px'}}/>))}
+        </div>
+        <div style={{background:`${alerta.cor}12`,borderBottom:`1px solid ${alerta.cor}33`,padding:'20px 24px 16px',display:'flex',gap:14,alignItems:'flex-start'}}>
+          <div style={{fontSize:36,flexShrink:0,lineHeight:1}}>{alerta.emoji}</div>
+          <div>
+            <div style={{fontSize:14,fontWeight:700,color:'#EEEAF8',lineHeight:1.4}}>{alerta.titulo}</div>
+            <div style={{fontSize:11,color:'#8A84AA',marginTop:4}}>Alerta {idx+1} de {alertas.length}</div>
+          </div>
+        </div>
+        <div style={{padding:'16px 24px'}}>
+          <p style={{fontSize:13,color:'#B8B2D4',lineHeight:1.7,margin:0}}>{alerta.msg}</p>
+          <div style={{marginTop:14,background:'#0D0B14',border:'1px solid #2A2640',borderRadius:10,padding:'10px 14px',maxHeight:120,overflowY:'auto'}}>
+            <div style={{fontSize:10,fontWeight:700,color:'#8A84AA',letterSpacing:'.06em',marginBottom:6}}>CARDS AFETADOS</div>
+            {alerta.leads.slice(0,8).map((nome,i)=>(
+              <div key={i} style={{fontSize:12,color:'#C4A7FF',padding:'2px 0',display:'flex',alignItems:'center',gap:6}}>
+                <span style={{width:5,height:5,borderRadius:'50%',background:alerta.cor,flexShrink:0}}/>
+                {nome}
+              </div>
+            ))}
+            {alerta.leads.length>8&&<div style={{fontSize:11,color:'#8A84AA',marginTop:4}}>+{alerta.leads.length-8} outros</div>}
+          </div>
+        </div>
+        <div style={{padding:'0 24px 20px',display:'flex',gap:8}}>
+          <button onClick={onClose} style={{flex:1,background:'transparent',border:'1px solid #2A2640',borderRadius:10,color:'#8A84AA',padding:'10px',fontSize:12,cursor:'pointer'}}>Ver depois</button>
+          <button onClick={isLast?onClose:onNext} style={{flex:2,background:alerta.cor,border:'none',borderRadius:10,color:'white',padding:'11px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+            {alerta.cta}{!isLast&&<span style={{marginLeft:6,opacity:.8}}>→</span>}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── MODAL PRINCIPAL ─────────────────────────────────────────────────────────
 function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConcluirAct, onDeleteAct, onActivityAdded, onDeleteLead, t }) {
   const user    = JSON.parse(localStorage.getItem('iara_user') || '{}')
@@ -1384,6 +1537,8 @@ export default function Pipeline() {
   const [aba,          setAba]          = useState('pipeline')
   const [showNovaOpp,  setShowNovaOpp]  = useState(false)
   const [sidebarOpen,  setSidebarOpen]  = useState(false)
+  const [briefing,     setBriefing]     = useState(null)
+  const [showRanking,  setShowRanking]  = useState(false)
 
   function toggleTheme() {
     const next = t.name === 'dark' ? THEMES.light : THEMES.dark
@@ -1444,6 +1599,72 @@ export default function Pipeline() {
         return acc
       }, {})
       setContactsMap(map)
+
+      // ── Daily Briefing — uma vez por dia por usuário ─────────────────────────
+      const hoje2 = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+      const briefingKey = `iara_briefing_${hoje2}_${user.id || user.nome}`
+      if (!localStorage.getItem(briefingKey)) {
+        const primeiroNome = user.nome?.split(' ')[0] || 'Parceiro'
+        const meusLeads = lAged.filter(l => !l.off && !l.op && l.resp?.includes(primeiroNome))
+        const hojeISO = hoje2
+
+        const semContato = meusLeads.filter(l => {
+          const cc = map[(l.conta || l.nome || '').toLowerCase()] || []
+          return !cc.some(c => c.tipo === 'contato')
+        })
+        const semAtividade = meusLeads.filter(l => {
+          const nome = (l.nome || '').toLowerCase()
+          const contaK = (l.conta || l.nome || '').toLowerCase()
+          const servK = (l.servico || '').toLowerCase()
+          const pend = a.filter(act => {
+            if (act.ok) return false
+            const al = (act.lead || '').toLowerCase()
+            if (nome && al === nome) return true
+            if (servK) return al.includes(contaK) && al.includes(servK)
+            return al.includes(contaK) && !al.includes(' — ')
+          })
+          return pend.length === 0
+        })
+        const comAtrasadas = meusLeads.filter(l => {
+          const nome = (l.nome || '').toLowerCase()
+          const contaK = (l.conta || l.nome || '').toLowerCase()
+          const servK = (l.servico || '').toLowerCase()
+          return a.some(act => {
+            if (act.ok) return false
+            if (!act.dt || act.dt >= hojeISO) return false
+            const al = (act.lead || '').toLowerCase()
+            if (nome && al === nome) return true
+            if (servK) return al.includes(contaK) && al.includes(servK)
+            return al.includes(contaK) && !al.includes(' — ')
+          })
+        })
+        const alertas = []
+        if (semContato.length > 0) alertas.push({
+          tipo: 'sem_contato',
+          titulo: `${primeiroNome}, ${semContato.length} oportunidade${semContato.length > 1 ? 's' : ''} sem contato! 😬`,
+          msg: `Você tem ${semContato.length} card${semContato.length > 1 ? 's' : ''} sem nenhum contato de pessoa cadastrado. O zagueiro tá dormindo — se você não souber quem ligar, a bola vai pra rede.`,
+          cta: 'Entendido, vou cadastrar! ⚽', cor: '#EF4444', emoji: '🚨',
+          leads: semContato.map(l => l.conta || l.nome),
+        })
+        if (semAtividade.length > 0) alertas.push({
+          tipo: 'sem_atividade',
+          titulo: `${primeiroNome}, ${semAtividade.length} card${semAtividade.length > 1 ? 's' : ''} sem próxima atividade! ⚠️`,
+          msg: `${semAtividade.length} oportunidade${semAtividade.length > 1 ? 's estão' : ' está'} sem nenhuma atividade programada. Atacante sem bola não faz gol — registra o próximo passo!`,
+          cta: 'Ok, vou agendar agora! 📅', cor: '#F59E0B', emoji: '⚡',
+          leads: semAtividade.map(l => l.conta || l.nome),
+        })
+        if (comAtrasadas.length > 0) alertas.push({
+          tipo: 'atrasadas',
+          titulo: `${primeiroNome}, ${comAtrasadas.length} card${comAtrasadas.length > 1 ? 's' : ''} com atividades atrasadas! 🔴`,
+          msg: `Você tem atividades vencidas em ${comAtrasadas.length} oportunidade${comAtrasadas.length > 1 ? 's' : ''}. Se não marcar o gol, o técnico vai chamar outro. Resolve hoje!`,
+          cta: 'Vou resolver agora! 🏃', cor: '#9D5CF6', emoji: '⏰',
+          leads: comAtrasadas.map(l => l.conta || l.nome),
+        })
+        if (alertas.length > 0) {
+          localStorage.setItem(briefingKey, '1')
+          setBriefing({ alertas, idx: 0 })
+        }
+      }
     } catch (e) { console.error(e) }
     setLoading(false)
   }
@@ -1886,6 +2107,38 @@ export default function Pipeline() {
               <div style={{ position: 'absolute', top: 6, right: 6, width: 5, height: 5, borderRadius: '50%', background: D.r, border: `1.5px solid ${D.bg2}` }} />
             </div>
 
+
+            {/* Pendências badge */}
+            {(() => {
+              const meuNome = user.nome?.split(' ')[0] || ''
+              const meusAtivos = leads.filter(l => !l.off && !l.op && l.resp?.includes(meuNome))
+              const hojeISO = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+              let total = 0
+              meusAtivos.forEach(l => {
+                const cc = contactsMap[(l.conta || l.nome || '').toLowerCase()] || []
+                if (!cc.some(c => c.tipo === 'contato')) total++
+                const nomeK = (l.nome || '').toLowerCase()
+                const contaK = (l.conta || l.nome || '').toLowerCase()
+                const servK = (l.servico || '').toLowerCase()
+                const pend = acts.filter(a => {
+                  if (a.ok) return false
+                  const al = (a.lead || '').toLowerCase()
+                  if (nomeK && al === nomeK) return true
+                  if (servK) return al.includes(contaK) && al.includes(servK)
+                  return al.includes(contaK) && !al.includes(' — ')
+                })
+                if (pend.length === 0) total++
+                if (pend.some(a => a.dt && a.dt < hojeISO)) total++
+              })
+              if (total === 0) return null
+              return (
+                <button onClick={() => setShowRanking(true)} title="Ver ranking de pendências"
+                  style={{ height: 32, padding: '0 10px', background: `${D.r}18`, border: `1px solid ${D.r}44`, borderRadius: 8, color: D.r2, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  ⚠ {total} pendências
+                </button>
+              )
+            })()}
+
             {/* Sincronizar (só admin) */}
             {isAdmin && (
               <button onClick={handleSync} disabled={syncing}
@@ -2263,6 +2516,10 @@ export default function Pipeline() {
       </div>
 
       {showNovaOpp && <NovoLeadWizard t={t} leads={leads} user={user} onSave={handleCriarOpp} onClose={() => setShowNovaOpp(false)} />}
+
+      <DailyBriefingModal briefing={briefing} onNext={()=>setBriefing(b=>({...b,idx:b.idx+1}))} onClose={()=>setBriefing(null)} />
+
+      {showRanking && <RankingModal leads={leads} acts={acts} contactsMap={contactsMap} onClose={()=>setShowRanking(false)} />}
 
       {selected && (
         <Modal
