@@ -118,7 +118,7 @@ export default function Login() {
 
   function handleSuccess() {
     localStorage.setItem('iara_user', JSON.stringify(selected))
-    navigate('/chat')
+    navigate('/pipeline')
   }
 
   return (
