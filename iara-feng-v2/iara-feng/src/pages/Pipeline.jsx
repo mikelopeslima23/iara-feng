@@ -1163,12 +1163,28 @@ export default function Pipeline() {
       if (!a.length) a = ACTIVITIES_INITIAL
       // Filtra atividades marcadas como deletadas (soft delete)
       a = a.filter(act => !act.deleted)
-      // Recalcula dias dinamicamente a partir de ultima_atualizacao
+      // Recalcula dias dinamicamente — usa a data mais recente entre:
+      // ultima_atualizacao do lead OU data da atividade mais recente (criado ou dt)
+      // Isso garante que atividades importadas via SQL também atualizam o contador
       const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+
+      // Mapa: nome do lead (lowercase) → data mais recente de atividade
+      const latestActDate = a.reduce((acc, act) => {
+        const key = (act.lead || '').toLowerCase().trim()
+        const dt  = (act.criado || act.dt || '').slice(0, 10)
+        if (dt && (!acc[key] || dt > acc[key])) acc[key] = dt
+        return acc
+      }, {})
+
       l = l.map(lead => {
-        if (lead.ultima_atualizacao) {
-          const ultima = new Date(lead.ultima_atualizacao + 'T00:00:00')
-          const diff = Math.floor((hoje - ultima) / (1000 * 60 * 60 * 24))
+        const key       = (lead.nome || '').toLowerCase().trim()
+        const fromAct   = latestActDate[key] || ''
+        const fromLead  = (lead.ultima_atualizacao || '').slice(0, 10)
+        // Pega a mais recente das duas fontes
+        const effective = fromAct > fromLead ? fromAct : fromLead
+        if (effective) {
+          const ultima = new Date(effective + 'T00:00:00')
+          const diff   = Math.floor((hoje - ultima) / (1000 * 60 * 60 * 24))
           return { ...lead, dias: Math.max(0, diff) }
         }
         return lead
