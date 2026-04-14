@@ -1879,67 +1879,66 @@ export default function Pipeline() {
           </div>
         </div>
 
-        {/* ── SUBNAV ── */}
-        <div style={{ height: 40, background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 20px', gap: 2, flexShrink: 0 }}>
+        {/* ── NAV UNIFICADA: tabs + filtros + responsáveis ── */}
+        <div style={{ background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 20px', gap: 2, flexShrink: 0, height: 40 }}>
+          {/* Tabs */}
           {[
-            { id: 'pipeline',  label: 'Pipeline',  ct: ativos.length,         ctc: D.pf, ctk: D.p2  },
-            { id: 'golive',    label: 'Go-Live',   ct: goLive.length,         ctc: D.gf, ctk: D.g2, warn: renovacoes.length > 0 },
-            { id: 'geladeira', label: 'Geladeira', ct: geladeira.length,      ctc: 'rgba(255,255,255,.06)', ctk: D.t2 },
+            { id: 'pipeline',  label: 'Pipeline',  ct: ativos.length,    ctc: D.pf,                    ctk: D.p2 },
+            { id: 'golive',    label: 'Go-Live',   ct: goLive.length,    ctc: D.gf,                    ctk: D.g2, warn: renovacoes.length > 0 },
+            { id: 'geladeira', label: 'Geladeira', ct: geladeira.length, ctc: 'rgba(255,255,255,.06)', ctk: D.t2 },
           ].map(tab => (
             <button key={tab.id} onClick={() => setAba(tab.id)}
-              style={{ height: 40, padding: '0 13px', background: 'none', border: 'none', borderBottom: aba === tab.id ? `2px solid ${D.p}` : '2px solid transparent', color: aba === tab.id ? D.p2 : D.t3, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontWeight: aba === tab.id ? 600 : 500, transition: 'all .15s' }}>
+              style={{ height: 40, padding: '0 12px', background: 'none', border: 'none', borderBottom: aba === tab.id ? `2px solid ${D.p}` : '2px solid transparent', color: aba === tab.id ? D.p2 : D.t3, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontWeight: aba === tab.id ? 600 : 500, transition: 'all .15s', flexShrink: 0 }}>
               {tab.label}
               {tab.warn && <span style={{ fontSize: 9, color: D.y }}>⚠</span>}
               <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: tab.ctc, color: tab.ctk }}>{tab.ct}</span>
             </button>
           ))}
 
-          {/* Filtros de responsável no lado direito */}
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+          {/* Separador */}
+          {aba === 'pipeline' && <div style={{ width: 1, height: 18, background: D.border, margin: '0 8px', flexShrink: 0 }} />}
+
+          {/* Filtros rápidos — só no pipeline */}
+          {aba === 'pipeline' && [
+            { id: 'hoje',        label: '⚡ Hoje',      ac: D.p, af: D.pf },
+            { id: 'atrasados',   label: '⏰ Atrasadas',  ac: D.r, af: D.rf },
+            { id: 'abandono',    label: '🚨 Abandono',   ac: D.r, af: D.rf },
+            { id: 'sem_fup',     label: '📭 Sem próx.',  ac: D.y, af: D.yf },
+            { id: 'sem_contato', label: '👤 Sem contato',ac: D.y, af: D.yf },
+          ].map(f => {
+            const on = filterEstado === f.id
+            return (
+              <button key={f.id} className="fp-btn" onClick={() => setFilterEstado(on ? null : f.id)}
+                style={{ flexShrink: 0, height: 24, padding: '0 9px', background: on ? f.af : 'transparent', border: `1px solid ${on ? f.ac : D.border}`, borderRadius: 20, fontSize: 10, color: on ? f.ac : D.t3, cursor: 'pointer', fontWeight: on ? 700 : 400 }}>
+                {f.label}{on ? ' ✕' : ''}
+              </button>
+            )
+          })}
+
+          {focoConta && aba === 'pipeline' && (
+            <button onClick={() => setFocoConta(null)}
+              style={{ flexShrink: 0, height: 24, padding: '0 9px', background: D.pf, border: `1px solid ${D.p}`, borderRadius: 20, fontSize: 10, color: D.p2, cursor: 'pointer', fontWeight: 700 }}>
+              🔍 {focoConta} ✕
+            </button>
+          )}
+
+          {(filterEstado || focoConta) && aba === 'pipeline' && (
+            <button onClick={() => { setFilterEstado(null); setFocoConta(null) }}
+              style={{ flexShrink: 0, height: 24, padding: '0 8px', border: `1px solid ${D.border}`, borderRadius: 20, background: 'none', color: D.t3, fontSize: 10, cursor: 'pointer' }}>
+              ✕
+            </button>
+          )}
+
+          {/* Responsáveis — sempre à direita */}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 3, flexShrink: 0 }}>
             {resps.map(r => (
               <button key={r} className="rp-btn" onClick={() => setFilterResp(r)}
-                style={{ height: 26, padding: '0 10px', background: filterResp === r ? D.pf : 'transparent', border: `1px solid ${filterResp === r ? D.p : D.border}`, borderRadius: 20, fontSize: 11, color: filterResp === r ? D.p2 : D.t3, cursor: 'pointer', fontWeight: filterResp === r ? 600 : 400 }}>
+                style={{ height: 24, padding: '0 9px', background: filterResp === r ? D.pf : 'transparent', border: `1px solid ${filterResp === r ? D.p : D.border}`, borderRadius: 20, fontSize: 10, color: filterResp === r ? D.p2 : D.t3, cursor: 'pointer', fontWeight: filterResp === r ? 600 : 400 }}>
                 {r}
               </button>
             ))}
           </div>
         </div>
-
-        {/* ── FILTER BAR ── */}
-        {aba === 'pipeline' && (
-          <div style={{ height: 38, background: D.bg, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 20px', gap: 5, flexShrink: 0, overflowX: 'auto' }}>
-            {[
-              { id: 'hoje',        label: '⚡ Minha lista hoje',   ac: D.p,  af: D.pf  },
-              { id: 'atrasados',   label: '⏰ Com atrasadas',       ac: D.r,  af: D.rf  },
-              { id: 'abandono',    label: '🚨 Em abandono',         ac: D.r,  af: D.rf  },
-              { id: 'sem_fup',     label: '📭 Sem próx. atividade', ac: D.y,  af: D.yf  },
-              { id: 'sem_contato', label: '👤 Sem contato',         ac: D.y,  af: D.yf  },
-            ].map(f => {
-              const on = filterEstado === f.id
-              return (
-                <button key={f.id} className="fp-btn" onClick={() => setFilterEstado(on ? null : f.id)}
-                  style={{ flexShrink: 0, height: 24, padding: '0 10px', background: on ? f.af : 'transparent', border: `1px solid ${on ? f.ac : D.border}`, borderRadius: 20, fontSize: 10, color: on ? f.ac : D.t3, cursor: 'pointer', fontWeight: on ? 700 : 400 }}>
-                  {f.label}{on ? ' ✕' : ''}
-                </button>
-              )
-            })}
-            {focoConta && (
-              <button onClick={() => setFocoConta(null)}
-                style={{ flexShrink: 0, height: 24, padding: '0 10px', background: D.pf, border: `1px solid ${D.p}`, borderRadius: 20, fontSize: 10, color: D.p2, cursor: 'pointer', fontWeight: 700 }}>
-                🔍 {focoConta} ✕
-              </button>
-            )}
-            {(filterEstado || focoConta) && (
-              <button onClick={() => { setFilterEstado(null); setFocoConta(null) }}
-                style={{ flexShrink: 0, height: 24, padding: '0 10px', border: `1px solid ${D.border}`, borderRadius: 20, background: 'none', color: D.t3, fontSize: 10, cursor: 'pointer' }}>
-                Limpar
-              </button>
-            )}
-            <span style={{ marginLeft: 'auto', fontSize: 10, color: D.t3, flexShrink: 0 }}>
-              {ativosFiltrados.length} cards
-            </span>
-          </div>
-        )}
 
       <div style={{ flex: 1, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 16, overflow: 'hidden' }}>
 
@@ -2007,8 +2006,10 @@ export default function Pipeline() {
                       const emFoco     = focoConta ? (l.conta || l.nome) === focoConta : true
                       const dimmed     = focoConta && !emFoco
                       const agDias     = l.dias || 0
-                      const agColor    = agDias <= 3 ? D.g : agDias <= 7 ? D.y2 : agDias <= 30 ? D.o : D.r
-                      const agLabel    = agDias <= 3 ? 'Hot' : agDias <= 7 ? 'Morno' : agDias <= 30 ? 'Frio' : `${agDias}d`
+                      const agColor    = agDias <= 3 ? D.g : agDias <= 7 ? D.y : agDias <= 30 ? D.o : D.r
+                      const agLabel    = agDias <= 3 ? 'Ativo' : agDias <= 7 ? 'Atenção' : agDias <= 30 ? 'Frio' : 'Crítico'
+                      const cc         = contactsMap[(l.conta || l.nome || '').toLowerCase()] || []
+                      const atrasadas  = pendLead.filter(a => a.dt && a.dt < hojeISO)
                       const cc         = contactsMap[(l.conta || l.nome || '').toLowerCase()] || []
                       const atrasadas  = pendLead.filter(a => a.dt && a.dt < hojeISO)
 
@@ -2022,43 +2023,51 @@ export default function Pipeline() {
                             borderRadius: '0 8px 8px 0', padding: '10px 11px', cursor: 'pointer',
                             opacity: dimmed ? 0.2 : 1, transition: 'opacity .2s, border-color .15s',
                           }}>
+                          {/* L1: Nome + aging */}
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div onClick={e => { e.stopPropagation(); setFocoConta(p => p === (l.conta || l.nome) ? null : (l.conta || l.nome)) }}
-                                style={{ fontSize: 12, fontWeight: 600, color: emAbandono && emFoco ? D.r2 : focoConta && emFoco ? D.p2 : D.t1, lineHeight: 1.3, cursor: 'pointer' }}>
-                                {l.conta || l.nome}
-                              </div>
-                              {l.servico && <div style={{ fontSize: 10, color: D.p, marginTop: 2 }}>{l.servico}</div>}
+                            <div onClick={e => { e.stopPropagation(); setFocoConta(p => p === (l.conta || l.nome) ? null : (l.conta || l.nome)) }}
+                              style={{ fontSize: 12, fontWeight: 600, color: emAbandono && emFoco ? D.r2 : focoConta && emFoco ? D.p2 : D.t1, lineHeight: 1.3, cursor: 'pointer', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {l.conta || l.nome}
                             </div>
-                            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 5px', borderRadius: 4, background: `${agColor}18`, color: agColor, flexShrink: 0 }}>{agLabel}</span>
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: `${agColor}18`, color: agColor, flexShrink: 0 }}>{agLabel}</span>
                           </div>
-                          <div style={{ fontSize: 10, color: D.t2, marginTop: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
-                            <div style={{ width: 14, height: 14, borderRadius: '50%', background: avCor(l.resp), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 6, fontWeight: 700, color: 'white', flexShrink: 0 }}>{avInit(l.resp)}</div>
+
+                          {/* L2: Serviço */}
+                          {l.servico && <div style={{ fontSize: 10, color: D.p, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.servico}</div>}
+
+                          {/* L3: Resp · dias · health · extras */}
+                          <div style={{ fontSize: 10, color: D.t2, marginTop: 5, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <div style={{ width: 14, height: 14, borderRadius: '50%', background: avCor(l.resp), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 6, fontWeight: 700, color: 'white', flexShrink: 0 }}>
+                              {avInit(l.resp)}
+                            </div>
                             <span>{l.resp?.split(' ')[0]}</span>
-                            <span style={{ color: D.t3 }}>·</span>
+                            <span style={{ color: D.border2 }}>·</span>
                             <span style={{ color: emAbandono && emFoco ? D.r2 : agDias > 7 ? D.y : D.t3 }}>{agDias}d</span>
-                            <span style={{ color: D.t3 }}>·</span>
+                            <span style={{ color: D.border2 }}>·</span>
                             <span style={{ color: hs >= 70 ? D.g : hs >= 40 ? D.y : D.r, fontWeight: 600 }}>❤ {hs}</span>
+                            {contaOps > 1 && <><span style={{ color: D.border2 }}>·</span><span style={{ color: D.b }}>{contaOps}op</span></>}
+                            {l.g12 && <span style={{ color: D.y, marginLeft: 2 }}>⭐</span>}
                           </div>
+
+                          {/* L4: Máx 2 tags — prioridade: abandono > atrasadas > sem próx > sem contato */}
                           {(() => {
                             const tags = []
-                            if (atrasadas.length > 0) tags.push({ label: `⏰ ${atrasadas.length} atrasada${atrasadas.length > 1 ? 's' : ''}`, c: D.r2, bg: D.rf })
-                            else if (pendLead.length === 0) tags.push({ label: '⚡ Sem próx.', c: D.p2, bg: D.pf })
+                            if (emAbandono && emFoco)       tags.push({ label: `🚨 ${agDias}d sem FUP`, c: D.r2, bg: D.rf })
+                            else if (atrasadas.length > 0)  tags.push({ label: `⏰ ${atrasadas.length} atrasada${atrasadas.length > 1 ? 's' : ''}`, c: D.r2, bg: D.rf })
+                            else if (pendLead.length === 0)  tags.push({ label: '⚡ Sem próx.', c: D.p2, bg: D.pf })
                             if (!cc.some(c => c.tipo === 'contato')) tags.push({ label: '👤 Sem contato', c: D.y2, bg: D.yf })
-                            if (emAbandono && emFoco) tags.push({ label: `🚨 ${agDias}d sem FUP`, c: D.r2, bg: D.rf })
-                            if (contaOps > 1) tags.push({ label: `${contaOps} op.`, c: D.b, bg: D.bf })
-                            if (l.g12) tags.push({ label: '⭐ G12', c: D.y2, bg: D.yf })
                             if (!tags.length) return null
                             return (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 6 }}>
-                                {tags.map((tg, i) => (
+                              <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                                {tags.slice(0, 2).map((tg, i) => (
                                   <span key={i} style={{ fontSize: 9, fontWeight: 600, padding: '2px 6px', borderRadius: 4, background: tg.bg, color: tg.c }}>{tg.label}</span>
                                 ))}
                               </div>
                             )
                           })()}
-                          {l.paralelo && <ParaleloBadges paralelo={l.paralelo} />}
-                          {l.prox && <div style={{ fontSize: 10, color: D.t3, borderTop: `1px solid ${D.border}`, paddingTop: 5, marginTop: 4 }}>→ {l.prox}</div>}
+
+                          {/* L5: Próx ação */}
+                          {l.prox && <div style={{ fontSize: 10, color: D.t3, borderTop: `1px solid ${D.border}`, paddingTop: 5, marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>→ {l.prox}</div>}
                         </div>
                       )
                     })}
