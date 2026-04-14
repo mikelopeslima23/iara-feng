@@ -15,6 +15,7 @@ const PARALELO_OPTIONS = [
   { label: 'Negociação',  color: '#FF6B1A' },
   { label: 'Jurídico',    color: '#3B82F6' },
   { label: 'Go-Live',     color: '#10B981' },
+  { label: 'Renovação',   color: '#F59E0B' },
 ]
 
 const DOC_TIPOS = [
@@ -681,11 +682,25 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
   const [editDoc,       setEditDoc]       = useState(null)
 
   const contaKey = (lead.conta || lead.nome || '').toLowerCase()
+  const nomeKey  = (lead.nome || '').toLowerCase()   // "Flamengo — ST Completo"
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
 
-  // ── Timeline ────────────────────────────────────────────────────────────────
+  // ── Timeline — filtra por oportunidade específica (nome completo) ─────────
+  // Prioridade: match pelo nome completo da oportunidade
+  // Fallback: match só pela conta (para atividades antigas sem serviço no lead)
   const allActs = acts
-    .filter(a => a.lead?.toLowerCase().includes(contaKey))
+    .filter(a => {
+      const actLead = (a.lead || '').toLowerCase()
+      // Se a atividade tem o nome completo da oportunidade → match exato
+      if (nomeKey && actLead === nomeKey) return true
+      // Se o card tem serviço definido, só inclui atividades que referenciam este serviço específico
+      if (lead.servico) {
+        const servKey = lead.servico.toLowerCase()
+        return actLead.includes(contaKey) && actLead.includes(servKey)
+      }
+      // Card sem serviço (prospecção): inclui atividades genéricas da conta
+      return actLead.includes(contaKey) && !actLead.includes(' — ')
+    })
     .sort((a, b) => {
       if (!a.ok && b.ok)  return -1
       if (a.ok  && !b.ok) return  1
@@ -1190,20 +1205,32 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
               Dados estruturais do card. Para registrar movimentos e atividades, use a aba <strong>+ Atividade</strong>.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>CONTA</div>
-                  <input value={form.conta || ''} onChange={e => set('conta', e.target.value)}
-                    style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
+              <div>
+                <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>CONTA</div>
+                <input value={form.conta || ''} onChange={e => set('conta', e.target.value)}
+                  style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>SERVIÇO</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 6 }}>
+                  {SERVICOS_FENG.map(s => {
+                    const ativo = form.servico === s
+                    return (
+                      <button key={s} onClick={() => {
+                        set('servico', ativo ? '' : s)
+                        const c = form.conta || lead.conta || ''
+                        set('nome', c && !ativo && s ? `${c} — ${s}` : c)
+                      }}
+                        style={{ padding: '4px 11px', borderRadius: 7, border: `1px solid ${ativo ? t.purple : t.border}`, background: ativo ? t.purpleFaint : t.surfaceInput, color: ativo ? t.purple : t.textMuted, fontSize: 11, fontWeight: ativo ? 700 : 400, cursor: 'pointer' }}>
+                        {ativo ? '✓ ' : ''}{s}
+                      </button>
+                    )
+                  })}
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>SERVIÇO</div>
-                  <input value={form.servico || ''} onChange={e => {
-                    set('servico', e.target.value)
-                    const c = form.conta || lead.conta || ''
-                    if (c && e.target.value) set('nome', `${c} — ${e.target.value}`)
-                  }} style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.purple}55`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }} />
-                </div>
+                <input value={SERVICOS_FENG.includes(form.servico) ? '' : (form.servico || '')}
+                  onChange={e => { set('servico', e.target.value); const c = form.conta || lead.conta || ''; set('nome', c && e.target.value ? `${c} — ${e.target.value}` : c) }}
+                  placeholder="Ou digite um serviço personalizado..."
+                  style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 12px', color: t.text, fontSize: 12, outline: 'none' }} />
               </div>
               {!lead.op && (
                 <div>
@@ -1762,7 +1789,16 @@ export default function Pipeline() {
                     {cards.length === 0 && <div style={{ textAlign: 'center', color: t.border, fontSize: 12, padding: '20px 0' }}>vazio</div>}
                     {cards.map(l => {
                       const { label: agLabel, color: agColor } = agingLabel(l.dias || 0)
-                      const pendLead = acts.filter(a => a.lead?.toLowerCase().includes((l.conta || l.nome || '').toLowerCase()) && !a.ok)
+                      const nomeL  = (l.nome  || '').toLowerCase()
+                      const contaL = (l.conta || l.nome || '').toLowerCase()
+                      const servL  = (l.servico || '').toLowerCase()
+                      const pendLead = acts.filter(a => {
+                        if (a.ok) return false
+                        const actLead = (a.lead || '').toLowerCase()
+                        if (nomeL && actLead === nomeL) return true
+                        if (servL) return actLead.includes(contaL) && actLead.includes(servL)
+                        return actLead.includes(contaL) && !actLead.includes(' — ')
+                      })
                       const contaOps = contasAtivas[l.conta || l.nome] || 1
                       const hs       = healthScore(l, acts, contactsMap)
                       const hsInfo   = healthLabel(hs)
@@ -1822,6 +1858,57 @@ export default function Pipeline() {
                 </div>
               )
             })}
+
+            {/* ── Coluna GO-LIVE inline no kanban ── */}
+            {(() => {
+              const goLiveVisiveis = goLive.filter(l =>
+                (filterResp === 'Todos' || l.resp?.includes(filterResp)) &&
+                (!busca || (l.conta || l.nome || '').toLowerCase().includes(busca) || (l.servico || '').toLowerCase().includes(busca))
+              )
+              if (goLiveVisiveis.length === 0) return null
+              return (
+                <div style={{ minWidth: 240, maxWidth: 260, flexShrink: 0 }}>
+                  <div style={{ background: t.surface, border: `1px solid ${t.green}55`, borderRadius: '12px 12px 0 0', padding: '10px 14px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: t.green, textTransform: 'uppercase', letterSpacing: '0.05em' }}>🏭 Go-Live</span>
+                      <span style={{ background: `${t.green}18`, borderRadius: 20, padding: '1px 8px', fontSize: 11, color: t.green, fontWeight: 600 }}>{goLiveVisiveis.length}</span>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: t.bgAlt, border: `1px solid ${t.green}33`, borderTop: 'none', borderRadius: '0 0 12px 12px', padding: 10, minHeight: 80 }}>
+                    {goLiveVisiveis.map(l => {
+                      const diasVenc  = diasParaVencer(l.vencimento)
+                      const vl        = vencimentoLabel(diasVenc)
+                      const alerta120 = diasVenc !== null && diasVenc <= 120 && diasVenc > 0
+                      const renovando = (l.paralelo || '').toLowerCase().includes('renovação') || (l.risco || '').toLowerCase().includes('renov')
+                      return (
+                        <div key={l.id} className="golive-card" onClick={() => setSelected(l)}
+                          style={{ background: t.surfaceInput, border: `1px solid ${alerta120 ? '#F59E0B55' : t.green + '33'}`, borderLeft: alerta120 ? '4px solid #F59E0B' : `4px solid ${t.green}`, borderRadius: '0 10px 10px 0', padding: '10px 13px', cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: t.text, lineHeight: 1.3 }}>{l.conta || l.nome}</div>
+                              {l.servico && <div style={{ fontSize: 11, color: t.green, marginTop: 1 }}>📦 {l.servico}</div>}
+                            </div>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%', background: t.green, boxShadow: `0 0 6px ${t.green}`, flexShrink: 0, marginTop: 4 }} />
+                          </div>
+                          <div style={{ fontSize: 11, color: t.textMuted }}>👤 {l.resp}</div>
+                          {alerta120 && (
+                            <div style={{ fontSize: 10, fontWeight: 700, color: '#F59E0B', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 5, padding: '2px 7px', display: 'inline-flex', alignItems: 'center', gap: 3, alignSelf: 'flex-start' }}>
+                              ⚠️ Renovar em {diasVenc}d
+                            </div>
+                          )}
+                          {renovando && (
+                            <div style={{ fontSize: 10, fontWeight: 700, color: t.purple, background: t.purpleFaint, border: `1px solid ${t.purple}33`, borderRadius: 5, padding: '2px 7px', display: 'inline-flex', alignItems: 'center', gap: 3, alignSelf: 'flex-start' }}>
+                              🔄 Renovação iniciada
+                            </div>
+                          )}
+                          {vl && <div style={{ fontSize: 11, color: vl.color, fontWeight: 500, marginTop: 2 }}>{vl.label}</div>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         </>}
 
