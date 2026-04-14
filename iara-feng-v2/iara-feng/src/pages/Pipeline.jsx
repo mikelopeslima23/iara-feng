@@ -1876,12 +1876,6 @@ export default function Pipeline() {
               style={{ height: 32, padding: '0 14px', background: D.p, border: 'none', borderRadius: 8, color: 'white', fontSize: 12, cursor: 'pointer', fontWeight: 600, letterSpacing: '-.1px' }}>
               + Novo Lead
             </button>
-
-            {/* Toggle tema */}
-            <button onClick={() => { const next = t.name === 'dark' ? THEMES.light : THEMES.dark; saveTheme(next.name); window.location.reload() }}
-              style={{ width: 32, height: 32, borderRadius: 8, background: D.bg3, border: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, color: D.t2 }}>
-              {t.name === 'dark' ? '☀️' : '🌙'}
-            </button>
           </div>
         </div>
 
@@ -2123,21 +2117,21 @@ export default function Pipeline() {
           </div>
         </>}
 
-        {/* ══ GO-LIVE ══}
+        {/* ══ GO-LIVE ══ */}
         {aba === 'golive' && <>
 
           {/* NPS — Em breve */}
-          <div style={{ background: `linear-gradient(135deg, ${D.pf}, ${D.pf})`, border: `1px dashed ${D.p}44`, borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ background: `${D.pf}`, border: `1px dashed ${D.p}44`, borderRadius: 14, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 44, height: 44, borderRadius: 12, background: D.pf, border: `1px solid ${D.p}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>📊</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: D.p2 }}>NPS — Pesquisa de Satisfação</div>
               <div style={{ fontSize: 12, color: D.t2, marginTop: 3, lineHeight: 1.5 }}>Envio automático de pesquisas para clientes em Go-Live. Acompanhe o índice de satisfação direto no IAra.</div>
             </div>
-            <span style={{ background: 'linear-gradient(135deg,#7C3AED,#9333EA)', color: 'white', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>Em breve ✨</span>
+            <span style={{ background: D.p, color: 'white', borderRadius: 20, padding: '4px 12px', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>Em breve ✨</span>
           </div>
 
           {renovacoes.length > 0 && (
-            <div style={{ background: D.rf, border: `1px solid ${t.red}33`, borderRadius: 12, padding: '14px 16px' }}>
+            <div style={{ background: D.rf, border: `1px solid ${D.r}33`, borderRadius: 12, padding: '14px 16px' }}>
               <div style={{ fontSize: 12, color: D.r2, fontWeight: 700, marginBottom: 10 }}>🔔 RENOVAÇÕES URGENTES ({renovacoes.length})</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {renovacoes.map(l => {
