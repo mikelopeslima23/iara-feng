@@ -296,9 +296,12 @@ function NovaOppModal({ t, leads, user, onSave, onClose }) {
   // Lista de contas únicas já existentes no pipeline
   const contasExistentes = [...new Set(leads.map(l => l.conta || l.nome).filter(Boolean))].sort()
 
-  // Sugestões filtradas pelo que está digitando
-  const sugestoes = contaInput.trim().length >= 2
-    ? contasExistentes.filter(c => c.toLowerCase().includes(contaInput.toLowerCase())).slice(0, 6)
+  // Sugestões: mostra todas ao focar (campo vazio), filtra ao digitar
+  const sugestoes = showSuggestions
+    ? (contaInput.trim().length === 0
+        ? contasExistentes.slice(0, 10)   // top 10 ao abrir
+        : contasExistentes.filter(c => c.toLowerCase().includes(contaInput.toLowerCase())).slice(0, 8)
+      )
     : []
 
   function selecionarConta(conta) {
@@ -350,7 +353,7 @@ function NovaOppModal({ t, leads, user, onSave, onClose }) {
                 }}
                 onFocus={() => setShowSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                placeholder="Ex: Flamengo"
+                placeholder="Clique para ver contas existentes..."
                 autoFocus
                 style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${form.conta ? t.purple + '55' : t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}
               />
@@ -370,8 +373,8 @@ function NovaOppModal({ t, leads, user, onSave, onClose }) {
                     )
                   })}
                   <div onMouseDown={() => { setShowSuggestions(false) }}
-                    style={{ padding: '7px 12px', fontSize: 12, color: t.textHint, fontStyle: 'italic', cursor: 'default' }}>
-                    + Nova conta: {contaInput}
+                    style={{ padding: '7px 12px', fontSize: 11, color: t.textHint, borderTop: `1px solid ${t.borderLight}`, cursor: 'default' }}>
+                    {contaInput ? `+ Criar nova conta: "${contaInput}"` : `${contasExistentes.length} contas no pipeline — digite para filtrar`}
                   </div>
                 </div>
               )}
