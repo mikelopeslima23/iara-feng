@@ -10,21 +10,22 @@ import Contatos from './pages/Contatos'
 
 function ProtectedRoute({ children }) {
   const user = localStorage.getItem('iara_user')
-  return user ? children : <Navigate to="/login" />
+  return user ? children : <Navigate to="/login" replace />
 }
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-        <Route path="/radar" element={<ProtectedRoute><Radar /></ProtectedRoute>} />
-        <Route path="/pipeline" element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
+        <Route path="/login"        element={<Login />} />
+        <Route path="/chat"         element={<ProtectedRoute><Chat /></ProtectedRoute>} />
+        <Route path="/radar"        element={<ProtectedRoute><Radar /></ProtectedRoute>} />
+        <Route path="/pipeline"     element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
         <Route path="/conhecimento" element={<ProtectedRoute><Conhecimento /></ProtectedRoute>} />
-        <Route path="/contatos" element={<ProtectedRoute><Contatos /></ProtectedRoute>} />
-        <Route path="/" element={<Navigate to="/pipeline" replace />} />
-        <Route path="*" element={<Navigate to="/pipeline" replace />} />
+        <Route path="/contatos"     element={<ProtectedRoute><Contatos /></ProtectedRoute>} />
+        <Route path="/"             element={<Navigate to="/pipeline" replace />} />
+        {/* Só redireciona rotas realmente desconhecidas */}
+        <Route path="*"             element={<Navigate to="/pipeline" replace />} />
       </Routes>
     </BrowserRouter>
   )
