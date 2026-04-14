@@ -283,6 +283,131 @@ function ContactModalInline({ contact, defaultConta, defaultLeadId, t, onSave, o
   )
 }
 
+// ─── NOVA OPORTUNIDADE MODAL ──────────────────────────────────────────────────
+function NovaOppModal({ t, leads, user, onSave, onClose }) {
+  const norm = s => (s || '').toLowerCase().trim()
+  const [form, setForm] = useState({
+    conta: '', servico: '', etapa: 'Prospecção', resp: user.nome || '', mov: '',
+  })
+  function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
+
+  // Detecta duplicata em tempo real enquanto digita
+  const duplicata = form.conta.trim() && form.servico.trim() && leads.find(l =>
+    norm(l.conta) === norm(form.conta) && norm(l.servico) === norm(form.servico)
+  )
+  const valido = form.conta.trim() && form.servico.trim() && !duplicata
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 200, padding: 16, backdropFilter: 'blur(4px)' }} onClick={onClose}>
+      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 18, width: '100%', maxWidth: 480, boxShadow: '0 24px 64px rgba(0,0,0,0.25)' }} onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding: '20px 24px 16px', borderBottom: `1px solid ${t.borderLight}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: t.text }}>➕ Nova Oportunidade</div>
+              <div style={{ fontSize: 11, color: t.textMuted, marginTop: 2 }}>Preencha os dados para criar o card no pipeline</div>
+            </div>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: t.textMuted, fontSize: 20, cursor: 'pointer' }}>✕</button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+          {/* Conta + Serviço */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>CONTA *</div>
+              <input
+                value={form.conta}
+                onChange={e => set('conta', e.target.value)}
+                placeholder="Ex: Flamengo"
+                autoFocus
+                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>SERVIÇO *</div>
+              <input
+                value={form.servico}
+                onChange={e => set('servico', e.target.value)}
+                placeholder="Ex: Sócio Torcedor"
+                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}
+              />
+            </div>
+          </div>
+
+          {/* Alerta de duplicata */}
+          {duplicata && (
+            <div style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#EF4444', display: 'flex', alignItems: 'center', gap: 6 }}>
+              ⚠️ Já existe: <strong>{duplicata.nome}</strong> — etapa {duplicata.etapa}
+            </div>
+          )}
+
+          {/* Preview do nome */}
+          {form.conta && form.servico && !duplicata && (
+            <div style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}22`, borderRadius: 8, padding: '7px 12px', fontSize: 12, color: t.purple, fontWeight: 500 }}>
+              📋 {form.conta} — {form.servico}
+            </div>
+          )}
+
+          {/* Etapa + Responsável */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>ETAPA INICIAL</div>
+              <select
+                value={form.etapa}
+                onChange={e => set('etapa', e.target.value)}
+                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}>
+                {ETAPAS.filter(e => e !== 'Operação / Go-Live').map(e => (
+                  <option key={e} value={e}>{e}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>RESPONSÁVEL</div>
+              <select
+                value={form.resp}
+                onChange={e => set('resp', e.target.value)}
+                style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none' }}>
+                {['Mike Lopes', 'Bruno Braga', 'Jardel Rocha', 'Silvio Vázquez', 'Beni Ertel', 'Alexandre Sivolella'].map(n => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Primeiro movimento — opcional */}
+          <div>
+            <div style={{ fontSize: 11, color: t.textMuted, fontWeight: 700, marginBottom: 5, letterSpacing: '0.05em' }}>CONTEXTO INICIAL <span style={{ fontWeight: 400, color: t.textHint }}>(opcional)</span></div>
+            <textarea
+              value={form.mov}
+              onChange={e => set('mov', e.target.value)}
+              rows={2}
+              placeholder="Como esse lead chegou, o que já foi conversado..."
+              style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.5 }}
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '14px 24px', borderTop: `1px solid ${t.borderLight}`, display: 'flex', gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, background: 'none', border: `1px solid ${t.border}`, borderRadius: 10, color: t.textMuted, padding: '11px', fontSize: 14, cursor: 'pointer' }}>
+            Cancelar
+          </button>
+          <button
+            onClick={() => valido && onSave(form)}
+            disabled={!valido}
+            style={{ flex: 2, background: valido ? 'linear-gradient(135deg,#7C3AED,#9333EA)' : t.surface, border: 'none', borderRadius: 10, color: valido ? 'white' : t.textMuted, padding: '11px', fontSize: 14, fontWeight: 600, cursor: valido ? 'pointer' : 'not-allowed', boxShadow: valido ? '0 4px 14px rgba(124,58,237,0.3)' : 'none' }}>
+            Criar Oportunidade
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── MODAL PRINCIPAL ─────────────────────────────────────────────────────────
 function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConcluirAct, onDeleteAct, onActivityAdded, t }) {
   const user    = JSON.parse(localStorage.getItem('iara_user') || '{}')
@@ -418,12 +543,21 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
         tipo:      novaAtv.tipo,
       }
       await upsertActivity(nA)
-      // Atualiza ultima_atualizacao do lead com fuso SP — zera dias
-      const leadAtualizado = { ...lead, ultima_atualizacao: hojeLocal, dias: 0 }
+
+      // Monta as atualizações do lead
+      let leadAtualizado = { ...lead, ultima_atualizacao: hojeLocal, dias: 0 }
+
+      // Opcional: avanço de etapa
+      if (novaAtv.novaEtapa && novaAtv.novaEtapa !== lead.etapa) {
+        leadAtualizado = { ...leadAtualizado, etapa: novaAtv.novaEtapa }
+      }
+      // Opcional: atualizar último movimento
+      if (novaAtv.atualizarMov && novaAtv.movTexto?.trim()) {
+        leadAtualizado = { ...leadAtualizado, mov: novaAtv.movTexto.trim() }
+      }
+
       await upsertLead(leadAtualizado)
-      // Avisa o pai: nova atividade foi criada (aparece na timeline imediatamente)
       onActivityAdded && onActivityAdded(nA)
-      // Atualiza o lead no estado do pai sem duplo-salvar
       onLeadUpdate(leadAtualizado)
     } catch (e) {
       console.error('Erro ao salvar atividade:', e)
@@ -698,7 +832,7 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
                 <textarea
                   value={novaAtv.descricao}
                   onChange={e => setAtv('descricao', e.target.value)}
-                  rows={3}
+                  rows={2}
                   placeholder="Ex: Fazer FUP com o Maurício para confirmar reunião..."
                   style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${novaAtv.descricao ? t.purple + '66' : t.border}`, borderRadius: 8, padding: '10px 12px', color: t.text, fontSize: 13, outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.5 }}
                 />
@@ -728,17 +862,63 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
                 </div>
               </div>
 
-              {/* Preview */}
-              {novaAtv.descricao && (
-                <div style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}22`, borderRadius: 8, padding: '10px 12px' }}>
-                  <div style={{ fontSize: 10, color: t.purple, fontWeight: 700, marginBottom: 4, letterSpacing: '0.05em' }}>PRÉVIA</div>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: tipoColor(novaAtv.tipo), background: `${tipoColor(novaAtv.tipo)}15`, border: `1px solid ${tipoColor(novaAtv.tipo)}33`, borderRadius: 4, padding: '1px 6px' }}>{novaAtv.tipo}</span>
-                    <span style={{ fontSize: 11, color: t.textMuted }}>📅 {formatDate(novaAtv.dt)} · 👤 {novaAtv.resp.split(' ')[0]}</span>
+              {/* Avanço de etapa — opcional */}
+              <div style={{ background: t.bg, border: `1px solid ${novaAtv.novaEtapa ? t.purple + '55' : t.border}`, borderRadius: 10, padding: '10px 14px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!novaAtv.novaEtapa}
+                    onChange={e => setAtv('novaEtapa', e.target.checked ? (lead.etapa || ETAPAS[0]) : '')}
+                    style={{ width: 16, height: 16, accentColor: t.purple, cursor: 'pointer', flexShrink: 0 }}
+                  />
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: novaAtv.novaEtapa ? t.purple : t.text }}>
+                      ⬆️ Esta atividade avança a etapa
+                    </div>
+                    <div style={{ fontSize: 11, color: t.textMuted, marginTop: 1 }}>
+                      Atual: <strong>{lead.etapa}</strong>
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: t.text }}>{novaAtv.descricao}</div>
-                </div>
-              )}
+                </label>
+                {novaAtv.novaEtapa && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 11, color: t.purple, fontWeight: 700, marginBottom: 6, letterSpacing: '0.04em' }}>NOVA ETAPA</div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                      {ETAPAS.filter(e => e !== lead.etapa && e !== 'Operação / Go-Live').map(e => (
+                        <button key={e} onClick={() => setAtv('novaEtapa', e)}
+                          style={{ padding: '5px 12px', borderRadius: 7, border: `1px solid ${novaAtv.novaEtapa === e ? t.purple : t.border}`, background: novaAtv.novaEtapa === e ? t.purpleFaint : t.surfaceInput, color: novaAtv.novaEtapa === e ? t.purple : t.textMuted, fontSize: 12, fontWeight: novaAtv.novaEtapa === e ? 700 : 400, cursor: 'pointer' }}>
+                          {novaAtv.novaEtapa === e ? '✓ ' : ''}{e}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Atualizar último movimento — opcional */}
+              <div style={{ background: t.bg, border: `1px solid ${novaAtv.atualizarMov ? t.orange + '55' : t.border}`, borderRadius: 10, padding: '10px 14px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', userSelect: 'none' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!novaAtv.atualizarMov}
+                    onChange={e => setAtv('atualizarMov', e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: t.orange, cursor: 'pointer', flexShrink: 0 }}
+                  />
+                  <div style={{ fontSize: 12, fontWeight: 600, color: novaAtv.atualizarMov ? t.orange : t.text }}>
+                    📝 Atualizar último movimento do card
+                  </div>
+                </label>
+                {novaAtv.atualizarMov && (
+                  <textarea
+                    value={novaAtv.movTexto || ''}
+                    onChange={e => setAtv('movTexto', e.target.value)}
+                    rows={2}
+                    placeholder="O que aconteceu / qual é o contexto atual desta oportunidade..."
+                    style={{ width: '100%', marginTop: 10, background: t.surfaceInput, border: `1px solid ${t.orange}44`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none', resize: 'none', fontFamily: 'inherit', lineHeight: 1.5 }}
+                  />
+                )}
+              </div>
+
             </div>
           </>}
 
@@ -899,6 +1079,7 @@ export default function Pipeline() {
   const [filterResp,  setFilterResp]  = useState('Todos')
   const [filterBusca, setFilterBusca] = useState('')
   const [aba,         setAba]         = useState('pipeline')
+  const [showNovaOpp, setShowNovaOpp] = useState(false)
 
   function toggleTheme() {
     const next = t.name === 'dark' ? THEMES.light : THEMES.dark
@@ -1009,6 +1190,44 @@ export default function Pipeline() {
   // Adiciona nova atividade ao estado local imediatamente — sem precisar de refresh
   function handleActivityAdded(nA) {
     setActs(prev => [...prev, nA])
+  }
+
+  async function handleCriarOpp(form) {
+    const norm = s => (s || '').toLowerCase().trim()
+    const jaExiste = leads.find(l =>
+      norm(l.conta) === norm(form.conta) &&
+      norm(l.servico) === norm(form.servico)
+    )
+    if (jaExiste) {
+      alert(`Já existe uma oportunidade "${form.conta} — ${form.servico}" no pipeline.\n\nAbra o card existente para editá-lo.`)
+      return
+    }
+    const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+    const nome = form.conta && form.servico ? `${form.conta} — ${form.servico}` : (form.conta || 'Nova oportunidade')
+    const nL = {
+      id:                 `opp-${Date.now()}`,
+      nome,
+      conta:              form.conta || '',
+      servico:            form.servico || '',
+      etapa:              form.etapa || 'Prospecção',
+      resp:               form.resp || user.nome,
+      dias:               0,
+      aging:              'Hot',
+      mov:                form.mov || '',
+      prox:               '',
+      dt:                 '',
+      op:                 false,
+      off:                false,
+      g12:                false,
+      risco:              '',
+      vencimento:         '',
+      paralelo:           '',
+      ultima_atualizacao: hoje,
+    }
+    await upsertLead(nL)
+    setLeads(prev => [...prev, nL])
+    setShowNovaOpp(false)
+    setSelected(nL)   // abre o card recém-criado
   }
 
   async function handleConcluirAct(act) {
@@ -1128,6 +1347,11 @@ export default function Pipeline() {
               {syncing ? '⏳ Sincronizando...' : '🔄 Sincronizar'}
             </button>
           )}
+          <button
+            onClick={() => setShowNovaOpp(true)}
+            style={{ background: 'linear-gradient(135deg,#7C3AED,#9333EA)', border: 'none', borderRadius: 8, color: 'white', padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}>
+            + Nova Oportunidade
+          </button>
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', overflowX: 'auto' }}>
           <button onClick={toggleTheme} style={{ width: 34, height: 34, borderRadius: 8, border: `1px solid ${t.border}`, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14, flexShrink: 0 }}>{t.icon}</button>
@@ -1382,6 +1606,9 @@ export default function Pipeline() {
           })}
         </>}
       </div>
+
+      {/* ── Modal Nova Oportunidade ── */}
+      {showNovaOpp && <NovaOppModal t={t} leads={leads} user={user} onSave={handleCriarOpp} onClose={() => setShowNovaOpp(false)} />}
 
       {selected && (
         <Modal
