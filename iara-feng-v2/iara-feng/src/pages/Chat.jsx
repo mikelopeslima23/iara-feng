@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory, getKnowledge, getNotifications, markNotificationRead, markAllRead, createNotification, upsertContact, logAudit, getAuditLog } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL, USERS } from '../data/pipeline'
 import { getTheme, saveTheme, THEMES } from '../lib/theme'
+import { SidebarDrawer, HamburgerBtn, LogoPill, D } from './Sidebar'
 
 const ADMINS = ['Mike Lopes', 'Bruno Braga']
 
@@ -216,20 +217,15 @@ function formatAuditDate(iso) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function buildCtx(leads, acts, userName, memories = [], knowledge = [], auditLog = []) {
-  // Força fuso horário de São Paulo para evitar erro de data no servidor Vercel (UTC)
-  const TZ = 'America/Sao_Paulo'
-  const agora = new Date()
-  const hoje      = agora.toLocaleDateString('pt-BR', { timeZone: TZ, day: '2-digit', month: '2-digit', year: 'numeric' })
-  const hojeISO   = agora.toLocaleDateString('sv-SE', { timeZone: TZ }) // retorna YYYY-MM-DD
-  const diaSemana = agora.toLocaleDateString('pt-BR', { timeZone: TZ, weekday: 'long' })
-  const horaAgora = agora.toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })
+  const hoje = new Date().toLocaleDateString('pt-BR')
+  const hojeISO = new Date().toISOString().split('T')[0]
   const pend = acts.filter(a => !a.ok)
   const mine = pend.filter(a => a.resp?.toLowerCase().includes(userName.split(' ')[0].toLowerCase()))
   const ativos = leads.filter(l => !l.off && !l.op && l.aging !== 'Geladeira' && l.aging !== 'Inativo')
   const g12 = leads.filter(l => l.g12 && !l.off)
   const isAdmin = ADMINS.includes(userName)
 
-  let c = `📅 HOJE: ${diaSemana}, ${hoje} — ${horaAgora} (América/São Paulo) | USUÁRIO:${userName} | ADMIN:${isAdmin}\n`
+  let c = `DATA:${hoje} | USUÁRIO:${userName} | ADMIN:${isAdmin}\n`
   c += `RESUMO:${ativos.length} oportunidades ativas | ${pend.length} pendentes | ${mine.length} com ${userName}\n\n`
 
   // ── Audit Log — movimentos recentes ──────────────────────────────────────
@@ -286,20 +282,12 @@ function buildCtx(leads, acts, userName, memories = [], knowledge = [], auditLog
   // ── Atividades pendentes ──────────────────────────────────────────────────
   if (pend.length > 0) {
     c += `⏳ ATIVIDADES PENDENTES (${pend.length}):\n`
-    // Usa comparação de string ISO para evitar confusão de fuso horário
-    // new Date(a.dt) < new Date() causava atividades de HOJE aparecerem como atrasadas
-    const atrasadas = pend.filter(a => a.dt && a.dt < hojeISO)
-    const deHoje    = pend.filter(a => a.dt === hojeISO)
-    const futuras   = pend.filter(a => !a.dt || a.dt > hojeISO)
+    const atrasadas = pend.filter(a => a.dt && new Date(a.dt) < new Date())
     if (atrasadas.length > 0) {
       c += `  ⚠️ ATRASADAS (${atrasadas.length}):\n`
       atrasadas.forEach(a => c += `  • [${a.id}] ${a.lead}: ${a.descricao} | venceu ${a.dt} | ${a.resp}\n`)
     }
-    if (deHoje.length > 0) {
-      c += `  📅 VENCEM HOJE (${deHoje.length}):\n`
-      deHoje.forEach(a => c += `  • [${a.id}] ${a.lead}: ${a.descricao} | HOJE ${hojeISO} | ${a.resp}\n`)
-    }
-    futuras.slice(0, 20)
+    pend.filter(a => !a.dt || new Date(a.dt) >= new Date()).slice(0, 20)
       .forEach(a => c += `  • [${a.id}] ${a.lead}: ${a.descricao} | até ${a.dt} | ${a.resp}\n`)
     c += '\n'
   }
@@ -388,22 +376,7 @@ Faça uma apresentação completa e envolvente. Use seu tom característico — 
 Prosa fluida, sem bullet points. Máximo 250 palavras.`
 }
 
-// buildSystem() — gera o SYSTEM prompt com a data injetada dinamicamente no momento da chamada.
-// SYSTEM como constante estática causava erro: o módulo é carregado uma vez e a data congela.
-// Aqui derivamos o dia da semana a partir do ISO (não de Intl.weekday) para evitar bugs de Node.js.
-function buildSystem() {
-  const TZ = 'America/Sao_Paulo'
-  const agora = new Date()
-  const hojeISO = agora.toLocaleDateString('sv-SE', { timeZone: TZ })          // "2026-04-14"
-  const [y, m, d] = hojeISO.split('-').map(Number)
-  const DIAS = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado']
-  const diaSemana = DIAS[new Date(y, m - 1, d).getDay()]
-  const hojeFormatado = `${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}/${y}`
-  const hora = agora.toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' })
-
-  return `⚠️ DATA ATUAL OBRIGATÓRIA: hoje é ${diaSemana}, ${hojeFormatado} (${hora} — América/São Paulo). Use SEMPRE esta data ao falar sobre "hoje", "amanhã", "essa semana" ou qualquer prazo. NUNCA use outra data.
-
-Você é a IAra, agente de inteligência comercial da FENG — empresa de tecnologia para clubes de futebol e esportes na América Latina.
+const SYSTEM = `Você é a IAra, agente de inteligência comercial da FENG — empresa de tecnologia para clubes de futebol e esportes na América Latina.
 
 IDENTIDADE: IAra — Intelligence and Action for Revenue Acceleration. Tom: colega descontraída, direta, bem-humorada. Português informal. NUNCA diz "Como posso te ajudar?". NUNCA repete a mesma frase.
 
@@ -471,7 +444,6 @@ JURÍDICO → [SUGESTÃO:juridico]Briefing Jurídico — [Lead]\nContexto: ...\n
 
 REGRA: Máximo 2 sugestões por resposta. Não sugira em consultas.
 ANTI-LOOP: Nunca repita pergunta. Quando receber info, AVANCE.`
-}
 
 const EXTRACT_SYSTEM = `Você é um extrator de memórias. Analise a troca e extraia APENAS fatos relevantes e duráveis.
 TIPOS: pessoal, time, perfil. Máximo 3. Se não houver, retorne {"memorias": []}.
@@ -517,6 +489,7 @@ async function extractAndSaveMemories(userId, userMsg, assistantMsg) {
 
 export default function Chat() {
   const navigate = useNavigate()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const user = JSON.parse(localStorage.getItem('iara_user') || '{}')
   const [theme, setTheme] = useState(getTheme())
   const t = theme
@@ -577,7 +550,7 @@ export default function Chat() {
       }
       const ctx = buildCtx(l, a, user.nome, mems, know, log)
       const cargoInfo = CARGOS[user.nome] || { cargo: 'membro do time comercial' }
-      const raw = await callAI([{ role: 'user', content: buildOnboardingPrompt(user.nome, cargoInfo.cargo) }], buildSystem() + '\n\n' + ctx)
+      const raw = await callAI([{ role: 'user', content: buildOnboardingPrompt(user.nome, cargoInfo.cargo) }], SYSTEM + '\n\n' + ctx)
       const txt = strip(raw)
       setMsgs([{ id: 'g1', role: 'assistant', text: txt, results: [], sugestoes: [] }])
       await saveMessage(user.id, 'assistant', txt)
@@ -597,7 +570,7 @@ export default function Chat() {
     try {
       const ctx = buildCtx(leads, acts, user.nome, memories, knowledge, auditLog)
       const apiMsgs = newMsgs.slice(-40).map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }))
-      const raw = await callAI(apiMsgs, buildSystem() + '\n\n' + ctx)
+      const raw = await callAI(apiMsgs, SYSTEM + '\n\n' + ctx)
       const actions = parseActions(raw)
       const sugestoes = parseSugestoes(raw)
       const notifsParsed = parseNotifs(raw)
@@ -609,33 +582,16 @@ export default function Chat() {
       for (const act of actions) {
         if (act.type === 'CONCLUIR') {
           const found = curA.find(a => a.id === act.data.id)
-          if (!found) {
-            // Tenta busca parcial pelo id — alguns ids podem ter sido truncados pela IA
-            const partial = curA.find(a => a.id?.includes(act.data.id) || act.data.id?.includes(a.id))
-            if (!partial) {
-              results.push(`⚠️ Atividade não encontrada: ${act.data.id}`)
-              continue
-            }
-            // Usa o encontrado pela busca parcial
-            const concluida = { ...partial, ok: true, concluido_em: new Date().toISOString() }
-            curA = curA.map(a => a.id === partial.id ? concluida : a)
-            await upsertActivity(concluida)
-            await logAudit({ evento: 'atividade_concluida', conta: partial.lead || '', detalhe: partial.descricao || '', feito_por: user.nome })
-            auditUpdated = true
-            results.push(`✅ Concluído: ${partial.descricao || act.data.id}`)
-            continue
-          }
-          const concluida = { ...found, ok: true, concluido_em: new Date().toISOString() }
-          curA = curA.map(a => a.id === act.data.id ? concluida : a)
-          await upsertActivity(concluida)
+          curA = curA.map(a => a.id === act.data.id ? { ...a, ok: true } : a)
+          await upsertActivity({ ...found, ok: true })
           await logAudit({
             evento: 'atividade_concluida',
-            conta: found.lead || '',
-            detalhe: found.descricao || '',
+            conta: found?.lead || '',
+            detalhe: found?.descricao || '',
             feito_por: user.nome,
           })
           auditUpdated = true
-          results.push(`✅ Concluído: ${found.descricao || act.data.id}`)
+          results.push(`✅ Concluído: ${found?.descricao || act.data.id}`)
         } else if (act.type === 'CRIAR') {
           const nA = {
             id: `act-${Date.now()}`, ok: false,
@@ -659,29 +615,6 @@ export default function Chat() {
           curL = curL.map(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()) ? { ...l, [campo]: valor, ultima_atualizacao: hoje } : l)
           const updated = curL.find(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()))
           if (updated) await upsertLead(updated)
-
-          // Quando IAra atualiza mov ou prox via chat, cria atividade na Timeline
-          // para o histórico não se perder (mesmo problema que o Jardel reportou no Pipeline)
-          if (campo === 'mov' || campo === 'prox') {
-            const leadLabel = updated?.conta && updated?.servico
-              ? `${updated.conta} — ${updated.servico}`
-              : (updated?.nome || updated?.conta || nome)
-            const actTimeline = {
-              id: `act-mov-${Date.now()}`,
-              ok: true,
-              criado: hoje,
-              lead: leadLabel,
-              descricao: campo === 'mov'
-                ? `📝 Movimento: ${valor}`
-                : `→ Próxima ação: ${valor}`,
-              dt: hoje,
-              resp: user.nome,
-              tipo: 'Atualização',
-            }
-            curA = [...curA, actTimeline]
-            await upsertActivity(actTimeline)
-          }
-
           if (campo === 'etapa') {
             await logAudit({
               evento: 'etapa_avancada',
@@ -706,39 +639,24 @@ export default function Chat() {
         } else if (act.type === 'CRIAR_OPP') {
           const { conta, servico, etapa, resp } = act.data
           const nome = conta && servico ? `${conta} — ${servico}` : (conta || servico || 'Nova oportunidade')
-
-          // Verifica se já existe card com mesma conta + servico (ativo ou na geladeira)
-          // Comparação normalizada: lowercase, sem espaços extras, ignora acentos simples
-          const norm = s => (s || '').toLowerCase().trim()
-          const jaExiste = curL.find(l =>
-            norm(l.conta) === norm(conta) &&
-            norm(l.servico) === norm(servico)
-          )
-
-          if (jaExiste) {
-            // Card já existe — não cria duplicata, apenas informa
-            results.push(`⚠️ Oportunidade já existe: ${nome} (id: ${jaExiste.id}) — use UPDATE_LEAD para atualizar`)
-          } else {
-            const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
-            const nL = {
-              id: `opp-${Date.now()}`, nome, conta: conta || '', servico: servico || '',
-              etapa: etapa || 'Prospecção', resp: resp || user.nome, dias: 0, aging: 'Hot',
-              mov: 'Nova oportunidade criada via IAra', prox: '', dt: '',
-              op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: '',
-              ultima_atualizacao: hoje,
-            }
-            curL = [...curL, nL]; await upsertLead(nL)
-            await logAudit({
-              evento: 'oportunidade_criada',
-              conta: conta || '',
-              servico: servico || '',
-              lead_nome: nome,
-              detalhe: `Etapa: ${etapa || 'Prospecção'} | Resp: ${resp || user.nome}`,
-              feito_por: user.nome,
-            })
-            auditUpdated = true
-            results.push(`✅ Oportunidade criada: ${nome}`)
+          const nL = {
+            id: `opp-${Date.now()}`, nome, conta: conta || '', servico: servico || '',
+            etapa: etapa || 'Prospecção', resp: resp || user.nome, dias: 0, aging: 'Hot',
+            mov: 'Nova oportunidade criada via IAra', prox: '', dt: '',
+            op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: '',
+            ultima_atualizacao: new Date().toISOString().split('T')[0],
           }
+          curL = [...curL, nL]; await upsertLead(nL)
+          await logAudit({
+            evento: 'oportunidade_criada',
+            conta: conta || '',
+            servico: servico || '',
+            lead_nome: nome,
+            detalhe: `Etapa: ${etapa || 'Prospecção'} | Resp: ${resp || user.nome}`,
+            feito_por: user.nome,
+          })
+          auditUpdated = true
+          results.push(`✅ Oportunidade criada: ${nome}`)
         } else if (act.type === 'CRIAR_CONTATO') {
           const contato = {
             id: `ct-${Date.now()}`,
@@ -795,7 +713,7 @@ export default function Chat() {
     await clearMessages(user.id); setMsgs([]); setLoading(true)
     try {
       const ctx = buildCtx(leads, acts, user.nome, memories, knowledge, auditLog)
-      const raw = await callAI([{ role: 'user', content: `Reabra a conversa com ${user.nome} com nova saudação breve.` }], buildSystem() + '\n\n' + ctx)
+      const raw = await callAI([{ role: 'user', content: `Reabra a conversa com ${user.nome} com nova saudação breve.` }], SYSTEM + '\n\n' + ctx)
       const txt = strip(raw)
       setMsgs([{ id: Date.now(), role: 'assistant', text: txt, results: [], sugestoes: [] }])
       await saveMessage(user.id, 'assistant', txt)
@@ -840,66 +758,83 @@ export default function Chat() {
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: t.bg, color: t.text, fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden', transition: 'background 0.3s' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: D.bg, color: D.t1, fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden' }}>
       <style>{`
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
         @keyframes blink{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
         @keyframes badgePop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-        ::-webkit-scrollbar{width:3px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:${t.scrollThumb};border-radius:3px}
+        ::-webkit-scrollbar{width:3px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:${D.border2};border-radius:3px}
         textarea{-webkit-appearance:none}
-        .chip:hover{background:${t.surfaceHover}!important;border-color:${t.purple}!important}
+        .chip:hover{background:${D.bg3}!important;border-color:${D.p}!important}
         .chip:active{transform:scale(0.95)} .send-btn:active{transform:scale(0.92)}
-        .notif-btn:hover{background:${t.purpleFaint}!important}
-        @media(max-width:600px){.header-extras{display:none!important}.header-stats{font-size:10px!important;padding:2px 8px!important}.msg-text{font-size:15px!important}}
+        @media(max-width:600px){.header-extras{display:none!important}}
       `}</style>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: `1px solid ${t.borderLight}`, background: t.header, flexShrink: 0, boxShadow: t.name === 'light' ? '0 2px 12px rgba(124,58,237,0.08)' : '0 2px 12px rgba(0,0,0,0.4)', position: 'relative', zIndex: 50 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: 'white', flexShrink: 0, boxShadow: '0 0 12px rgba(124,58,237,0.4)' }}>IA</div>
+      <SidebarDrawer open={sidebarOpen} onClose={() => setSidebarOpen(false)} user={user} />
+
+      {/* ── TOPBAR ── */}
+      <div style={{ height: 52, background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 14px', gap: 10, flexShrink: 0, zIndex: 10, position: 'relative' }}>
+        <HamburgerBtn open={sidebarOpen} onClick={() => setSidebarOpen(o => !o)} />
+        <LogoPill />
+
+        {/* IAra identity */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: D.p, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0 }}>IA</div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: t.text, letterSpacing: '0.05em' }}>IAra</span>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.green, display: 'inline-block', animation: 'pulse 2s ease infinite', boxShadow: `0 0 6px ${t.green}` }} />
-              <span style={{ fontSize: 10, color: t.green }}>online</span>
-              {isAdmin && <span style={{ fontSize: 10, background: t.purpleFaint, color: t.purple, border: `1px solid ${t.purple}44`, borderRadius: 4, padding: '1px 6px' }}>admin</span>}
+              <span style={{ fontSize: 14, fontWeight: 700, color: D.t1, letterSpacing: '.05em' }}>IAra</span>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: D.g, display: 'inline-block', animation: 'pulse 2s ease infinite' }} />
+              <span style={{ fontSize: 10, color: D.g2 }}>online</span>
+              {isAdmin && <span style={{ fontSize: 9, background: D.pf, color: D.p2, border: `1px solid ${D.p}44`, borderRadius: 4, padding: '1px 6px' }}>admin</span>}
             </div>
-            <div style={{ fontSize: 10, color: t.textMuted, display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span>Agente comercial</span>
-              <span style={{ color: t.textHint, fontWeight: 700, letterSpacing: '0.1em' }}>FENG</span>
-              {memCount > 0 && <span style={{ color: t.purple, marginLeft: 2 }}>· 🧠 {memCount}</span>}
-              {knowCount > 0 && <span style={{ color: t.green }}>· 📚 {knowCount}</span>}
+            <div style={{ fontSize: 10, color: D.t3 }}>
+              Agente comercial FENG
+              {memCount > 0 && <span style={{ color: D.p2, marginLeft: 5 }}>· 🧠 {memCount}</span>}
+              {knowCount > 0 && <span style={{ color: D.g2, marginLeft: 5 }}>· 📚 {knowCount}</span>}
             </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
-          <div className="header-stats" style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6, padding: '3px 10px', fontSize: 11, color: t.textMuted }}>
-            <span style={{ color: t.purple, fontWeight: 600 }}>{ativosCount}</span> · <span style={{ color: t.orange, fontWeight: 600 }}>{pendCount}</span>
+        {/* Right actions */}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+          {/* Stats chip */}
+          <div style={{ background: D.bg3, border: `1px solid ${D.border}`, borderRadius: 6, padding: '3px 10px', fontSize: 11 }}>
+            <span style={{ color: D.p2, fontWeight: 600 }}>{ativosCount}</span>
+            <span style={{ color: D.t3 }}> · </span>
+            <span style={{ color: D.o, fontWeight: 600 }}>{pendCount}</span>
           </div>
-          <button className="notif-btn" onClick={() => setShowNotifs(v => !v)} style={{ position: 'relative', width: 36, height: 36, borderRadius: 9, border: `1px solid ${unreadCount > 0 ? t.purple + '44' : t.border}`, background: unreadCount > 0 ? t.purpleFaint : t.surface, color: unreadCount > 0 ? t.purple : t.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, transition: 'all 0.15s', flexShrink: 0 }}>
+
+          {/* Notificações */}
+          <button onClick={() => setShowNotifs(v => !v)}
+            style={{ position: 'relative', width: 34, height: 34, borderRadius: 8, border: `1px solid ${unreadCount > 0 ? D.p + '44' : D.border}`, background: unreadCount > 0 ? D.pf : 'transparent', color: unreadCount > 0 ? D.p2 : D.t2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14 }}>
             🔔
-            {unreadCount > 0 && <div style={{ position: 'absolute', top: -4, right: -4, background: t.red, color: 'white', borderRadius: '50%', width: 16, height: 16, fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'badgePop 0.3s ease', border: `2px solid ${t.bg}` }}>{unreadCount > 9 ? '9+' : unreadCount}</div>}
+            {unreadCount > 0 && <div style={{ position: 'absolute', top: -4, right: -4, background: D.r, color: 'white', borderRadius: '50%', width: 15, height: 15, fontSize: 8, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'badgePop 0.3s ease', border: `2px solid ${D.bg2}` }}>{unreadCount > 9 ? '9+' : unreadCount}</div>}
           </button>
-          <button onClick={toggleTheme} style={{ width: 36, height: 36, borderRadius: 9, border: `1px solid ${t.border}`, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, flexShrink: 0, transition: 'all 0.15s' }}>{t.icon}</button>
-          {isAdmin && <button onClick={() => send('IAra fechar Radar')} className="header-extras" style={{ background: t.greenFaint, border: `1px solid ${t.greenDark}`, borderRadius: 6, color: t.greenDark, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📊 Radar</button>}
-          {isAdmin && radarReady && <button onClick={() => navigate('/radar')} style={{ background: t.green, border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>Ver →</button>}
-          <button onClick={() => navigate('/pipeline')} style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}66`, borderRadius: 6, color: t.purple, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📋 Pipeline</button>
-          <button onClick={() => navigate('/contatos')} className="header-extras" style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}66`, borderRadius: 6, color: t.purple, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>👥 Contatos</button>
-          <button onClick={() => navigate('/conhecimento')} className="header-extras" style={{ background: t.greenFaint, border: `1px solid ${t.green}66`, borderRadius: 6, color: t.greenDark, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>🧠 Conhecimento</button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }} onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
-            <div style={{ width: 22, height: 22, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', boxShadow: `0 0 8px ${user.cor}66` }}>{user.iniciais}</div>
-            <span style={{ fontSize: 11, color: t.purpleLight, fontWeight: 500 }}>{user.nome?.split(' ')[0]}</span>
+
+          {/* Radar — admin only */}
+          {isAdmin && <button onClick={() => send('IAra fechar Radar')} className="header-extras"
+            style={{ background: D.gf, border: `1px solid ${D.g}44`, borderRadius: 6, color: D.g2, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📊 Radar</button>}
+          {isAdmin && radarReady && <button onClick={() => navigate('/radar')}
+            style={{ background: D.g, border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>Ver →</button>}
+
+          {/* Avatar / logout */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: D.bg3, border: `1px solid ${D.border}`, borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}
+            onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
+            <div style={{ width: 20, height: 20, borderRadius: '50%', background: user.cor || D.p, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: 'white' }}>{user.iniciais}</div>
+            <span style={{ fontSize: 11, color: D.t2, fontWeight: 500 }}>{user.nome?.split(' ')[0]}</span>
           </div>
-          <button onClick={handleClear} style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 7, color: t.textMuted, padding: '5px 9px', fontSize: 13, cursor: 'pointer', minWidth: 34, minHeight: 34 }}>🗑</button>
+
+          {/* Limpar chat */}
+          <button onClick={handleClear}
+            style={{ width: 34, height: 34, background: 'none', border: `1px solid ${D.border}`, borderRadius: 7, color: D.t3, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}>🗑</button>
         </div>
       </div>
 
       {showNotifs && <NotifModal notifs={notifs} userId={user.id} t={t} onClose={() => setShowNotifs(false)} onMarkRead={handleMarkRead} onMarkAll={handleMarkAll} />}
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 8px', display: 'flex', flexDirection: 'column', gap: 16, WebkitOverflowScrolling: 'touch' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 8px', display: 'flex', flexDirection: 'column', gap: 16, WebkitOverflowScrolling: 'touch', background: D.bg }}>
         {msgs.map(m => m.role === 'user' ? (
           <div key={m.id} style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'flex-end' }}>
             <div className="msg-text" style={{ background: t.msgUser, borderRadius: '16px 16px 3px 16px', padding: '12px 16px', maxWidth: '80%', fontSize: 15, lineHeight: 1.6, color: '#fff', wordBreak: 'break-word', boxShadow: '0 4px 16px rgba(124,58,237,0.3)' }}>{m.text}</div>
@@ -959,16 +894,16 @@ export default function Chat() {
         <textarea ref={txRef} value={inp} onChange={e => setInp(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
           placeholder="Mensagem para a IAra..."
-          style={{ flex: 1, background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', color: t.text, fontSize: 15, outline: 'none', resize: 'none', fontFamily: 'inherit', minHeight: 44, maxHeight: 140, lineHeight: 1.5, WebkitAppearance: 'none' }}
-          onFocus={e => e.target.style.borderColor = t.purple}
-          onBlur={e => e.target.style.borderColor = t.border}
+          style={{ flex: 1, background: D.bg3, border: `1px solid ${D.border}`, borderRadius: 12, padding: '12px 14px', color: D.t1, fontSize: 15, outline: 'none', resize: 'none', fontFamily: 'inherit', minHeight: 44, maxHeight: 140, lineHeight: 1.5, WebkitAppearance: 'none' }}
+          onFocus={e => e.target.style.borderColor = D.p}
+          onBlur={e => e.target.style.borderColor = D.border}
           rows={1} />
-        <button className="send-btn" onClick={() => send()} disabled={loading || !inp.trim()} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: loading || !inp.trim() ? t.surface : `linear-gradient(135deg,${t.orange},${t.orangeLight})`, color: loading || !inp.trim() ? t.textDark : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loading || !inp.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, fontSize: 16, transition: 'all 0.15s', boxShadow: loading || !inp.trim() ? 'none' : `0 4px 14px ${t.orange}44` }}>➤</button>
+        <button className="send-btn" onClick={() => send()} disabled={loading || !inp.trim()} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: loading || !inp.trim() ? D.bg3 : D.o, color: loading || !inp.trim() ? D.t3 : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loading || !inp.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, fontSize: 16, transition: 'all 0.15s' }}>➤</button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '3px 0', background: t.bgAlt, borderTop: `1px solid ${t.borderFaint}` }}>
-        <span style={{ fontSize: 9, color: t.textDark, letterSpacing: '0.08em' }}>powered by</span>
-        <span style={{ fontSize: 9, fontWeight: 700, color: t.textDark, letterSpacing: '0.15em' }}>FENG</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '3px 0', background: D.bg2, borderTop: `1px solid ${D.border}` }}>
+        <span style={{ fontSize: 9, color: D.t3, letterSpacing: '0.08em' }}>powered by</span>
+        <span style={{ fontSize: 9, fontWeight: 700, color: D.t3, letterSpacing: '0.15em' }}>FENG</span>
       </div>
     </div>
   )
