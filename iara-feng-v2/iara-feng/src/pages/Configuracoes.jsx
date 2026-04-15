@@ -34,7 +34,8 @@ export default function Configuracoes() {
   const [showInvite, setShowInvite] = useState(false)
   const [form,     setForm]     = useState({ nome: '', email: '', cor: '#7C3AED', admin: false })
   const [saving,   setSaving]   = useState(false)
-  const [msg,      setMsg]      = useState(null) // {type: 'ok'|'err', text}
+  const [msg,      setMsg]      = useState(null)
+  const [inviteError, setInviteError] = useState('') // {type: 'ok'|'err', text}
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -73,13 +74,15 @@ export default function Configuracoes() {
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Erro ao convidar')
-      setMsg({ type: 'ok', text: `✅ Convite enviado para ${form.email}! O usuário receberá um e-mail para definir a senha.` })
-      setForm({ nome: '', email: '', cor: '#7C3AED', admin: false })
+      if (!res.ok) throw new Error(data.error || 'Erro desconhecido')
+      // Sucesso — fecha modal e mostra confirmação
       setShowInvite(false)
+      setForm({ nome: '', email: '', cor: '#7C3AED', admin: false })
+      setMsg({ type: 'ok', text: `✅ Convite enviado para ${form.email}! O usuário receberá um e-mail para definir a senha.` })
       await loadUsers()
     } catch (err) {
-      setMsg({ type: 'err', text: err.message })
+      // Erro — mantém modal aberto e mostra erro dentro dele
+      setInviteError(err.message || 'Erro ao enviar convite')
     }
     setSaving(false)
   }
@@ -98,16 +101,24 @@ export default function Configuracoes() {
   async function handleResendInvite(email) {
     setSaving(true)
     try {
+      const u = users.find(u => u.email === email)
       const res = await fetch('/api/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, nome: users.find(u => u.email === email)?.nome || email }),
+        body: JSON.stringify({
+          email,
+          nome: u?.nome || email,
+          iniciais: u?.iniciais || '',
+          cor: u?.cor || '#7C3AED',
+          admin: u?.admin || false,
+          resend: true,
+        }),
       })
       const data = await res.json()
-      if (!res.ok && !res.status === 409) throw new Error(data.error)
-      alert(`Convite reenviado para ${email}`)
+      if (!res.ok) throw new Error(data.error)
+      alert(`✅ E-mail de acesso reenviado para ${email}`)
     } catch (err) {
-      alert('Erro: ' + err.message)
+      alert('❌ Erro: ' + err.message)
     }
     setSaving(false)
   }
@@ -161,7 +172,7 @@ export default function Configuracoes() {
         </div>
         <span style={{fontSize:15,fontWeight:700,color:D.t1}}>Configurações</span>
         <div style={{marginLeft:'auto'}}>
-          <button onClick={() => setShowInvite(true)}
+          <button onClick={() => { setShowInvite(true); setInviteError('') }}
             style={{height:32,padding:'0 14px',background:D.p,border:'none',borderRadius:8,color:'white',fontSize:12,cursor:'pointer',fontWeight:600}}>
             + Convidar usuário
           </button>
@@ -289,6 +300,12 @@ export default function Configuracoes() {
                   <div style={{fontSize:11,color:D.t3}}>Pode convidar usuários, apagar cards e acessar todas as funções</div>
                 </div>
               </label>
+
+              {inviteError && (
+                <div style={{background:'rgba(239,68,68,.1)',border:'1px solid rgba(239,68,68,.3)',borderRadius:8,padding:'10px 12px',fontSize:12,color:'#FCA5A5'}}>
+                  ❌ {inviteError}
+                </div>
+              )}
 
               <div style={{display:'flex',gap:8,paddingTop:4}}>
                 <button type="button" onClick={()=>setShowInvite(false)}
