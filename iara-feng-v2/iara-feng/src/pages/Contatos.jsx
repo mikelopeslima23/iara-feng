@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { getAllContacts, upsertContact, deleteContact, getLeads } from '../lib/supabase'
 import { getTheme, saveTheme, THEMES } from '../lib/theme'
 
@@ -129,7 +128,7 @@ function ContactModal({ contact, leads, t, onSave, onClose }) {
       <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 16, padding: 24, width: '100%', maxWidth: 440, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: D.t1 }}>{contact?.id ? '✏️ Editar Contato' : '+ Novo Contato'}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: _D.t1 }}>{contact?.id ? '✏️ Editar Contato' : '+ Novo Contato'}</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: t.textMuted, fontSize: 20, cursor: 'pointer' }}>✕</button>
         </div>
 
@@ -252,7 +251,7 @@ function ContactCard({ contact: c, isAdmin, t, onEdit, onDelete }) {
       </div>
 
       <div style={{ display: 'flex', gap: 6 }}>
-        <button onClick={onEdit} style={{ flex: 1, background: D.pf, border: `1px solid ${t.purple}33`, borderRadius: 7, color: t.purple, padding: '5px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>✏️ Editar</button>
+        <button onClick={onEdit} style={{ flex: 1, background: _D.pf, border: `1px solid ${t.purple}33`, borderRadius: 7, color: t.purple, padding: '5px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>✏️ Editar</button>
         {isAdmin && (
           <button onClick={onDelete} style={{ background: t.redFaint, border: `1px solid ${t.red}33`, borderRadius: 7, color: t.red, padding: '5px 10px', fontSize: 11, cursor: 'pointer' }}>🗑</button>
         )}
@@ -270,7 +269,7 @@ function ContactRow({ contact: c, isAdmin, t, onEdit, onDelete }) {
       <div style={{ width: 36, height: 36, borderRadius: '50%', background: cfg.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{cfg.icon}</div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 14, fontWeight: 600, color: D.t1 }}>{c.nome}</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: _D.t1 }}>{c.nome}</span>
           <span style={{ fontSize: 10, fontWeight: 700, color: cfg.color, background: cfg.bg, borderRadius: 4, padding: '1px 6px' }}>{cfg.label}</span>
           {c.conta && <span style={{ fontSize: 11, color: t.textHint }}>· {c.conta}</span>}
         </div>
@@ -285,9 +284,9 @@ function ContactRow({ contact: c, isAdmin, t, onEdit, onDelete }) {
         )}
         {c.email && (
           <a href={`mailto:${c.email}`}
-            style={{ background: D.pf, border: `1px solid ${t.purple}33`, borderRadius: 7, color: t.purple, padding: '5px 10px', fontSize: 11, textDecoration: 'none' }}>✉️</a>
+            style={{ background: _D.pf, border: `1px solid ${t.purple}33`, borderRadius: 7, color: t.purple, padding: '5px 10px', fontSize: 11, textDecoration: 'none' }}>✉️</a>
         )}
-        <button onClick={onEdit} style={{ background: D.pf, border: `1px solid ${t.purple}33`, borderRadius: 7, color: t.purple, padding: '5px 10px', fontSize: 11, cursor: 'pointer' }}>✏️</button>
+        <button onClick={onEdit} style={{ background: _D.pf, border: `1px solid ${t.purple}33`, borderRadius: 7, color: t.purple, padding: '5px 10px', fontSize: 11, cursor: 'pointer' }}>✏️</button>
         {isAdmin && (
           <button onClick={onDelete} style={{ background: t.redFaint, border: `1px solid ${t.red}33`, borderRadius: 7, color: t.red, padding: '5px 10px', fontSize: 11, cursor: 'pointer' }}>🗑</button>
         )}
@@ -369,32 +368,32 @@ export default function Contatos() {
   const contasCount = new Set(contacts.map(c => c.conta).filter(Boolean)).size
 
   if (loading) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: D.bg, color: D.p, fontSize: 14 }}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: _D.bg, color: _D.p, fontSize: 14 }}>
       Carregando contatos...
     </div>
   )
 
   return (
-    <div style={{ minHeight: '100dvh', background: D.bg, color: D.t1, fontFamily: "'Inter',system-ui,sans-serif" }}>
+    <div style={{ minHeight: '100dvh', background: _D.bg, color: _D.t1, fontFamily: "'Inter',system-ui,sans-serif" }}>
       <style>{`
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 3px; }
-        ::-webkit-scrollbar-thumb { background: ${D.border2}; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: ${_D.border2}; border-radius: 3px; }
         a { transition: opacity 0.15s; }
         a:hover { opacity: 0.8; }
       `}</style>
       <_SidebarNav open={_sidebarOpen} onClose={()=>_setSidebarOpen(false)} currentPath={_location.pathname} onLogout={()=>{localStorage.removeItem("iara_user");navigate("/login")}} userNome={user.nome}/>
 
       {/* ── TOPBAR ── */}
-      <div style={{ height: 52, background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 10 }}>
+      <div style={{ height: 52, background: _D.bg2, borderBottom: `1px solid ${_D.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 10 }}>
         <_HamburgerBtn open={_sidebarOpen} onClick={()=>_setSidebarOpen(o=>!o)}/>
         <div style={{width:28,height:28,background:_D.p,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:11,fontWeight:800,color:"white",letterSpacing:"-.5px"}}>IA</span></div>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: D.t1 }}>Contatos</div>
-          <div style={{ fontSize: 10, color: D.t3 }}>
-            <span style={{ color: D.p2, fontWeight: 600 }}>👤 {contatoCount}</span>{' · '}
-            <span style={{ color: D.o, fontWeight: 600 }}>🤝 {advisorCount}</span>{' · '}
-            <span style={{ color: D.t3 }}>{contasCount} contas</span>
+          <div style={{ fontSize: 15, fontWeight: 700, color: _D.t1 }}>Contatos</div>
+          <div style={{ fontSize: 10, color: _D.t3 }}>
+            <span style={{ color: _D.p2, fontWeight: 600 }}>👤 {contatoCount}</span>{' · '}
+            <span style={{ color: _D.o, fontWeight: 600 }}>🤝 {advisorCount}</span>{' · '}
+            <span style={{ color: _D.t3 }}>{contasCount} contas</span>
           </div>
         </div>
 
@@ -402,22 +401,22 @@ export default function Contatos() {
 
           {isAdmin && (
             <div style={{ position: 'relative' }}>
-              <button onClick={() => setShowExportMenu(v => !v)} style={{ background: D.gf, border: `1px solid ${D.g}44`, borderRadius: 8, color: D.g2, padding: '6px 12px', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>
+              <button onClick={() => setShowExportMenu(v => !v)} style={{ background: _D.gf, border: `1px solid ${_D.g}44`, borderRadius: 8, color: _D.g2, padding: '6px 12px', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>
                 ⬇️ Exportar
               </button>
               {showExportMenu && (
                 <>
                   <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setShowExportMenu(false)} />
-                  <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: D.bg2, border: `1px solid ${D.border}`, borderRadius: 10, padding: 6, zIndex: 50, minWidth: 150, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
+                  <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: _D.bg2, border: `1px solid ${_D.border}`, borderRadius: 10, padding: 6, zIndex: 50, minWidth: 150, boxShadow: '0 8px 24px rgba(0,0,0,0.15)' }}>
                     <button onClick={() => { exportCSV(filtered); setShowExportMenu(false) }}
-                      style={{ display: 'block', width: '100%', background: 'none', border: 'none', color: D.t1, padding: '8px 12px', fontSize: 13, cursor: 'pointer', textAlign: 'left', borderRadius: 6 }}
-                      onMouseEnter={e => e.currentTarget.style.background = D.bg3}
+                      style={{ display: 'block', width: '100%', background: 'none', border: 'none', color: _D.t1, padding: '8px 12px', fontSize: 13, cursor: 'pointer', textAlign: 'left', borderRadius: 6 }}
+                      onMouseEnter={e => e.currentTarget.style.background = _D.bg3}
                       onMouseLeave={e => e.currentTarget.style.background = 'none'}>
                       📄 CSV
                     </button>
                     <button onClick={() => { exportXLS(filtered); setShowExportMenu(false) }}
-                      style={{ display: 'block', width: '100%', background: 'none', border: 'none', color: D.t1, padding: '8px 12px', fontSize: 13, cursor: 'pointer', textAlign: 'left', borderRadius: 6 }}
-                      onMouseEnter={e => e.currentTarget.style.background = D.bg3}
+                      style={{ display: 'block', width: '100%', background: 'none', border: 'none', color: _D.t1, padding: '8px 12px', fontSize: 13, cursor: 'pointer', textAlign: 'left', borderRadius: 6 }}
+                      onMouseEnter={e => e.currentTarget.style.background = _D.bg3}
                       onMouseLeave={e => e.currentTarget.style.background = 'none'}>
                       📊 Excel (.xls)
                     </button>
@@ -427,19 +426,19 @@ export default function Contatos() {
             </div>
           )}
 
-          <button onClick={() => setEditContact({})} style={{ background: D.p, border: 'none', borderRadius: 8, color: 'white', padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+          <button onClick={() => setEditContact({})} style={{ background: _D.p, border: 'none', borderRadius: 8, color: 'white', padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
             + Novo Contato
           </button>
         </div>
       </div>
 
       {/* Busca + Filtros */}
-      <div style={{ padding: '10px 16px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', borderBottom: `1px solid ${D.border}`, background: D.bg2 }}>
+      <div style={{ padding: '10px 16px', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', borderBottom: `1px solid ${_D.border}`, background: _D.bg2 }}>
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="🔍 Buscar por nome, e-mail, cargo, conta..."
-          style={{ flex: 1, minWidth: 200, background: D.bg3, border: `1px solid ${D.border}`, borderRadius: 10, padding: '8px 14px', color: D.t1, fontSize: 13, outline: 'none' }}
-          onFocus={e => e.target.style.borderColor = D.p}
-          onBlur={e => e.target.style.borderColor = D.border} />
+          style={{ flex: 1, minWidth: 200, background: _D.bg3, border: `1px solid ${_D.border}`, borderRadius: 10, padding: '8px 14px', color: _D.t1, fontSize: 13, outline: 'none' }}
+          onFocus={e => e.target.style.borderColor = _D.p}
+          onBlur={e => e.target.style.borderColor = _D.border} />
 
         {/* Filtros tipo */}
         <div style={{ display: 'flex', gap: 6 }}>
@@ -449,21 +448,21 @@ export default function Contatos() {
             { id: 'advisor', label: `🤝 (${advisorCount})` },
           ].map(f => (
             <button key={f.id} onClick={() => setFilterTipo(f.id)} style={{
-              background: filterTipo === f.id ? D.p : D.bg3,
-              border: `1px solid ${filterTipo === f.id ? D.p : D.border}`,
+              background: filterTipo === f.id ? _D.p : _D.bg3,
+              border: `1px solid ${filterTipo === f.id ? _D.p : _D.border}`,
               borderRadius: 20, padding: '4px 12px', fontSize: 11,
-              color: filterTipo === f.id ? '#fff' : D.t3,
+              color: filterTipo === f.id ? '#fff' : _D.t3,
               cursor: 'pointer', fontWeight: filterTipo === f.id ? 600 : 400, whiteSpace: 'nowrap',
             }}>{f.label}</button>
           ))}
         </div>
 
         {/* Toggle view */}
-        <div style={{ display: 'flex', gap: 3, background: D.bg3, border: `1px solid ${D.border}`, borderRadius: 8, padding: 3 }}>
+        <div style={{ display: 'flex', gap: 3, background: _D.bg3, border: `1px solid ${_D.border}`, borderRadius: 8, padding: 3 }}>
           {[['conta', '🏢'], ['lista', '📋']].map(([mode, icon]) => (
             <button key={mode} onClick={() => setViewMode(mode)}
               title={mode === 'conta' ? 'Por Conta' : 'Lista'}
-              style={{ background: viewMode === mode ? D.p : 'transparent', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 13, color: viewMode === mode ? '#fff' : D.t3, cursor: 'pointer', transition: 'all 0.15s' }}>
+              style={{ background: viewMode === mode ? _D.p : 'transparent', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 13, color: viewMode === mode ? '#fff' : _D.t3, cursor: 'pointer', transition: 'all 0.15s' }}>
               {icon}
             </button>
           ))}
@@ -474,9 +473,9 @@ export default function Contatos() {
       <div style={{ padding: '16px 16px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
         {filtered.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: D.t2 }}>
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: _D.t2 }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: D.t1, marginBottom: 6 }}>Nenhum contato encontrado</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: _D.t1, marginBottom: 6 }}>Nenhum contato encontrado</div>
             <div style={{ fontSize: 13 }}>
               {search ? `Nenhum resultado para "${search}"` : 'Clique em "+ Novo Contato" para começar'}
             </div>
@@ -487,11 +486,11 @@ export default function Contatos() {
         {viewMode === 'conta' && contasSorted.map(conta => (
           <div key={conta}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: D.t1 }}>{conta}</span>
-              <span style={{ background: D.pf, borderRadius: 20, padding: '1px 8px', fontSize: 11, color: D.p2, fontWeight: 600 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: _D.t1 }}>{conta}</span>
+              <span style={{ background: _D.pf, borderRadius: 20, padding: '1px 8px', fontSize: 11, color: _D.p2, fontWeight: 600 }}>
                 {grouped[conta].length}
               </span>
-              <div style={{ flex: 1, height: 1, background: D.border }} />
+              <div style={{ flex: 1, height: 1, background: _D.border }} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px, 1fr))', gap: 10 }}>
               {grouped[conta]
