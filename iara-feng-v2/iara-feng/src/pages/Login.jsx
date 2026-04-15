@@ -24,16 +24,33 @@ export default function Login() {
   // Detecta token de convite ou reset na URL
   useEffect(() => {
     const hash = window.location.hash
+
     if (hash.includes('error_code=otp_expired') || hash.includes('error=access_denied')) {
       setError('Este link expirou ou já foi usado. Clique em "Esqueci minha senha" para receber um novo.')
-      // Limpa o hash feio da URL
       window.history.replaceState(null, '', '/login')
-    } else if (hash.includes('type=invite') || hash.includes('type=signup')) {
-      setMode('set_password')
-      window.history.replaceState(null, '', '/login')
-    } else if (hash.includes('type=recovery')) {
-      setMode('reset_password')
-      window.history.replaceState(null, '', '/login')
+      return
+    }
+
+    // Tem token válido — deixa o Supabase processar o hash ANTES de limpar
+    if (hash.includes('access_token') || hash.includes('type=invite') || hash.includes('type=recovery')) {
+      // Supabase lê o hash automaticamente ao inicializar
+      // Aguarda a sessão ser estabelecida
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          setMode('set_password')
+        }
+      })
+
+      // Escuta a mudança de sessão disparada pelo hash
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if ((event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') && session) {
+          setMode('set_password')
+          window.history.replaceState(null, '', '/login')
+          subscription.unsubscribe()
+        }
+      })
+
+      return () => subscription.unsubscribe()
     }
   }, [])
 
