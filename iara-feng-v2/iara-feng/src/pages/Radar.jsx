@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { getLeads, getActivities, saveRadarSnapshot, getRadarSnapshots } from '../lib/supabase'
 import { useState } from 'react'
-import { useLocation } from 'react-router-dom'
 
 // ── Dark tokens + nav inline ─────────────────────────────────────────────────
 const _D = {
@@ -285,37 +284,37 @@ export default function Radar() {
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: D.bg, fontFamily: "'Inter',system-ui,sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: _D.bg, fontFamily: "'Inter',system-ui,sans-serif" }}>
 
       <_SidebarNav open={_sidebarOpen} onClose={()=>_setSidebarOpen(false)} currentPath={_location.pathname} onLogout={()=>{localStorage.removeItem("iara_user");navigate("/login")}} userNome={user.nome}/>
 
       {/* ── TOPBAR ── */}
-      <div style={{ height: 52, background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 10 }}>
+      <div style={{ height: 52, background: _D.bg2, borderBottom: `1px solid ${_D.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 10 }}>
         <_HamburgerBtn open={_sidebarOpen} onClick={()=>_setSidebarOpen(o=>!o)}/>
         <div style={{width:28,height:28,background:_D.p,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:11,fontWeight:800,color:"white",letterSpacing:"-.5px"}}>IA</span></div>
-        <span style={{ fontSize: 14, fontWeight: 700, color: D.t1 }}>Relatórios</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: _D.t1 }}>Relatórios</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input
             value={semana}
             onChange={e => setSemana(e.target.value)}
-            style={{ fontSize: 11, padding: '4px 10px', border: `1px solid ${D.border}`, borderRadius: 6, background: D.bg3, color: D.t1, width: 200 }}
+            style={{ fontSize: 11, padding: '4px 10px', border: `1px solid ${_D.border}`, borderRadius: 6, background: _D.bg3, color: _D.t1, width: 200 }}
           />
 
           <button
             onClick={generateResumo}
             disabled={generating}
-            style={{ padding: '5px 12px', background: D.p, color: 'white', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer', opacity: generating ? 0.6 : 1 }}>
+            style={{ padding: '5px 12px', background: _D.p, color: 'white', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer', opacity: generating ? 0.6 : 1 }}>
             {generating ? 'Gerando...' : '✨ Gerar Resumo com IA'}
           </button>
           <button
             onClick={saveSnapshot}
             disabled={saving}
-            style={{ padding: '5px 12px', background: D.g, color: 'white', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>
+            style={{ padding: '5px 12px', background: _D.g, color: 'white', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>
             💾 Salvar Snapshot
           </button>
           <button
             onClick={() => window.print()}
-            style={{ padding: '5px 12px', background: D.bg3, color: D.p2, border: `1px solid ${D.border}`, borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>
+            style={{ padding: '5px 12px', background: _D.bg3, color: _D.p2, border: `1px solid ${_D.border}`, borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>
             🖨 Imprimir / PDF
           </button>
         </div>
