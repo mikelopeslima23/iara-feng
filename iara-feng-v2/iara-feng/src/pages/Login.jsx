@@ -23,10 +23,16 @@ export default function Login() {
   // Detecta token de convite ou reset na URL
   useEffect(() => {
     const hash = window.location.hash
-    if (hash.includes('type=invite') || hash.includes('type=signup')) {
+    if (hash.includes('error_code=otp_expired') || hash.includes('error=access_denied')) {
+      setError('Este link expirou ou já foi usado. Clique em "Esqueci minha senha" para receber um novo.')
+      // Limpa o hash feio da URL
+      window.history.replaceState(null, '', '/login')
+    } else if (hash.includes('type=invite') || hash.includes('type=signup')) {
       setMode('set_password')
+      window.history.replaceState(null, '', '/login')
     } else if (hash.includes('type=recovery')) {
       setMode('reset_password')
+      window.history.replaceState(null, '', '/login')
     }
   }, [])
 
