@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     let userId = null
 
     if (resend) {
-      // ── Reenvio: gera link de recuperação para usuário existente ──────────
+      // ── Reenvio: gera link direto (sem rate limit de e-mail) ──────────────
       const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
         type: 'recovery',
         email: emailNorm,
@@ -34,11 +34,12 @@ export default async function handler(req, res) {
 
       userId = linkData.user?.id
 
-      // Envia o e-mail manualmente via Supabase
-      const { error: emailErr } = await supabaseAdmin.auth.resetPasswordForEmail(emailNorm, {
-        redirectTo: `${appUrl}/login`
+      // Retorna o link para o admin copiar e enviar diretamente
+      return res.status(200).json({
+        success: true,
+        link: linkData.properties?.action_link,
+        message: `Link gerado para ${email}. Copie e envie diretamente ao usuário.`,
       })
-      if (emailErr) throw emailErr
 
     } else {
       // ── Novo convite ──────────────────────────────────────────────────────
