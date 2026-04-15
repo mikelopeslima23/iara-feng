@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { getKnowledge, saveKnowledge, deleteKnowledge } from '../lib/supabase'
 import { useState as useSidebarState } from 'react'
 
@@ -223,7 +222,7 @@ TAGS:
   }, {})
 
   return (
-    <div style={{ minHeight: '100dvh', background: D.bg, color: D.t1, fontFamily: "'Inter',system-ui,sans-serif" }}>
+    <div style={{ minHeight: '100dvh', background: _D.bg, color: _D.t1, fontFamily: "'Inter',system-ui,sans-serif" }}>
       <style>{`
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { height: 3px; width: 3px; }
@@ -237,19 +236,19 @@ TAGS:
       <_SidebarNav open={_sidebarOpen} onClose={()=>_setSidebarOpen(false)} currentPath={_location.pathname} onLogout={()=>{localStorage.removeItem("iara_user");navigate("/login")}} userNome={user.nome}/>
 
       {/* ── TOPBAR ── */}
-      <div style={{ height: 52, background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 10 }}>
+      <div style={{ height: 52, background: _D.bg2, borderBottom: `1px solid ${_D.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 10 }}>
         <_HamburgerBtn open={_sidebarOpen} onClick={()=>_setSidebarOpen(o=>!o)}/>
         <div style={{width:28,height:28,background:_D.p,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:11,fontWeight:800,color:"white",letterSpacing:"-.5px"}}>IA</span></div>
         <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: D.t1 }}>Base de Conhecimento</div>
-          <div style={{ fontSize: 10, color: D.t3 }}>{items.length} documentos · IAra aprende com cada um</div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: _D.t1 }}>Base de Conhecimento</div>
+          <div style={{ fontSize: 10, color: _D.t3 }}>{items.length} documentos · IAra aprende com cada um</div>
         </div>
         {isAdmin && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-            <button onClick={() => { setModal('upload'); setStep('') }} style={{ background: D.p, border: 'none', borderRadius: 8, color: 'white', padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
+            <button onClick={() => { setModal('upload'); setStep('') }} style={{ background: _D.p, border: 'none', borderRadius: 8, color: 'white', padding: '6px 14px', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
               📎 Upload
             </button>
-            <button onClick={() => { setModal('manual'); setStep('') }} style={{ background: D.pf, border: `1px solid ${D.p}66`, borderRadius: 8, color: D.p2, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>
+            <button onClick={() => { setModal('manual'); setStep('') }} style={{ background: _D.pf, border: `1px solid ${_D.p}66`, borderRadius: 8, color: _D.p2, padding: '6px 14px', fontSize: 12, cursor: 'pointer' }}>
               ✏️ Manual
             </button>
           </div>
@@ -257,12 +256,12 @@ TAGS:
       </div>
 
       {/* Filtros por categoria */}
-      <div style={{ padding: '10px 16px 0', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: `1px solid ${D.border}` }}>
-        <button onClick={() => setFilterCat('todos')} style={{ background: filterCat === 'todos' ? D.p : D.bg3, border: `1px solid ${filterCat === 'todos' ? D.p : D.border}`, borderRadius: 20, padding: '4px 12px', fontSize: 11, color: filterCat === 'todos' ? '#fff' : D.t3, cursor: 'pointer', fontWeight: filterCat === 'todos' ? 600 : 400 }}>
+      <div style={{ padding: '10px 16px 0', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: `1px solid ${_D.border}` }}>
+        <button onClick={() => setFilterCat('todos')} style={{ background: filterCat === 'todos' ? _D.p : _D.bg3, border: `1px solid ${filterCat === 'todos' ? _D.p : _D.border}`, borderRadius: 20, padding: '4px 12px', fontSize: 11, color: filterCat === 'todos' ? '#fff' : _D.t3, cursor: 'pointer', fontWeight: filterCat === 'todos' ? 600 : 400 }}>
           Todos ({items.length})
         </button>
         {CATEGORIAS.map(c => (
-          <button key={c.id} onClick={() => setFilterCat(c.id)} style={{ background: filterCat === c.id ? `${c.color}22` : D.bg3, border: `1px solid ${filterCat === c.id ? c.color : D.border}`, borderRadius: 20, padding: '4px 12px', fontSize: 11, color: filterCat === c.id ? c.color : D.t3, cursor: 'pointer', fontWeight: filterCat === c.id ? 600 : 400 }}>
+          <button key={c.id} onClick={() => setFilterCat(c.id)} style={{ background: filterCat === c.id ? `${c.color}22` : _D.bg3, border: `1px solid ${filterCat === c.id ? c.color : _D.border}`, borderRadius: 20, padding: '4px 12px', fontSize: 11, color: filterCat === c.id ? c.color : _D.t3, cursor: 'pointer', fontWeight: filterCat === c.id ? 600 : 400 }}>
             {c.label} ({catCounts[c.id] || 0})
           </button>
         ))}
