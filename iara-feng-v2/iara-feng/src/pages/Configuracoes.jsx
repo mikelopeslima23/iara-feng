@@ -35,7 +35,8 @@ export default function Configuracoes() {
   const [form,     setForm]     = useState({ nome: '', email: '', cor: '#7C3AED', admin: false })
   const [saving,   setSaving]   = useState(false)
   const [msg,      setMsg]      = useState(null)
-  const [inviteError, setInviteError] = useState('') // {type: 'ok'|'err', text}
+  const [inviteError, setInviteError] = useState('')
+  const [linkModal, setLinkModal] = useState(null) // {type: 'ok'|'err', text}
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -116,7 +117,12 @@ export default function Configuracoes() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      alert(`✅ E-mail de acesso reenviado para ${email}`)
+      if (data.link) {
+        // Mostra o link para copiar e enviar via WhatsApp/Slack
+        setLinkModal({ email, link: data.link })
+      } else {
+        alert(`✅ Acesso reenviado para ${email}`)
+      }
     } catch (err) {
       alert('❌ Erro: ' + err.message)
     }
@@ -245,6 +251,33 @@ export default function Configuracoes() {
           Para redefinir uma senha, o usuário pode clicar em "Esqueci minha senha" na tela de login.
         </div>
       </div>
+
+      {/* Modal Link de Acesso */}
+      {linkModal && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:300,padding:16,backdropFilter:'blur(6px)'}}
+          onClick={()=>setLinkModal(null)}>
+          <div style={{background:'#13111E',border:'1px solid #2A2640',borderRadius:18,width:'100%',maxWidth:480,padding:'24px',boxShadow:'0 24px 80px rgba(0,0,0,.4)'}}
+            onClick={e=>e.stopPropagation()}>
+            <div style={{fontSize:15,fontWeight:700,color:'#EEEAF8',marginBottom:8}}>🔗 Link de acesso para {linkModal.email}</div>
+            <div style={{fontSize:12,color:'#8A84AA',marginBottom:14,lineHeight:1.6}}>
+              O e-mail não pôde ser enviado automaticamente. Copie o link abaixo e envie diretamente ao usuário via WhatsApp ou Slack. <strong style={{color:'#FCD34D'}}>Válido por 24 horas.</strong>
+            </div>
+            <div style={{background:'#0D0B14',border:'1px solid #3D3860',borderRadius:8,padding:'10px 12px',fontSize:11,color:'#C4A7FF',wordBreak:'break-all',marginBottom:14,fontFamily:'monospace'}}>
+              {linkModal.link}
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={()=>{navigator.clipboard.writeText(linkModal.link);alert('Link copiado!')}}
+                style={{flex:2,background:'#9D5CF6',border:'none',borderRadius:10,color:'white',padding:'11px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                📋 Copiar link
+              </button>
+              <button onClick={()=>setLinkModal(null)}
+                style={{flex:1,background:'transparent',border:'1px solid #2A2640',borderRadius:10,color:'#8A84AA',padding:'11px',fontSize:13,cursor:'pointer'}}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Convidar */}
       {showInvite && (
