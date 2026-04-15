@@ -19,6 +19,7 @@ export default function Login() {
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
   const [showPass, setShowPass] = useState(false)
+  const [resetLink, setResetLink] = useState('')
 
   // Detecta token de convite ou reset na URL
   useEffect(() => {
@@ -98,13 +99,28 @@ export default function Login() {
   async function handleForgotPassword() {
     if (!email.trim()) { setError('Digite seu e-mail para redefinir a senha.'); return }
     setLoading(true)
-    const { error: err } = await supabase.auth.resetPasswordForEmail(
-      email.trim().toLowerCase(),
-      { redirectTo: `${window.location.origin}/login` }
-    )
+    try {
+      // Tenta via backend (gera link direto, sem rate limit)
+      const res = await fetch('/api/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), nome: email.trim(), resend: true }),
+      })
+      const data = await res.json()
+      if (data.link) {
+        // Rate limit ativo — mostra link para copiar
+        setResetLink(data.link)
+        setError('')
+      } else if (data.success) {
+        setError('')
+        alert('E-mail enviado! Verifique sua caixa de entrada.')
+      } else {
+        throw new Error(data.error || 'Erro ao gerar link')
+      }
+    } catch (err) {
+      setError('Erro ao gerar link de acesso. Tente novamente.')
+    }
     setLoading(false)
-    if (err) setError('Erro ao enviar e-mail.')
-    else { setError(''); alert('E-mail enviado! Verifique sua caixa de entrada.') }
   }
 
   const inp = {
@@ -217,6 +233,18 @@ export default function Login() {
             <button onClick={handleForgotPassword} disabled={loading}
               style={{background:'none',border:'none',color:D.t3,fontSize:12,cursor:'pointer',textDecoration:'underline'}}>
               Esqueci minha senha
+            </button>
+          </div>
+        )}
+
+        {resetLink && (
+          <div style={{marginTop:14,background:'rgba(157,92,246,.1)',border:'1px solid rgba(157,92,246,.3)',borderRadius:10,padding:'12px 14px'}}>
+            <div style={{fontSize:12,color:'#C4A7FF',fontWeight:600,marginBottom:6}}>⚠️ E-mail indisponível no momento</div>
+            <div style={{fontSize:11,color:'#8A84AA',marginBottom:10}}>Copie o link abaixo e envie para o usuário via WhatsApp ou Slack. Válido por 24h.</div>
+            <div style={{background:'#0D0B14',borderRadius:6,padding:'8px 10px',fontSize:10,color:'#C4A7FF',wordBreak:'break-all',fontFamily:'monospace',marginBottom:10}}>{resetLink}</div>
+            <button onClick={()=>{navigator.clipboard.writeText(resetLink);alert('Link copiado!')}}
+              style={{width:'100%',background:'#9D5CF6',border:'none',borderRadius:8,color:'white',padding:'9px',fontSize:12,fontWeight:700,cursor:'pointer'}}>
+              📋 Copiar link
             </button>
           </div>
         )}
