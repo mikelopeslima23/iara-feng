@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 // ── Dark tokens inline ─────────────────────────────────────────────────────
@@ -24,8 +24,10 @@ const NAV = [
 function avInit(n){const p=(n||'').split(' ');return(p[0]?.[0]||'')+(p[1]?.[0]||'')}
 
 export default function Configuracoes() {
-  const navigate = useNavigate()
-  const user     = JSON.parse(localStorage.getItem('iara_user') || '{}')
+  const navigate  = useNavigate()
+  const location  = useLocation()
+  const user      = JSON.parse(localStorage.getItem('iara_user') || '{}')
+  const forcedChangePassword = new URLSearchParams(location.search).get('change_password') === '1'
   const isAdmin  = user.admin === true
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -36,7 +38,10 @@ export default function Configuracoes() {
   const [saving,   setSaving]   = useState(false)
   const [msg,      setMsg]      = useState(null)
   const [inviteError, setInviteError] = useState('')
-  const [linkModal, setLinkModal] = useState(null) // {type: 'ok'|'err', text}
+  const [linkModal, setLinkModal] = useState(null)
+  const [showChangePass, setShowChangePass] = useState(false)
+  const [passForm, setPassForm] = useState({ nova: '', confirma: '' })
+  const [passMsg, setPassMsg] = useState(null) // {type: 'ok'|'err', text}
 
   function set(k, v) { setForm(f => ({ ...f, [k]: v })) }
 
@@ -168,6 +173,69 @@ export default function Configuracoes() {
           onClick={()=>{localStorage.removeItem('iara_user');navigate('/login')}}>{avInit(user.nome)}</div>
       </div>
 
+      {/* Forçar troca de senha no primeiro acesso */}
+      {forcedChangePassword && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,.85)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:400,padding:16,backdropFilter:'blur(8px)'}}>
+          <div style={{background:D.bg2,border:`1px solid ${D.p}44`,borderRadius:20,width:'100%',maxWidth:420,padding:'28px 28px',boxShadow:`0 24px 80px ${D.p}22`}}>
+            <div style={{textAlign:'center',marginBottom:20}}>
+              <div style={{fontSize:32,marginBottom:8}}>🔑</div>
+              <div style={{fontSize:16,fontWeight:700,color:D.t1}}>Bem-vindo ao IAra!</div>
+              <div style={{fontSize:12,color:D.t3,marginTop:6,lineHeight:1.6}}>
+                Por segurança, crie uma senha pessoal antes de continuar.<br/>
+                <strong style={{color:D.y2}}>Não use a senha provisória novamente.</strong>
+              </div>
+            </div>
+
+            {passMsg && (
+              <div style={{background:passMsg.type==='ok'?D.gf:D.rf,border:`1px solid ${passMsg.type==='ok'?D.g:D.r}44`,borderRadius:8,padding:'9px 12px',fontSize:12,color:passMsg.type==='ok'?D.g2:D.r2,marginBottom:12}}>
+                {passMsg.text}
+              </div>
+            )}
+
+            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+              <div>
+                <label style={{fontSize:11,fontWeight:700,color:D.t3,display:'block',marginBottom:5}}>NOVA SENHA</label>
+                <input type="password" value={passForm.nova}
+                  onChange={e=>setPassForm(f=>({...f,nova:e.target.value}))}
+                  placeholder="Mínimo 6 caracteres" autoFocus
+                  style={{width:'100%',background:D.bg3,border:`1px solid ${D.border}`,borderRadius:8,padding:'11px 12px',color:D.t1,fontSize:14,outline:'none'}}
+                  onFocus={e=>e.target.style.borderColor=D.p}
+                  onBlur={e=>e.target.style.borderColor=D.border}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,fontWeight:700,color:D.t3,display:'block',marginBottom:5}}>CONFIRMAR SENHA</label>
+                <input type="password" value={passForm.confirma}
+                  onChange={e=>setPassForm(f=>({...f,confirma:e.target.value}))}
+                  placeholder="Repita a nova senha"
+                  style={{width:'100%',background:D.bg3,border:`1px solid ${D.border}`,borderRadius:8,padding:'11px 12px',color:D.t1,fontSize:14,outline:'none'}}
+                  onFocus={e=>e.target.style.borderColor=D.p}
+                  onBlur={e=>e.target.style.borderColor=D.border}/>
+              </div>
+              <button
+                onClick={async () => {
+                  if (!passForm.nova || passForm.nova.length < 6) { setPassMsg({type:'err',text:'Senha deve ter ao menos 6 caracteres.'}); return }
+                  if (passForm.nova !== passForm.confirma) { setPassMsg({type:'err',text:'As senhas não coincidem.'}); return }
+                  if (passForm.nova === 'FengIara2024!') { setPassMsg({type:'err',text:'Não use a senha provisória. Escolha uma senha pessoal.'}); return }
+                  try {
+                    const { error } = await supabase.auth.updateUser({ password: passForm.nova })
+                    if (error) throw error
+                    // Remove flag must_change_password
+                    await supabase.from('user_profiles').update({ must_change_password: false }).eq('id', user.id)
+                    setPassMsg({type:'ok',text:'✅ Senha criada! Redirecionando...'})
+                    setPassForm({nova:'',confirma:''})
+                    setTimeout(() => navigate('/pipeline'), 1500)
+                  } catch(e) {
+                    setPassMsg({type:'err',text:e.message||'Erro ao salvar senha.'})
+                  }
+                }}
+                style={{marginTop:4,background:D.p,border:'none',borderRadius:10,color:'white',padding:'13px',fontSize:14,fontWeight:700,cursor:'pointer',boxShadow:`0 4px 20px ${D.p}44`}}>
+                Criar minha senha →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Topbar */}
       <div style={{height:52,background:D.bg2,borderBottom:`1px solid ${D.border}`,display:'flex',alignItems:'center',padding:'0 16px',gap:10,position:'sticky',top:0,zIndex:10}}>
         <button onClick={()=>setSidebarOpen(o=>!o)} style={{width:34,height:34,borderRadius:8,background:sidebarOpen?D.pf:'transparent',border:`1px solid ${sidebarOpen?D.p:D.border}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0}}>
@@ -249,6 +317,65 @@ export default function Configuracoes() {
           Ao convidar um usuário, ele recebe um e-mail automático do Supabase com um link para definir sua senha.
           Após definir a senha, o usuário pode entrar no IAra com e-mail e senha a qualquer momento.
           Para redefinir uma senha, o usuário pode clicar em "Esqueci minha senha" na tela de login.
+        </div>
+
+        {/* Trocar senha */}
+        <div style={{background:D.bg2,border:`1px solid ${D.border}`,borderRadius:12,padding:'16px 18px'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:D.t1}}>🔑 Minha senha</div>
+              <div style={{fontSize:11,color:D.t3,marginTop:2}}>Altere sua senha de acesso ao IAra</div>
+            </div>
+            <button onClick={()=>setShowChangePass(v=>!v)}
+              style={{background:D.pf,border:`1px solid ${D.p}44`,borderRadius:8,color:D.p2,padding:'6px 14px',fontSize:12,cursor:'pointer',fontWeight:600}}>
+              {showChangePass ? 'Cancelar' : 'Alterar senha'}
+            </button>
+          </div>
+
+          {showChangePass && (
+            <div style={{marginTop:14,display:'flex',flexDirection:'column',gap:10}}>
+              {passMsg && (
+                <div style={{background:passMsg.type==='ok'?D.gf:D.rf,border:`1px solid ${passMsg.type==='ok'?D.g:D.r}44`,borderRadius:8,padding:'9px 12px',fontSize:12,color:passMsg.type==='ok'?D.g2:D.r2}}>
+                  {passMsg.text}
+                </div>
+              )}
+              <div>
+                <label style={{fontSize:11,fontWeight:700,color:D.t3,display:'block',marginBottom:5}}>NOVA SENHA</label>
+                <input type="password" value={passForm.nova}
+                  onChange={e=>setPassForm(f=>({...f,nova:e.target.value}))}
+                  placeholder="Mínimo 6 caracteres"
+                  style={{width:'100%',background:D.bg3,border:`1px solid ${D.border}`,borderRadius:8,padding:'10px 12px',color:D.t1,fontSize:13,outline:'none'}}
+                  onFocus={e=>e.target.style.borderColor=D.p}
+                  onBlur={e=>e.target.style.borderColor=D.border}/>
+              </div>
+              <div>
+                <label style={{fontSize:11,fontWeight:700,color:D.t3,display:'block',marginBottom:5}}>CONFIRMAR NOVA SENHA</label>
+                <input type="password" value={passForm.confirma}
+                  onChange={e=>setPassForm(f=>({...f,confirma:e.target.value}))}
+                  placeholder="Repita a nova senha"
+                  style={{width:'100%',background:D.bg3,border:`1px solid ${D.border}`,borderRadius:8,padding:'10px 12px',color:D.t1,fontSize:13,outline:'none'}}
+                  onFocus={e=>e.target.style.borderColor=D.p}
+                  onBlur={e=>e.target.style.borderColor=D.border}/>
+              </div>
+              <button
+                onClick={async () => {
+                  if (!passForm.nova || passForm.nova.length < 6) { setPassMsg({type:'err',text:'Senha deve ter ao menos 6 caracteres.'}); return }
+                  if (passForm.nova !== passForm.confirma) { setPassMsg({type:'err',text:'As senhas não coincidem.'}); return }
+                  try {
+                    const { error } = await supabase.auth.updateUser({ password: passForm.nova })
+                    if (error) throw error
+                    setPassMsg({type:'ok',text:'✅ Senha alterada com sucesso!'})
+                    setPassForm({nova:'',confirma:''})
+                    setTimeout(()=>{setShowChangePass(false);setPassMsg(null)}, 2000)
+                  } catch(e) {
+                    setPassMsg({type:'err',text:e.message||'Erro ao alterar senha.'})
+                  }
+                }}
+                style={{background:D.p,border:'none',borderRadius:9,color:'white',padding:'11px',fontSize:13,fontWeight:700,cursor:'pointer'}}>
+                Salvar nova senha
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
