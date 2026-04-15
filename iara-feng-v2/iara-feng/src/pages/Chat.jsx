@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory, getKnowledge, getNotifications, markNotificationRead, markAllRead, createNotification, upsertContact, logAudit, getAuditLog } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL, USERS } from '../data/pipeline'
 import { getTheme, saveTheme, THEMES } from '../lib/theme'
@@ -806,15 +806,15 @@ export default function Chat() {
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: D.bg, color: D.t1, fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: _D.bg, color: _D.t1, fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden' }}>
       <style>{`
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
         @keyframes blink{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
         @keyframes badgePop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-        ::-webkit-scrollbar{width:3px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:${D.border2};border-radius:3px}
+        ::-webkit-scrollbar{width:3px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:${_D.border2};border-radius:3px}
         textarea{-webkit-appearance:none}
-        .chip:hover{background:${D.bg3}!important;border-color:${D.p}!important}
+        .chip:hover{background:${_D.bg3}!important;border-color:${_D.p}!important}
         .chip:active{transform:scale(0.95)} .send-btn:active{transform:scale(0.92)}
         @media(max-width:600px){.header-extras{display:none!important}}
       `}</style>
@@ -822,24 +822,24 @@ export default function Chat() {
       <_SidebarNav open={_sidebarOpen} onClose={()=>_setSidebarOpen(false)} currentPath={_location.pathname} onLogout={()=>{localStorage.removeItem("iara_user");navigate("/login")}} userNome={user.nome}/>
 
       {/* ── TOPBAR ── */}
-      <div style={{ height: 52, background: D.bg2, borderBottom: `1px solid ${D.border}`, display: 'flex', alignItems: 'center', padding: '0 14px', gap: 10, flexShrink: 0, zIndex: 10, position: 'relative' }}>
+      <div style={{ height: 52, background: _D.bg2, borderBottom: `1px solid ${_D.border}`, display: 'flex', alignItems: 'center', padding: '0 14px', gap: 10, flexShrink: 0, zIndex: 10, position: 'relative' }}>
         <_HamburgerBtn open={_sidebarOpen} onClick={()=>_setSidebarOpen(o=>!o)}/>
         <div style={{width:28,height:28,background:_D.p,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:11,fontWeight:800,color:"white",letterSpacing:"-.5px"}}>IA</span></div>
 
         {/* IAra identity */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: D.p, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0 }}>IA</div>
+          <div style={{ width: 32, height: 32, borderRadius: '50%', background: _D.p, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0 }}>IA</div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: D.t1, letterSpacing: '.05em' }}>IAra</span>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: D.g, display: 'inline-block', animation: 'pulse 2s ease infinite' }} />
-              <span style={{ fontSize: 10, color: D.g2 }}>online</span>
-              {isAdmin && <span style={{ fontSize: 9, background: D.pf, color: D.p2, border: `1px solid ${D.p}44`, borderRadius: 4, padding: '1px 6px' }}>admin</span>}
+              <span style={{ fontSize: 14, fontWeight: 700, color: _D.t1, letterSpacing: '.05em' }}>IAra</span>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: _D.g, display: 'inline-block', animation: 'pulse 2s ease infinite' }} />
+              <span style={{ fontSize: 10, color: _D.g2 }}>online</span>
+              {isAdmin && <span style={{ fontSize: 9, background: _D.pf, color: _D.p2, border: `1px solid ${_D.p}44`, borderRadius: 4, padding: '1px 6px' }}>admin</span>}
             </div>
-            <div style={{ fontSize: 10, color: D.t3 }}>
+            <div style={{ fontSize: 10, color: _D.t3 }}>
               Agente comercial FENG
-              {memCount > 0 && <span style={{ color: D.p2, marginLeft: 5 }}>· 🧠 {memCount}</span>}
-              {knowCount > 0 && <span style={{ color: D.g2, marginLeft: 5 }}>· 📚 {knowCount}</span>}
+              {memCount > 0 && <span style={{ color: _D.p2, marginLeft: 5 }}>· 🧠 {memCount}</span>}
+              {knowCount > 0 && <span style={{ color: _D.g2, marginLeft: 5 }}>· 📚 {knowCount}</span>}
             </div>
           </div>
         </div>
@@ -847,42 +847,42 @@ export default function Chat() {
         {/* Right actions */}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
           {/* Stats chip */}
-          <div style={{ background: D.bg3, border: `1px solid ${D.border}`, borderRadius: 6, padding: '3px 10px', fontSize: 11 }}>
-            <span style={{ color: D.p2, fontWeight: 600 }}>{ativosCount}</span>
-            <span style={{ color: D.t3 }}> · </span>
-            <span style={{ color: D.o, fontWeight: 600 }}>{pendCount}</span>
+          <div style={{ background: _D.bg3, border: `1px solid ${_D.border}`, borderRadius: 6, padding: '3px 10px', fontSize: 11 }}>
+            <span style={{ color: _D.p2, fontWeight: 600 }}>{ativosCount}</span>
+            <span style={{ color: _D.t3 }}> · </span>
+            <span style={{ color: _D.o, fontWeight: 600 }}>{pendCount}</span>
           </div>
 
           {/* Notificações */}
           <button onClick={() => setShowNotifs(v => !v)}
-            style={{ position: 'relative', width: 34, height: 34, borderRadius: 8, border: `1px solid ${unreadCount > 0 ? D.p + '44' : D.border}`, background: unreadCount > 0 ? D.pf : 'transparent', color: unreadCount > 0 ? D.p2 : D.t2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14 }}>
+            style={{ position: 'relative', width: 34, height: 34, borderRadius: 8, border: `1px solid ${unreadCount > 0 ? _D.p + '44' : _D.border}`, background: unreadCount > 0 ? _D.pf : 'transparent', color: unreadCount > 0 ? _D.p2 : _D.t2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14 }}>
             🔔
-            {unreadCount > 0 && <div style={{ position: 'absolute', top: -4, right: -4, background: D.r, color: 'white', borderRadius: '50%', width: 15, height: 15, fontSize: 8, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'badgePop 0.3s ease', border: `2px solid ${D.bg2}` }}>{unreadCount > 9 ? '9+' : unreadCount}</div>}
+            {unreadCount > 0 && <div style={{ position: 'absolute', top: -4, right: -4, background: _D.r, color: 'white', borderRadius: '50%', width: 15, height: 15, fontSize: 8, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'badgePop 0.3s ease', border: `2px solid ${_D.bg2}` }}>{unreadCount > 9 ? '9+' : unreadCount}</div>}
           </button>
 
           {/* Radar — admin only */}
           {isAdmin && <button onClick={() => send('IAra fechar Radar')} className="header-extras"
-            style={{ background: D.gf, border: `1px solid ${D.g}44`, borderRadius: 6, color: D.g2, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📊 Radar</button>}
+            style={{ background: _D.gf, border: `1px solid ${_D.g}44`, borderRadius: 6, color: _D.g2, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📊 Radar</button>}
           {isAdmin && radarReady && <button onClick={() => navigate('/radar')}
-            style={{ background: D.g, border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>Ver →</button>}
+            style={{ background: _D.g, border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>Ver →</button>}
 
           {/* Avatar / logout */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: D.bg3, border: `1px solid ${D.border}`, borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: _D.bg3, border: `1px solid ${_D.border}`, borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}
             onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
-            <div style={{ width: 20, height: 20, borderRadius: '50%', background: user.cor || D.p, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: 'white' }}>{user.iniciais}</div>
-            <span style={{ fontSize: 11, color: D.t2, fontWeight: 500 }}>{user.nome?.split(' ')[0]}</span>
+            <div style={{ width: 20, height: 20, borderRadius: '50%', background: user.cor || _D.p, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: 'white' }}>{user.iniciais}</div>
+            <span style={{ fontSize: 11, color: _D.t2, fontWeight: 500 }}>{user.nome?.split(' ')[0]}</span>
           </div>
 
           {/* Limpar chat */}
           <button onClick={handleClear}
-            style={{ width: 34, height: 34, background: 'none', border: `1px solid ${D.border}`, borderRadius: 7, color: D.t3, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}>🗑</button>
+            style={{ width: 34, height: 34, background: 'none', border: `1px solid ${_D.border}`, borderRadius: 7, color: _D.t3, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}>🗑</button>
         </div>
       </div>
 
       {showNotifs && <NotifModal notifs={notifs} userId={user.id} t={t} onClose={() => setShowNotifs(false)} onMarkRead={handleMarkRead} onMarkAll={handleMarkAll} />}
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 8px', display: 'flex', flexDirection: 'column', gap: 16, WebkitOverflowScrolling: 'touch', background: D.bg }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 8px', display: 'flex', flexDirection: 'column', gap: 16, WebkitOverflowScrolling: 'touch', background: _D.bg }}>
         {msgs.map(m => m.role === 'user' ? (
           <div key={m.id} style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'flex-end' }}>
             <div className="msg-text" style={{ background: t.msgUser, borderRadius: '16px 16px 3px 16px', padding: '12px 16px', maxWidth: '80%', fontSize: 15, lineHeight: 1.6, color: '#fff', wordBreak: 'break-word', boxShadow: '0 4px 16px rgba(124,58,237,0.3)' }}>{m.text}</div>
@@ -942,16 +942,16 @@ export default function Chat() {
         <textarea ref={txRef} value={inp} onChange={e => setInp(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
           placeholder="Mensagem para a IAra..."
-          style={{ flex: 1, background: D.bg3, border: `1px solid ${D.border}`, borderRadius: 12, padding: '12px 14px', color: D.t1, fontSize: 15, outline: 'none', resize: 'none', fontFamily: 'inherit', minHeight: 44, maxHeight: 140, lineHeight: 1.5, WebkitAppearance: 'none' }}
-          onFocus={e => e.target.style.borderColor = D.p}
-          onBlur={e => e.target.style.borderColor = D.border}
+          style={{ flex: 1, background: _D.bg3, border: `1px solid ${_D.border}`, borderRadius: 12, padding: '12px 14px', color: _D.t1, fontSize: 15, outline: 'none', resize: 'none', fontFamily: 'inherit', minHeight: 44, maxHeight: 140, lineHeight: 1.5, WebkitAppearance: 'none' }}
+          onFocus={e => e.target.style.borderColor = _D.p}
+          onBlur={e => e.target.style.borderColor = _D.border}
           rows={1} />
-        <button className="send-btn" onClick={() => send()} disabled={loading || !inp.trim()} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: loading || !inp.trim() ? D.bg3 : D.o, color: loading || !inp.trim() ? D.t3 : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loading || !inp.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, fontSize: 16, transition: 'all 0.15s' }}>➤</button>
+        <button className="send-btn" onClick={() => send()} disabled={loading || !inp.trim()} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: loading || !inp.trim() ? _D.bg3 : _D.o, color: loading || !inp.trim() ? _D.t3 : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loading || !inp.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, fontSize: 16, transition: 'all 0.15s' }}>➤</button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '3px 0', background: D.bg2, borderTop: `1px solid ${D.border}` }}>
-        <span style={{ fontSize: 9, color: D.t3, letterSpacing: '0.08em' }}>powered by</span>
-        <span style={{ fontSize: 9, fontWeight: 700, color: D.t3, letterSpacing: '0.15em' }}>FENG</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '3px 0', background: _D.bg2, borderTop: `1px solid ${_D.border}` }}>
+        <span style={{ fontSize: 9, color: _D.t3, letterSpacing: '0.08em' }}>powered by</span>
+        <span style={{ fontSize: 9, fontWeight: 700, color: _D.t3, letterSpacing: '0.15em' }}>FENG</span>
       </div>
     </div>
   )
