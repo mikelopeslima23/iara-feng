@@ -682,22 +682,38 @@ function RankingModal({ leads, acts, contactsMap, onClose }) {
   const hojeISO = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
   const stats = TEAM_RANK.map(nome => {
     const fn = nome.split(' ')[0]
-    const ml = leads.filter(l => !l.off && !l.op && l.resp?.includes(fn))
+    // Pipeline ativos + Go-Live (para contato e atrasadas)
+    const mlPipeline = leads.filter(l => !l.off && !l.op && l.resp?.includes(fn))
+    const mlGoLive   = leads.filter(l => !l.off &&  l.op && l.resp?.includes(fn))
+    const mlTodos    = [...mlPipeline, ...mlGoLive]
     let semContato=0, semAtividade=0, atrasadas=0
-    ml.forEach(l => {
+
+    mlTodos.forEach(l => {
       const ck=(l.conta||l.nome||'').toLowerCase(), nk=(l.nome||'').toLowerCase(), sk=(l.servico||'').toLowerCase()
       const cc=contactsMap[ck]||[]
+      // Sem contato → conta para todos (pipeline + go-live)
       if(!cc.some(c=>c.tipo==='contato')) semContato++
+
       const pend=acts.filter(a=>{
         if(a.ok)return false; const al=(a.lead||'').toLowerCase()
         if(nk&&al===nk)return true
         if(sk)return al.includes(ck)&&al.includes(sk)
         return al.includes(ck)&&!al.includes(' — ')
       })
-      if(pend.length===0) semAtividade++
+
+      // Sem próxima atividade → só pipeline OU go-live em renovação (≤120 dias)
+      if(!l.op) {
+        if(pend.length===0) semAtividade++
+      } else {
+        const diasVenc = l.vencimento ? Math.ceil((new Date(l.vencimento) - new Date()) / (1000*60*60*24)) : null
+        const emRenovacao = diasVenc !== null && diasVenc <= 120
+        if(emRenovacao && pend.length===0) semAtividade++
+      }
+
+      // Atrasadas → conta para todos
       if(pend.some(a=>a.dt&&a.dt<hojeISO)) atrasadas++
     })
-    return { nome, fn, semContato, semAtividade, atrasadas, total:semContato+semAtividade+atrasadas, cards:ml.length }
+    return { nome, fn, semContato, semAtividade, atrasadas, total:semContato+semAtividade+atrasadas, cards:mlTodos.length }
   }).filter(s=>s.cards>0)
 
   const D2={bg:'#0D0B14',bg2:'#13111E',bg3:'#1A1729',border:'#2A2640',p:'#9D5CF6',p2:'#C4A7FF',pf:'rgba(157,92,246,.15)',t1:'#EEEAF8',t2:'#B8B2D4',t3:'#8A84AA',r:'#EF4444',rf:'rgba(239,68,68,.12)',r2:'#FCA5A5',g:'#10B981',y:'#F59E0B'}
@@ -843,16 +859,17 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
   // Fallback: match só pela conta (para atividades antigas sem serviço no lead)
   const allActs = acts
     .filter(a => {
-      const actLead = (a.lead || '').toLowerCase()
-      // Se a atividade tem o nome completo da oportunidade → match exato
+      const actLead = (a.lead || '').toLowerCase().trim()
+      // 1. Match exato pelo nome completo da oportunidade (mais confiável)
       if (nomeKey && actLead === nomeKey) return true
-      // Se o card tem serviço definido, só inclui atividades que referenciam este serviço específico
+      // 2. Card com serviço: atividade deve referenciar EXATAMENTE "conta — serviço"
       if (lead.servico) {
-        const servKey = lead.servico.toLowerCase()
-        return actLead.includes(contaKey) && actLead.includes(servKey)
+        const nomeCompleto = `${contaKey} — ${lead.servico.toLowerCase()}`
+        return actLead === nomeCompleto
       }
-      // Card sem serviço (prospecção): inclui atividades genéricas da conta
-      return actLead.includes(contaKey) && !actLead.includes(' — ')
+      // 3. Card sem serviço (só prospecção genérica): match exato só pela conta
+      // e atividade NÃO pode ter " — " (seria de outra oportunidade da mesma conta)
+      return actLead === contaKey
     })
     .sort((a, b) => {
       if (!a.ok && b.ok)  return -1
@@ -1613,6 +1630,11 @@ export default function Pipeline() {
           return !cc.some(c => c.tipo === 'contato')
         })
         const semAtividade = meusLeads.filter(l => {
+          // Go-Live só conta se estiver em renovação (≤120 dias)
+          if (l.op) {
+            const diasVenc = l.vencimento ? Math.ceil((new Date(l.vencimento) - new Date()) / (1000*60*60*24)) : null
+            if (diasVenc === null || diasVenc > 120) return false
+          }
           const nome = (l.nome || '').toLowerCase()
           const contaK = (l.conta || l.nome || '').toLowerCase()
           const servK = (l.servico || '').toLowerCase()
