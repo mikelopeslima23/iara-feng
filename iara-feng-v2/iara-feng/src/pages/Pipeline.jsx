@@ -2247,7 +2247,7 @@ export default function Pipeline() {
           </div>
         </div>
 
-      <div style={{ flex: 1, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 16, overflow: 'hidden' }}>
+      <div style={{ flex: 1, padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 16, overflow: aba === 'pipeline' ? 'hidden' : 'auto' }}>
 
         {/* ══ PIPELINE ══ */}
         {aba === 'pipeline' && <>
