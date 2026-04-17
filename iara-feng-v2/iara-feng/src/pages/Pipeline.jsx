@@ -1822,9 +1822,22 @@ export default function Pipeline() {
         paralelo:           '',
         valor:              form.valor || '',
         ultima_atualizacao: hoje,
+        pais:               form.pais || '',
       }
-      await upsertLead(nL)
+
+      // Salva no estado local primeiro (otimista) — usuário vê o card imediatamente
       setLeads(prev => [...prev, nL])
+      setShowNovaOpp(false)
+      setSelected(nL)
+
+      // Salva no banco em background — se falhar, o card ainda aparece na sessão
+      try {
+        await upsertLead(nL)
+      } catch (dbErr) {
+        console.error('Erro ao salvar lead no banco:', dbErr)
+        // Não bloqueia — card já está visível, usuário pode continuar
+      }
+
       if (primeiraAtv && primeiraAtv.descricao?.trim()) {
         const nA = {
           id:        `act-${Date.now()}`,
@@ -1836,14 +1849,16 @@ export default function Pipeline() {
           resp:      form.resp || user.nome,
           tipo:      primeiraAtv.tipo || 'FUP',
         }
-        await upsertActivity(nA)
         setActs(prev => [...prev, nA])
+        try {
+          await upsertActivity(nA)
+        } catch (actErr) {
+          console.error('Erro ao salvar atividade:', actErr)
+        }
       }
-      setShowNovaOpp(false)
-      setSelected(nL)
     } catch (e) {
       console.error('Erro ao criar oportunidade:', e)
-      throw e  // re-lança para o finally do handleFinalizar rodar setSaving(false)
+      throw e
     }
   }
 
