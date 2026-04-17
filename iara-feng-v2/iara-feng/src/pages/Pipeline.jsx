@@ -2142,12 +2142,11 @@ export default function Pipeline() {
 
 
             {/* Pendências badge */}
+            {/* Ranking de Pendências — sempre visível */}
             {(() => {
-              const meuNome = user.nome?.split(' ')[0] || ''
-              const meusAtivos = leads.filter(l => !l.off && !l.op && respMatch(l.resp, user.nome || ''))
               const hojeISO = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
               let total = 0
-              meusAtivos.forEach(l => {
+              leads.filter(l => !l.off).forEach(l => {
                 const cc = contactsMap[(l.conta || l.nome || '').toLowerCase()] || []
                 if (!cc.some(c => c.tipo === 'contato')) total++
                 const nomeK = (l.nome || '').toLowerCase()
@@ -2160,14 +2159,13 @@ export default function Pipeline() {
                   if (servK) return al.includes(contaK) && al.includes(servK)
                   return al.includes(contaK) && !al.includes(' — ')
                 })
-                if (pend.length === 0) total++
+                if (!l.op && pend.length === 0) total++
                 if (pend.some(a => a.dt && a.dt < hojeISO)) total++
               })
-              if (total === 0) return null
               return (
-                <button onClick={() => setShowRanking(true)} title="Ver ranking de pendências"
-                  style={{ height: 32, padding: '0 10px', background: `${D.r}18`, border: `1px solid ${D.r}44`, borderRadius: 8, color: D.r2, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-                  ⚠ {total} pendências
+                <button onClick={() => setShowRanking(true)} title="Ver ranking de pendências do time"
+                  style={{ height: 32, padding: '0 10px', background: total > 0 ? `${D.r}18` : D.bg3, border: `1px solid ${total > 0 ? D.r + '44' : D.border}`, borderRadius: 8, color: total > 0 ? D.r2 : D.t3, fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  🏆 {total > 0 ? `${total} pendências` : 'Ranking'}
                 </button>
               )
             })()}
