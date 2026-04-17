@@ -683,8 +683,8 @@ function RankingModal({ leads, acts, contactsMap, onClose }) {
   const stats = TEAM_RANK.map(nome => {
     const fn = nome.split(' ')[0]
     // Pipeline ativos + Go-Live (para contato e atrasadas)
-    const mlPipeline = leads.filter(l => !l.off && !l.op && l.resp?.includes(fn))
-    const mlGoLive   = leads.filter(l => !l.off &&  l.op && l.resp?.includes(fn))
+    const mlPipeline = leads.filter(l => !l.off && !l.op && respMatch(l.resp, nome))
+    const mlGoLive   = leads.filter(l => !l.off &&  l.op && respMatch(l.resp, nome))
     const mlTodos    = [...mlPipeline, ...mlGoLive]
     let semContato=0, semAtividade=0, atrasadas=0
 
@@ -1619,10 +1619,10 @@ export default function Pipeline() {
 
       // ── Daily Briefing — uma vez por dia por usuário ─────────────────────────
       const hoje2 = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
-      const briefingKey = `iara_briefing_${hoje2}_${user.id || user.nome}`
-      if (!localStorage.getItem(briefingKey)) {
+      // Mostra briefing em todo login (sem filtro de data)
+      {
         const primeiroNome = user.nome?.split(' ')[0] || 'Parceiro'
-        const meusLeads = lAged.filter(l => !l.off && !l.op && l.resp?.includes(primeiroNome))
+        const meusLeads = lAged.filter(l => !l.off && !l.op && respMatch(l.resp, user.nome || ''))
         const hojeISO = hoje2
 
         const semContato = meusLeads.filter(l => {
@@ -1683,7 +1683,6 @@ export default function Pipeline() {
           leads: comAtrasadas.map(l => l.conta || l.nome),
         })
         if (alertas.length > 0) {
-          localStorage.setItem(briefingKey, '1')
           setBriefing({ alertas, idx: 0 })
         }
       }
@@ -1758,6 +1757,19 @@ export default function Pipeline() {
       // Chama diretamente via supabase client — não depende de função exportada
       const { createClient } = await import('@supabase/supabase-js')
       // Usa a instância já criada via import dinâmico do módulo supabase
+
+// Verifica se um responsável bate com o nome do usuário (match exato por primeiro nome ou nome completo)
+function respMatch(resp, nome) {
+  if (!resp || !nome) return false
+  const nomeCompleto = nome.trim().toLowerCase()
+  const primeiroNome = nomeCompleto.split(' ')[0]
+  const respLower    = resp.trim().toLowerCase()
+  // Match exato pelo nome completo
+  if (respLower === nomeCompleto) return true
+  // Match pelo primeiro nome como palavra isolada (não substring)
+  const palavras = respLower.split(/[\s,/]+/)
+  return palavras.includes(primeiroNome)
+}
       const mod = await import('../lib/supabase')
       if (mod.supabase) {
         await mod.supabase.from('iara_leads').delete().eq('id', lead.id)
@@ -2133,7 +2145,7 @@ export default function Pipeline() {
             {/* Pendências badge */}
             {(() => {
               const meuNome = user.nome?.split(' ')[0] || ''
-              const meusAtivos = leads.filter(l => !l.off && !l.op && l.resp?.includes(meuNome))
+              const meusAtivos = leads.filter(l => !l.off && !l.op && respMatch(l.resp, user.nome || ''))
               const hojeISO = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
               let total = 0
               meusAtivos.forEach(l => {
