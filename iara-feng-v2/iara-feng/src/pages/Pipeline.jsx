@@ -1534,6 +1534,17 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─── RESP MATCH — match exato por primeiro nome ou nome completo ──────────────
+function respMatch(resp, nome) {
+  if (!resp || !nome) return false
+  const nomeCompleto = nome.trim().toLowerCase()
+  const primeiroNome = nomeCompleto.split(' ')[0]
+  const respLower    = resp.trim().toLowerCase()
+  if (respLower === nomeCompleto) return true
+  const palavras = respLower.split(/[\s,/]+/)
+  return palavras.includes(primeiroNome)
+}
+
 export default function Pipeline() {
   const navigate  = useNavigate()
   const user      = JSON.parse(localStorage.getItem('iara_user') || '{}')
@@ -1758,18 +1769,6 @@ export default function Pipeline() {
       const { createClient } = await import('@supabase/supabase-js')
       // Usa a instância já criada via import dinâmico do módulo supabase
 
-// Verifica se um responsável bate com o nome do usuário (match exato por primeiro nome ou nome completo)
-function respMatch(resp, nome) {
-  if (!resp || !nome) return false
-  const nomeCompleto = nome.trim().toLowerCase()
-  const primeiroNome = nomeCompleto.split(' ')[0]
-  const respLower    = resp.trim().toLowerCase()
-  // Match exato pelo nome completo
-  if (respLower === nomeCompleto) return true
-  // Match pelo primeiro nome como palavra isolada (não substring)
-  const palavras = respLower.split(/[\s,/]+/)
-  return palavras.includes(primeiroNome)
-}
       const mod = await import('../lib/supabase')
       if (mod.supabase) {
         await mod.supabase.from('iara_leads').delete().eq('id', lead.id)
