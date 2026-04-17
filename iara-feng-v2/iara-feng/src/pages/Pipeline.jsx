@@ -1750,10 +1750,25 @@ export default function Pipeline() {
   }
 
   async function handleReativar(form) {
-    const reativado = { ...form, off: false, dias: 0, aging: 'Hot' }
-    await upsertLead(reativado)
+    const reativado = { ...form, off: false, dias: 0, aging: 'Hot', ultima_atualizacao: new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) }
+    // Atualiza estado local imediatamente
     setLeads(prev => prev.map(l => l.id === form.id ? reativado : l))
     setSelected(null)
+    // Salva no banco — tenta até 2 vezes
+    let saved = false
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await upsertLead(reativado)
+        saved = true
+        break
+      } catch (e) {
+        console.error(`Tentativa ${attempt + 1} falhou:`, e)
+        if (attempt === 0) await new Promise(r => setTimeout(r, 800))
+      }
+    }
+    if (!saved) {
+      alert('⚠️ Card reativado localmente mas não salvou no banco. Recarregue a página e tente novamente, ou use o SQL:\n\nUPDATE iara_leads SET off = false, dias = 0 WHERE id = ' + form.id)
+    }
   }
 
   // Atualiza apenas o estado do lead no pai (sem lógica de mov/prox)
