@@ -1105,7 +1105,7 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
                       <div key={a.id} style={{ background: t.bg, border: `1px solid ${isAtrasada ? '#EF444433' : t.border}`, borderLeft: `3px solid ${isAtrasada ? '#EF4444' : cor}`, borderRadius: '0 10px 10px 0', padding: '10px 14px' }}>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
                           <span style={{ fontSize: 10, fontWeight: 700, color: cor, background: `${cor}15`, border: `1px solid ${cor}33`, borderRadius: 4, padding: '1px 6px' }}>{a.tipo || 'Atividade'}</span>
-                          {actNum && <span title={`Atividade #${a.id}`} style={{ fontSize: 8, color: '#3D3860', fontFamily: 'monospace' }}>#{actNum}</span>}
+                          {actNum && <span title={`Atividade #${a.id}`} style={{ fontSize: 9, color: '#5A5480', fontFamily: 'monospace', background: '#1A1729', border: '1px solid #2A2640', borderRadius: 3, padding: '1px 5px' }}>#{actNum}</span>}
                           {isAtrasada && <span style={{ fontSize: 10, color: '#EF4444', fontWeight: 700 }}>⏰ ATRASADA</span>}
                           <div style={{ marginLeft: 'auto', display: 'flex', gap: 5, flexShrink: 0 }}>
                             <button
@@ -1159,7 +1159,7 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
                                 <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 3 }}>
                                   <span style={{ fontSize: 10, fontWeight: 700, color: cor, background: `${cor}15`, border: `1px solid ${cor}33`, borderRadius: 4, padding: '1px 6px' }}>{a.tipo || 'Atividade'}</span>
                                   <span style={{ fontSize: 11, color: t.green, fontWeight: 600 }}>✓ Concluída</span>
-                                  {actNum && <span title={`Atividade #${a.id}`} style={{ fontSize: 8, color: '#3D3860', fontFamily: 'monospace' }}>#{actNum}</span>}
+                                  {actNum && <span title={`Atividade #${a.id}`} style={{ fontSize: 9, color: '#5A5480', fontFamily: 'monospace', background: '#1A1729', border: '1px solid #2A2640', borderRadius: 3, padding: '1px 5px' }}>#{actNum}</span>}
                                 </div>
                                 <div style={{ fontSize: 13, color: t.text, lineHeight: 1.4 }}>{a.descricao}</div>
                                 <div style={{ fontSize: 11, color: t.textMuted, marginTop: 3 }}>👤 {a.resp}</div>
@@ -2409,9 +2409,15 @@ export default function Pipeline() {
                           {l.prox && <div style={{ fontSize: 10, color: D.t3, borderTop: `1px solid ${D.border}`, paddingTop: 5, marginTop: 5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>→ {l.prox}</div>}
 
                           {/* Card ID — canto inferior direito */}
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
-                            <span title={`Card #${l.id}`} style={{ fontSize: 8, color: D.border2, fontFamily: 'monospace', letterSpacing: '.02em' }}>#{l.id}</span>
-                          </div>
+                          {(() => {
+                            const cid = typeof l.id === 'number' ? l.id : String(l.id).replace(/[^0-9]/g,'').slice(-4)
+                            if (!cid) return null
+                            return (
+                              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 5 }}>
+                                <span title={`Card #${l.id}`} style={{ fontSize: 9, color: D.t3, fontFamily: 'monospace', background: D.bg3, border: `1px solid ${D.border}`, borderRadius: 3, padding: '1px 5px', letterSpacing: '.02em' }}>#{cid}</span>
+                              </div>
+                            )
+                          })()}
                         </div>
                       )
                     })}
