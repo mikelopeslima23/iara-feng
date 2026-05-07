@@ -1808,76 +1808,82 @@ export default function Pipeline() {
   }
 
   async function handleCriarOpp(form, primeiraAtv = null) {
+    const norm = s => (s || '').toLowerCase().trim()
+    const jaExiste = leads.find(l =>
+      norm(l.conta || l.nome) === norm(form.conta) &&
+      form.servico &&
+      norm(l.servico) === norm(form.servico)
+    )
+    if (jaExiste) {
+      alert(`Já existe: ${form.conta}${form.servico ? ` — ${form.servico}` : ''} no pipeline.`)
+      return
+    }
+    const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+    const nome = form.conta && form.servico ? `${form.conta} — ${form.servico}` : form.conta
+    const nL = {
+      id:                 `opp-${Date.now()}`,
+      nome,
+      conta:              form.conta || '',
+      servico:            form.servico || '',
+      etapa:              form.etapa || 'Prospecção',
+      resp:               form.resp || user.nome,
+      dias:               0,
+      aging:              'Hot',
+      mov:                form.mov || '',
+      prox:               form.prox || '',
+      dt:                 form.dt   || '',
+      op:                 false,
+      off:                false,
+      g12:                false,
+      risco:              '',
+      vencimento:         '',
+      paralelo:           '',
+      valor:              form.valor || '',
+      ultima_atualizacao: hoje,
+      pais:               form.pais || '',
+    }
+
+    // 1. Salva no banco PRIMEIRO — se falhar, usuário precisa saber antes de fechar o modal
     try {
-      const norm = s => (s || '').toLowerCase().trim()
-      const jaExiste = leads.find(l =>
-        norm(l.conta || l.nome) === norm(form.conta) &&
-        form.servico &&
-        norm(l.servico) === norm(form.servico)
+      await upsertLead(nL)
+    } catch (dbErr) {
+      console.error('Erro ao salvar lead no banco:', dbErr)
+      alert(
+        `❌ Erro ao salvar o lead "${nome}" no banco:\n\n` +
+        `${dbErr?.message || 'erro desconhecido'}\n\n` +
+        `Nada foi gravado. Verifique sua conexão e tente novamente.`
       )
-      if (jaExiste) {
-        alert(`Já existe: ${form.conta}${form.servico ? ` — ${form.servico}` : ''} no pipeline.`)
-        return
-      }
-      const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
-      const nome = form.conta && form.servico ? `${form.conta} — ${form.servico}` : form.conta
-      const nL = {
-        id:                 `opp-${Date.now()}`,
-        nome,
-        conta:              form.conta || '',
-        servico:            form.servico || '',
-        etapa:              form.etapa || 'Prospecção',
-        resp:               form.resp || user.nome,
-        dias:               0,
-        aging:              'Hot',
-        mov:                form.mov || '',
-        prox:               form.prox || '',
-        dt:                 form.dt   || '',
-        op:                 false,
-        off:                false,
-        g12:                false,
-        risco:              '',
-        vencimento:         '',
-        paralelo:           '',
-        valor:              form.valor || '',
-        ultima_atualizacao: hoje,
-        pais:               form.pais || '',
-      }
+      return  // mantém modal aberto; wizard limpa saving via finally
+    }
 
-      // Salva no estado local primeiro (otimista) — usuário vê o card imediatamente
-      setLeads(prev => [...prev, nL])
-      setShowNovaOpp(false)
-      setSelected(nL)
+    // 2. DB save passou — agora sim atualiza UI e fecha modal
+    setLeads(prev => [...prev, nL])
+    setShowNovaOpp(false)
+    setSelected(nL)
 
-      // Salva no banco em background — se falhar, o card ainda aparece na sessão
+    // 3. Atividade inicial opcional — lead já está salvo, isolar a falha
+    if (primeiraAtv && primeiraAtv.descricao?.trim()) {
+      const nA = {
+        id:        `act-${Date.now()}`,
+        ok:        false,
+        criado:    hoje,
+        lead:      nome,
+        descricao: primeiraAtv.descricao.trim(),
+        dt:        primeiraAtv.dt || hoje,
+        resp:      form.resp || user.nome,
+        tipo:      primeiraAtv.tipo || 'FUP',
+      }
       try {
-        await upsertLead(nL)
-      } catch (dbErr) {
-        console.error('Erro ao salvar lead no banco:', dbErr)
-        // Não bloqueia — card já está visível, usuário pode continuar
-      }
-
-      if (primeiraAtv && primeiraAtv.descricao?.trim()) {
-        const nA = {
-          id:        `act-${Date.now()}`,
-          ok:        false,
-          criado:    hoje,
-          lead:      nome,
-          descricao: primeiraAtv.descricao.trim(),
-          dt:        primeiraAtv.dt || hoje,
-          resp:      form.resp || user.nome,
-          tipo:      primeiraAtv.tipo || 'FUP',
-        }
+        await upsertActivity(nA)
         setActs(prev => [...prev, nA])
-        try {
-          await upsertActivity(nA)
-        } catch (actErr) {
-          console.error('Erro ao salvar atividade:', actErr)
-        }
+      } catch (actErr) {
+        console.error('Erro ao salvar atividade inicial:', actErr)
+        alert(
+          `⚠️ Lead "${nome}" foi salvo, mas a atividade inicial falhou.\n\n` +
+          `Erro: ${actErr?.message || 'desconhecido'}\n\n` +
+          `Você pode adicionar a atividade manualmente abrindo o card.`
+        )
       }
-    } catch (e) {
-      console.error('Erro ao criar oportunidade:', e)
-      throw e
     }
   }
 
