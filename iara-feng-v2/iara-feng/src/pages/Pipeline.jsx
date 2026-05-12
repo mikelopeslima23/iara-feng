@@ -10,6 +10,44 @@ import { getTheme, saveTheme, THEMES } from '../lib/theme'
 
 const ETAPAS = ['Prospecção', 'Oportunidade', 'Proposta', 'Negociação', 'Jurídico', 'Operação / Go-Live']
 
+// ─── Validação/normalização de etapa ─────────────────────────────────────────
+// Garante que qualquer valor de etapa que vai pro banco está dentro do enum.
+// Tenta um fuzzy match leve (case/acentos) antes de cair pro default.
+function normalizeEtapa(raw, fallback = 'Prospecção') {
+  if (!raw) return fallback
+  const s = String(raw).trim()
+  if (ETAPAS.includes(s)) return s  // hit exato
+  const norm = txt => txt.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ').trim()
+  const target = norm(s)
+  const hit = ETAPAS.find(e => norm(e) === target)
+  if (hit) return hit
+  // mapeamentos comuns de variantes antigas
+  const aliases = {
+    'qualificacao':       'Oportunidade',
+    'reativacao':         'Oportunidade',
+    'retorno':            'Oportunidade',
+    'aditivo':            'Negociação',
+    'renovacao':          'Operação / Go-Live',
+    'encerrado':          fallback,
+    'geladeira':          fallback,
+    'operacao':           'Operação / Go-Live',
+    'implementacao':      'Operação / Go-Live',
+    'go-live':            'Operação / Go-Live',
+    'golive':             'Operação / Go-Live',
+    'proposta enviada':   'Proposta',
+    'em negociacao':      'Negociação',
+    'em juridico':        'Jurídico',
+  }
+  if (aliases[target]) {
+    console.warn(`[normalizeEtapa] "${raw}" mapeado para "${aliases[target]}"`)
+    return aliases[target]
+  }
+  console.warn(`[normalizeEtapa] "${raw}" fora do enum — usando fallback "${fallback}"`)
+  return fallback
+}
+
 const PARALELO_OPTIONS = [
   { label: 'Proposta',    color: '#A855F7' },
   { label: 'Negociação',  color: '#FF6B1A' },
@@ -991,7 +1029,7 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
 
       // Opcional: avanço de etapa
       if (novaAtv.novaEtapa && novaAtv.novaEtapa !== lead.etapa) {
-        leadAtualizado = { ...leadAtualizado, etapa: novaAtv.novaEtapa }
+        leadAtualizado = { ...leadAtualizado, etapa: normalizeEtapa(novaAtv.novaEtapa, lead.etapa) }
       }
       // Opcional: atualizar último movimento
       if (novaAtv.atualizarMov && novaAtv.movTexto?.trim()) {
@@ -1720,7 +1758,9 @@ export default function Pipeline() {
   async function handleSave(form) {
     const anterior = leads.find(l => l.id === form.id)
     const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
-    const formAtualizado = { ...form, ultima_atualizacao: hoje, dias: 0 }
+    // Normaliza etapa pra evitar fantasmas. Preserva etapa anterior como fallback.
+    const etapaNormalizada = normalizeEtapa(form.etapa, anterior?.etapa || 'Prospecção')
+    const formAtualizado = { ...form, etapa: etapaNormalizada, ultima_atualizacao: hoje, dias: 0 }
     await upsertLead(formAtualizado)
     setLeads(prev => prev.map(l => l.id === form.id ? formAtualizado : l))
 
@@ -1825,7 +1865,7 @@ export default function Pipeline() {
       nome,
       conta:              form.conta || '',
       servico:            form.servico || '',
-      etapa:              form.etapa || 'Prospecção',
+      etapa:              normalizeEtapa(form.etapa, 'Prospecção'),
       resp:               form.resp || user.nome,
       dias:               0,
       aging:              'Hot',
