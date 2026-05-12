@@ -1,55 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { getLeads, getActivities, upsertLead, upsertActivity, getMessages, saveMessage, clearMessages, getMemories, saveMemory, getKnowledge, getNotifications, markNotificationRead, markAllRead, createNotification, upsertContact, logAudit, getAuditLog } from '../lib/supabase'
 import { PIPELINE_INITIAL, ACTIVITIES_INITIAL, USERS } from '../data/pipeline'
 import { getTheme, saveTheme, THEMES } from '../lib/theme'
-
-// ── Dark tokens + nav inline ─────────────────────────────────────────────────
-const _D = {
-  bg:'#0D0B14',bg2:'#13111E',bg3:'#1A1729',border:'#2A2640',border2:'#3D3860',
-  p:'#9D5CF6',p2:'#C4A7FF',pf:'rgba(157,92,246,.15)',
-  g:'#10B981',gf:'rgba(16,185,129,.12)',g2:'#6EE7B7',
-  o:'#FF6B1A',r:'#EF4444',rf:'rgba(239,68,68,.12)',r2:'#FCA5A5',
-  y:'#F59E0B',yf:'rgba(245,158,11,.12)',y2:'#FCD34D',
-  b:'#60A5FA',bf:'rgba(96,165,250,.12)',t1:'#EEEAF8',t2:'#B8B2D4',t3:'#8A84AA',
-}
-const _NAV=[
-  {path:'/pipeline',label:'Pipeline',d:'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'},
-  {path:'/chat',label:'Chat IAra',d:'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'},
-  {path:'/contatos',label:'Contatos',d:'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 7a4 4 0 1 0 0-8 4 4 0 0 0 0 8z'},
-  {path:'/radar',label:'Relatórios',d:'M18 20V10M12 20V4M6 20v-6'},
-]
-function _avInit(n){const p=(n||'').split(' ');return(p[0]?.[0]||'')+(p[1]?.[0]||'')}
-function _SidebarNav({open,onClose,currentPath,onLogout,userNome}){
-  const _navigate=useNavigate()
-  if(!open)return null
-  return(<>
-    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,.6)',zIndex:18,backdropFilter:'blur(2px)'}}/>
-    <div style={{position:'fixed',left:0,top:0,bottom:0,width:52,background:_D.bg2,borderRight:`1px solid ${_D.border}`,display:'flex',flexDirection:'column',alignItems:'center',padding:'14px 0',gap:2,zIndex:20}}>
-      <div onClick={onClose} style={{width:32,height:32,background:_D.p,borderRadius:9,display:'flex',alignItems:'center',justifyContent:'center',marginBottom:14,cursor:'pointer',flexShrink:0}}>
-        <span style={{fontSize:12,fontWeight:800,color:'white',letterSpacing:'-.5px'}}>IA</span>
-      </div>
-      {_NAV.map(item=>{const active=currentPath===item.path;return(
-        <div key={item.path} onClick={()=>{_navigate(item.path);onClose()}} title={item.label}
-          style={{width:38,height:38,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',position:'relative',background:active?_D.pf:'transparent'}}>
-          {active&&<div style={{position:'absolute',left:0,width:2,height:18,background:_D.p,borderRadius:'0 2px 2px 0',marginLeft:-1}}/>}
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={active?_D.p2:_D.t3} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            {item.d.split('M').filter(Boolean).map((s,i)=><path key={i} d={`M${s}`}/>)}
-          </svg>
-        </div>
-      )})}
-      <div style={{width:26,height:1,background:_D.border,margin:'6px 0'}}/>
-      <div style={{marginTop:'auto',width:30,height:30,borderRadius:'50%',background:_D.o,display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:700,color:'white',cursor:'pointer',flexShrink:0}}
-        onClick={onLogout} title="Sair">{_avInit(userNome)}</div>
-    </div>
-  </>)
-}
-function _HamburgerBtn({open,onClick}){
-  return(<button onClick={onClick} style={{width:34,height:34,borderRadius:8,background:open?_D.pf:'transparent',border:`1px solid ${open?_D.p:_D.border}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0}}>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={open?_D.p2:_D.t2} strokeWidth="2" strokeLinecap="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
-  </button>)
-}
-
 
 const ADMINS = ['Mike Lopes', 'Bruno Braga']
 
@@ -72,6 +25,45 @@ const NOTIF_TIPO_CONFIG = {
   tarefa: { color: '#A855F7', bg: 'rgba(168,85,247,0.1)', icon: '📌' },
   aviso: { color: '#F59E0B', bg: 'rgba(245,158,11,0.1)', icon: '⚠️' },
   alerta: { color: '#EF4444', bg: 'rgba(239,68,68,0.1)', icon: '🔴' },
+}
+
+// ─── Validação/normalização de etapa ─────────────────────────────────────────
+// Espelhado do Pipeline.jsx. Garante que valores fora do enum (vindo da IAra
+// ou de payloads antigos) sejam mapeados pras 6 etapas canônicas em vez de
+// virarem cards fantasmas.
+const ETAPAS_CANONICAS = ['Prospecção', 'Oportunidade', 'Proposta', 'Negociação', 'Jurídico', 'Operação / Go-Live']
+function normalizeEtapa(raw, fallback = 'Prospecção') {
+  if (!raw) return fallback
+  const s = String(raw).trim()
+  if (ETAPAS_CANONICAS.includes(s)) return s
+  const norm = txt => txt.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ').trim()
+  const target = norm(s)
+  const hit = ETAPAS_CANONICAS.find(e => norm(e) === target)
+  if (hit) return hit
+  const aliases = {
+    'qualificacao':     'Oportunidade',
+    'reativacao':       'Oportunidade',
+    'retorno':          'Oportunidade',
+    'aditivo':          'Negociação',
+    'renovacao':        'Operação / Go-Live',
+    'encerrado':        fallback,
+    'geladeira':        fallback,
+    'operacao':         'Operação / Go-Live',
+    'implementacao':    'Operação / Go-Live',
+    'go-live':          'Operação / Go-Live',
+    'golive':           'Operação / Go-Live',
+    'proposta enviada': 'Proposta',
+    'em negociacao':    'Negociação',
+    'em juridico':      'Jurídico',
+  }
+  if (aliases[target]) {
+    console.warn(`[normalizeEtapa] "${raw}" mapeado para "${aliases[target]}"`)
+    return aliases[target]
+  }
+  console.warn(`[normalizeEtapa] "${raw}" fora do enum — usando fallback "${fallback}"`)
+  return fallback
 }
 
 // ─── RENDERER OPÇÃO C ─────────────────────────────────────────────────────────
@@ -535,9 +527,6 @@ async function extractAndSaveMemories(userId, userMsg, assistantMsg) {
 
 export default function Chat() {
   const navigate = useNavigate()
-  const _location = useLocation()
-  const [_sidebarOpen, _setSidebarOpen] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const user = JSON.parse(localStorage.getItem('iara_user') || '{}')
   const [theme, setTheme] = useState(getTheme())
   const t = theme
@@ -660,7 +649,11 @@ export default function Chat() {
           const { nome, campo, valor, etapa_anterior } = act.data
           const before = curL.find(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()))
           const hoje = new Date().toISOString().split('T')[0]
-          curL = curL.map(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()) ? { ...l, [campo]: valor, ultima_atualizacao: hoje } : l)
+          // Se IAra está atualizando a etapa, normaliza pro enum canônico
+          const valorAplicado = campo === 'etapa'
+            ? normalizeEtapa(valor, before?.etapa || 'Prospecção')
+            : valor
+          curL = curL.map(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()) ? { ...l, [campo]: valorAplicado, ultima_atualizacao: hoje } : l)
           const updated = curL.find(l => l.nome?.toLowerCase().includes(nome?.toLowerCase()))
           if (updated) await upsertLead(updated)
           if (campo === 'etapa') {
@@ -668,9 +661,9 @@ export default function Chat() {
               evento: 'etapa_avancada',
               conta: updated?.conta || nome,
               servico: updated?.servico || '',
-              detalhe: `${etapa_anterior || before?.etapa || '?'} → ${valor}`,
+              detalhe: `${etapa_anterior || before?.etapa || '?'} → ${valorAplicado}`,
               de: etapa_anterior || before?.etapa || '',
-              para: valor,
+              para: valorAplicado,
               feito_por: user.nome,
             })
           } else {
@@ -678,7 +671,7 @@ export default function Chat() {
               evento: 'lead_atualizado',
               conta: updated?.conta || nome,
               servico: updated?.servico || '',
-              detalhe: `${campo}: ${valor}`,
+              detalhe: `${campo}: ${valorAplicado}`,
               feito_por: user.nome,
             })
           }
@@ -687,9 +680,10 @@ export default function Chat() {
         } else if (act.type === 'CRIAR_OPP') {
           const { conta, servico, etapa, resp } = act.data
           const nome = conta && servico ? `${conta} — ${servico}` : (conta || servico || 'Nova oportunidade')
+          const etapaNormalizada = normalizeEtapa(etapa, 'Prospecção')
           const nL = {
             id: `opp-${Date.now()}`, nome, conta: conta || '', servico: servico || '',
-            etapa: etapa || 'Prospecção', resp: resp || user.nome, dias: 0, aging: 'Hot',
+            etapa: etapaNormalizada, resp: resp || user.nome, dias: 0, aging: 'Hot',
             mov: 'Nova oportunidade criada via IAra', prox: '', dt: '',
             op: false, off: false, g12: false, risco: '', vencimento: '', paralelo: '',
             ultima_atualizacao: new Date().toISOString().split('T')[0],
@@ -700,7 +694,7 @@ export default function Chat() {
             conta: conta || '',
             servico: servico || '',
             lead_nome: nome,
-            detalhe: `Etapa: ${etapa || 'Prospecção'} | Resp: ${resp || user.nome}`,
+            detalhe: `Etapa: ${etapaNormalizada} | Resp: ${resp || user.nome}`,
             feito_por: user.nome,
           })
           auditUpdated = true
@@ -806,83 +800,66 @@ export default function Chat() {
   ]
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: _D.bg, color: _D.t1, fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: t.bg, color: t.text, fontFamily: "'Inter',system-ui,sans-serif", overflow: 'hidden', transition: 'background 0.3s' }}>
       <style>{`
         @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
         @keyframes blink{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
         @keyframes badgePop{0%{transform:scale(0)}70%{transform:scale(1.2)}100%{transform:scale(1)}}
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
-        ::-webkit-scrollbar{width:3px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:${_D.border2};border-radius:3px}
+        ::-webkit-scrollbar{width:3px} ::-webkit-scrollbar-track{background:transparent} ::-webkit-scrollbar-thumb{background:${t.scrollThumb};border-radius:3px}
         textarea{-webkit-appearance:none}
-        .chip:hover{background:${_D.bg3}!important;border-color:${_D.p}!important}
+        .chip:hover{background:${t.surfaceHover}!important;border-color:${t.purple}!important}
         .chip:active{transform:scale(0.95)} .send-btn:active{transform:scale(0.92)}
-        @media(max-width:600px){.header-extras{display:none!important}}
+        .notif-btn:hover{background:${t.purpleFaint}!important}
+        @media(max-width:600px){.header-extras{display:none!important}.header-stats{font-size:10px!important;padding:2px 8px!important}.msg-text{font-size:15px!important}}
       `}</style>
 
-      <_SidebarNav open={_sidebarOpen} onClose={()=>_setSidebarOpen(false)} currentPath={_location.pathname} onLogout={()=>{localStorage.removeItem("iara_user");navigate("/login")}} userNome={user.nome}/>
-
-      {/* ── TOPBAR ── */}
-      <div style={{ height: 52, background: _D.bg2, borderBottom: `1px solid ${_D.border}`, display: 'flex', alignItems: 'center', padding: '0 14px', gap: 10, flexShrink: 0, zIndex: 10, position: 'relative' }}>
-        <_HamburgerBtn open={_sidebarOpen} onClick={()=>_setSidebarOpen(o=>!o)}/>
-        <div style={{width:28,height:28,background:_D.p,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:11,fontWeight:800,color:"white",letterSpacing:"-.5px"}}>IA</span></div>
-
-        {/* IAra identity */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 32, height: 32, borderRadius: '50%', background: _D.p, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0 }}>IA</div>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderBottom: `1px solid ${t.borderLight}`, background: t.header, flexShrink: 0, boxShadow: t.name === 'light' ? '0 2px 12px rgba(124,58,237,0.08)' : '0 2px 12px rgba(0,0,0,0.4)', position: 'relative', zIndex: 50 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'linear-gradient(135deg,#7C3AED,#A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: 'white', flexShrink: 0, boxShadow: '0 0 12px rgba(124,58,237,0.4)' }}>IA</div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: _D.t1, letterSpacing: '.05em' }}>IAra</span>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: _D.g, display: 'inline-block', animation: 'pulse 2s ease infinite' }} />
-              <span style={{ fontSize: 10, color: _D.g2 }}>online</span>
-              {isAdmin && <span style={{ fontSize: 9, background: _D.pf, color: _D.p2, border: `1px solid ${_D.p}44`, borderRadius: 4, padding: '1px 6px' }}>admin</span>}
+              <span style={{ fontSize: 15, fontWeight: 700, color: t.text, letterSpacing: '0.05em' }}>IAra</span>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', background: t.green, display: 'inline-block', animation: 'pulse 2s ease infinite', boxShadow: `0 0 6px ${t.green}` }} />
+              <span style={{ fontSize: 10, color: t.green }}>online</span>
+              {isAdmin && <span style={{ fontSize: 10, background: t.purpleFaint, color: t.purple, border: `1px solid ${t.purple}44`, borderRadius: 4, padding: '1px 6px' }}>admin</span>}
             </div>
-            <div style={{ fontSize: 10, color: _D.t3 }}>
-              Agente comercial FENG
-              {memCount > 0 && <span style={{ color: _D.p2, marginLeft: 5 }}>· 🧠 {memCount}</span>}
-              {knowCount > 0 && <span style={{ color: _D.g2, marginLeft: 5 }}>· 📚 {knowCount}</span>}
+            <div style={{ fontSize: 10, color: t.textMuted, display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span>Agente comercial</span>
+              <span style={{ color: t.textHint, fontWeight: 700, letterSpacing: '0.1em' }}>FENG</span>
+              {memCount > 0 && <span style={{ color: t.purple, marginLeft: 2 }}>· 🧠 {memCount}</span>}
+              {knowCount > 0 && <span style={{ color: t.green }}>· 📚 {knowCount}</span>}
             </div>
           </div>
         </div>
 
-        {/* Right actions */}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-          {/* Stats chip */}
-          <div style={{ background: _D.bg3, border: `1px solid ${_D.border}`, borderRadius: 6, padding: '3px 10px', fontSize: 11 }}>
-            <span style={{ color: _D.p2, fontWeight: 600 }}>{ativosCount}</span>
-            <span style={{ color: _D.t3 }}> · </span>
-            <span style={{ color: _D.o, fontWeight: 600 }}>{pendCount}</span>
+        <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
+          <div className="header-stats" style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 6, padding: '3px 10px', fontSize: 11, color: t.textMuted }}>
+            <span style={{ color: t.purple, fontWeight: 600 }}>{ativosCount}</span> · <span style={{ color: t.orange, fontWeight: 600 }}>{pendCount}</span>
           </div>
-
-          {/* Notificações */}
-          <button onClick={() => setShowNotifs(v => !v)}
-            style={{ position: 'relative', width: 34, height: 34, borderRadius: 8, border: `1px solid ${unreadCount > 0 ? _D.p + '44' : _D.border}`, background: unreadCount > 0 ? _D.pf : 'transparent', color: unreadCount > 0 ? _D.p2 : _D.t2, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 14 }}>
+          <button className="notif-btn" onClick={() => setShowNotifs(v => !v)} style={{ position: 'relative', width: 36, height: 36, borderRadius: 9, border: `1px solid ${unreadCount > 0 ? t.purple + '44' : t.border}`, background: unreadCount > 0 ? t.purpleFaint : t.surface, color: unreadCount > 0 ? t.purple : t.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, transition: 'all 0.15s', flexShrink: 0 }}>
             🔔
-            {unreadCount > 0 && <div style={{ position: 'absolute', top: -4, right: -4, background: _D.r, color: 'white', borderRadius: '50%', width: 15, height: 15, fontSize: 8, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'badgePop 0.3s ease', border: `2px solid ${_D.bg2}` }}>{unreadCount > 9 ? '9+' : unreadCount}</div>}
+            {unreadCount > 0 && <div style={{ position: 'absolute', top: -4, right: -4, background: t.red, color: 'white', borderRadius: '50%', width: 16, height: 16, fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'badgePop 0.3s ease', border: `2px solid ${t.bg}` }}>{unreadCount > 9 ? '9+' : unreadCount}</div>}
           </button>
-
-          {/* Radar — admin only */}
-          {isAdmin && <button onClick={() => send('IAra fechar Radar')} className="header-extras"
-            style={{ background: _D.gf, border: `1px solid ${_D.g}44`, borderRadius: 6, color: _D.g2, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📊 Radar</button>}
-          {isAdmin && radarReady && <button onClick={() => navigate('/radar')}
-            style={{ background: _D.g, border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>Ver →</button>}
-
-          {/* Avatar / logout */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: _D.bg3, border: `1px solid ${_D.border}`, borderRadius: 8, padding: '4px 10px', cursor: 'pointer' }}
-            onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
-            <div style={{ width: 20, height: 20, borderRadius: '50%', background: user.cor || _D.p, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 8, fontWeight: 700, color: 'white' }}>{user.iniciais}</div>
-            <span style={{ fontSize: 11, color: _D.t2, fontWeight: 500 }}>{user.nome?.split(' ')[0]}</span>
+          <button onClick={toggleTheme} style={{ width: 36, height: 36, borderRadius: 9, border: `1px solid ${t.border}`, background: t.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 15, flexShrink: 0, transition: 'all 0.15s' }}>{t.icon}</button>
+          {isAdmin && <button onClick={() => send('IAra fechar Radar')} className="header-extras" style={{ background: t.greenFaint, border: `1px solid ${t.greenDark}`, borderRadius: 6, color: t.greenDark, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📊 Radar</button>}
+          {isAdmin && radarReady && <button onClick={() => navigate('/radar')} style={{ background: t.green, border: 'none', borderRadius: 6, color: 'white', padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 600, animation: 'pulse 1.5s ease infinite' }}>Ver →</button>}
+          <button onClick={() => navigate('/pipeline')} style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}66`, borderRadius: 6, color: t.purple, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>📋 Pipeline</button>
+          <button onClick={() => navigate('/contatos')} className="header-extras" style={{ background: t.purpleFaint2, border: `1px solid ${t.purple}66`, borderRadius: 6, color: t.purple, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>👥 Contatos</button>
+          <button onClick={() => navigate('/conhecimento')} className="header-extras" style={{ background: t.greenFaint, border: `1px solid ${t.green}66`, borderRadius: 6, color: t.greenDark, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 500 }}>🧠 Conhecimento</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: t.surface, border: `1px solid ${t.border}`, borderRadius: 8, padding: '5px 10px', cursor: 'pointer' }} onClick={() => { localStorage.removeItem('iara_user'); navigate('/login') }}>
+            <div style={{ width: 22, height: 22, borderRadius: '50%', background: user.cor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', boxShadow: `0 0 8px ${user.cor}66` }}>{user.iniciais}</div>
+            <span style={{ fontSize: 11, color: t.purpleLight, fontWeight: 500 }}>{user.nome?.split(' ')[0]}</span>
           </div>
-
-          {/* Limpar chat */}
-          <button onClick={handleClear}
-            style={{ width: 34, height: 34, background: 'none', border: `1px solid ${_D.border}`, borderRadius: 7, color: _D.t3, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: 13 }}>🗑</button>
+          <button onClick={handleClear} style={{ background: 'none', border: `1px solid ${t.border}`, borderRadius: 7, color: t.textMuted, padding: '5px 9px', fontSize: 13, cursor: 'pointer', minWidth: 34, minHeight: 34 }}>🗑</button>
         </div>
       </div>
 
       {showNotifs && <NotifModal notifs={notifs} userId={user.id} t={t} onClose={() => setShowNotifs(false)} onMarkRead={handleMarkRead} onMarkAll={handleMarkAll} />}
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 8px', display: 'flex', flexDirection: 'column', gap: 16, WebkitOverflowScrolling: 'touch', background: _D.bg }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 14px 8px', display: 'flex', flexDirection: 'column', gap: 16, WebkitOverflowScrolling: 'touch' }}>
         {msgs.map(m => m.role === 'user' ? (
           <div key={m.id} style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'flex-end' }}>
             <div className="msg-text" style={{ background: t.msgUser, borderRadius: '16px 16px 3px 16px', padding: '12px 16px', maxWidth: '80%', fontSize: 15, lineHeight: 1.6, color: '#fff', wordBreak: 'break-word', boxShadow: '0 4px 16px rgba(124,58,237,0.3)' }}>{m.text}</div>
@@ -942,16 +919,16 @@ export default function Chat() {
         <textarea ref={txRef} value={inp} onChange={e => setInp(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
           placeholder="Mensagem para a IAra..."
-          style={{ flex: 1, background: _D.bg3, border: `1px solid ${_D.border}`, borderRadius: 12, padding: '12px 14px', color: _D.t1, fontSize: 15, outline: 'none', resize: 'none', fontFamily: 'inherit', minHeight: 44, maxHeight: 140, lineHeight: 1.5, WebkitAppearance: 'none' }}
-          onFocus={e => e.target.style.borderColor = _D.p}
-          onBlur={e => e.target.style.borderColor = _D.border}
+          style={{ flex: 1, background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 12, padding: '12px 14px', color: t.text, fontSize: 15, outline: 'none', resize: 'none', fontFamily: 'inherit', minHeight: 44, maxHeight: 140, lineHeight: 1.5, WebkitAppearance: 'none' }}
+          onFocus={e => e.target.style.borderColor = t.purple}
+          onBlur={e => e.target.style.borderColor = t.border}
           rows={1} />
-        <button className="send-btn" onClick={() => send()} disabled={loading || !inp.trim()} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: loading || !inp.trim() ? _D.bg3 : _D.o, color: loading || !inp.trim() ? _D.t3 : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loading || !inp.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, fontSize: 16, transition: 'all 0.15s' }}>➤</button>
+        <button className="send-btn" onClick={() => send()} disabled={loading || !inp.trim()} style={{ width: 44, height: 44, borderRadius: 12, border: 'none', background: loading || !inp.trim() ? t.surface : `linear-gradient(135deg,${t.orange},${t.orangeLight})`, color: loading || !inp.trim() ? t.textDark : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loading || !inp.trim() ? 'not-allowed' : 'pointer', flexShrink: 0, fontSize: 16, transition: 'all 0.15s', boxShadow: loading || !inp.trim() ? 'none' : `0 4px 14px ${t.orange}44` }}>➤</button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '3px 0', background: _D.bg2, borderTop: `1px solid ${_D.border}` }}>
-        <span style={{ fontSize: 9, color: _D.t3, letterSpacing: '0.08em' }}>powered by</span>
-        <span style={{ fontSize: 9, fontWeight: 700, color: _D.t3, letterSpacing: '0.15em' }}>FENG</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '3px 0', background: t.bgAlt, borderTop: `1px solid ${t.borderFaint}` }}>
+        <span style={{ fontSize: 9, color: t.textDark, letterSpacing: '0.08em' }}>powered by</span>
+        <span style={{ fontSize: 9, fontWeight: 700, color: t.textDark, letterSpacing: '0.15em' }}>FENG</span>
       </div>
     </div>
   )
