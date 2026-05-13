@@ -630,10 +630,26 @@ export default function Chat() {
           auditUpdated = true
           results.push(`✅ Concluído: ${found?.descricao || act.data.id}`)
         } else if (act.type === 'CRIAR') {
+          // Sprint B: resolve lead_id pelo nome (matching exato com prioridades)
+          const leadText = act.data.lead || ''
+          const matched =
+               curL.find(l => l.nome === leadText)
+            || (function() {
+                 // tenta variações conta+servico (em-dash / hífen / parêntese)
+                 return curL.find(l => l.servico && (
+                   leadText === `${l.conta} — ${l.servico}` ||
+                   leadText === `${l.conta} - ${l.servico}` ||
+                   leadText === `${l.conta} (${l.servico})`
+                 ))
+               })()
+            || curL.find(l => l.conta === leadText && (!l.servico || l.servico === ''))
+            || curL.find(l => l.conta === leadText)  // fallback (pode pegar 1 entre múltiplos)
           const nA = {
             id: `act-${Date.now()}`, ok: false,
             criado: new Date().toISOString().split('T')[0],
-            lead: act.data.lead, descricao: act.data.descricao,
+            lead: leadText,
+            lead_id: matched?.id || null,
+            descricao: act.data.descricao,
             dt: act.data.dt, resp: act.data.resp, tipo: act.data.tipo || 'Atividade'
           }
           curA = [...curA, nA]; await upsertActivity(nA)
