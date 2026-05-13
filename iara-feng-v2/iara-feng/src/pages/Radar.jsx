@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getLeads, getActivities, saveRadarSnapshot, getRadarSnapshots } from '../lib/supabase'
 
@@ -48,7 +48,20 @@ function _HamburgerBtn({open,onClick}){
   </button>)
 }
 
+// ── Paleta FENG (brand identity) ─────────────────────────────────────────────
+const FENG = {
+  purple:      '#7C3AED',
+  purpleDark:  '#5B21B6',
+  purpleLight: '#A78BFA',
+  orange:      '#FF6B1A',
+  orangeDark:  '#C2410C',
+  bgDark:      '#0D0B14',
+  bgNavy:      '#1A1729',
+  silver:      '#B8B2D4',
+  silverDark:  '#8A84AA',
+}
 
+// ── Cores por etapa do pipeline ──────────────────────────────────────────────
 const ETAPA_COLORS = {
   'Prospecção':        '#B5D4F4',
   'Oportunidade':      '#85B7EB',
@@ -59,44 +72,57 @@ const ETAPA_COLORS = {
   'Operação / Go-Live':'#1D9E75',
 }
 
-function getWeek() {
-  const d = new Date()
-  const mon = new Date(d); mon.setDate(d.getDate() - d.getDay() + 1)
-  const fri = new Date(mon); fri.setDate(mon.getDate() + 4)
-  const m = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto',
-             'Setembro','Outubro','Novembro','Dezembro']
-  return `${mon.getDate()} de ${m[mon.getMonth()]} a ${fri.getDate()} de ${m[fri.getMonth()]}`
+// ── Helpers de data ──────────────────────────────────────────────────────────
+function getMondayOfWeek(d=new Date()) {
+  const x = new Date(d); x.setHours(0,0,0,0)
+  const day = x.getDay() // 0=dom, 1=seg ... 6=sab
+  const diff = day === 0 ? -6 : 1 - day
+  x.setDate(x.getDate() + diff)
+  return x
 }
-
+function getFridayOfWeek(d=new Date()) {
+  const mon = getMondayOfWeek(d)
+  const fri = new Date(mon); fri.setDate(mon.getDate() + 4)
+  return fri
+}
+function getWeekNumber(d) {
+  const date = new Date(d); date.setHours(0,0,0,0)
+  date.setDate(date.getDate() + 3 - ((date.getDay()+6)%7))
+  const week1 = new Date(date.getFullYear(),0,4)
+  return 1 + Math.round(((date - week1)/86400000 - 3 + ((week1.getDay()+6)%7))/7)
+}
+function isoDate(d) {
+  const x = new Date(d)
+  return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`
+}
+function formatPeriodo(iniIso, fimIso) {
+  if (!iniIso || !fimIso) return '—'
+  const M = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
+  const di = new Date(iniIso + 'T12:00:00')
+  const df = new Date(fimIso + 'T12:00:00')
+  if (di.getMonth() === df.getMonth() && di.getFullYear() === df.getFullYear()) {
+    return `${di.getDate()} a ${df.getDate()} de ${M[di.getMonth()]} de ${df.getFullYear()}`
+  }
+  return `${di.getDate()} de ${M[di.getMonth()]} a ${df.getDate()} de ${M[df.getMonth()]} de ${df.getFullYear()}`
+}
 function formatDate(str) {
   if (!str) return '—'
   try {
-    return new Date(str + 'T12:00:00').toLocaleDateString('pt-BR', {
-      day: '2-digit', month: '2-digit',
-    })
+    return new Date(str + 'T12:00:00').toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit' })
   } catch { return str }
 }
 
-// ── Gera riscos automaticamente a partir de atividades atrasadas ──────────────
-function buildRiscosFromActivities(acts) {
-  const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
-
-  const atrasadas = acts.filter(a => {
-    if (a.ok || !a.dt) return false
-    const dt = new Date(a.dt); dt.setHours(0, 0, 0, 0)
-    return dt < hoje
-  })
-
-  // Agrupa por lead — pega a mais atrasada de cada
-  const byLead = {}
-  for (const a of atrasadas) {
-    const key = a.lead || 'Sem lead'
-    if (!byLead[key] || new Date(a.dt) < new Date(byLead[key].dt)) byLead[key] = a
-  }
-
-  return Object.values(byLead).map(a => ({
+// ── Gera riscos automaticamente a partir de atividades atrasadas ─────────────
+function buildRiscosFromActivities(activities) {
+  const hoje = new Date(); hoje.setHours(0,0,0,0)
+  return activities.filter(a => {
+    if (a.ok) return false
+    if (!a.dt) return false
+    const d = new Date(a.dt + 'T12:00:00')
+    return d < hoje
+  }).slice(0, 30).map(a => ({
     lead:  a.lead || '—',
-    tema:  a.tipo || 'Atividade',
+    tema:  a.tipo || 'Atividade atrasada',
     risco: a.descricao?.slice(0, 100) || 'Atividade em atraso',
     acao:  'Verificar status e reagendar.',
     resp:  a.resp || '—',
@@ -105,7 +131,7 @@ function buildRiscosFromActivities(acts) {
   }))
 }
 
-// ── Linha editável de risco ────────────────────────────────────────────────────
+// ── Linha editável de risco ──────────────────────────────────────────────────
 function RiscoRow({ r, index, onEdit, onDelete }) {
   return (
     <tr style={{ background: index % 2 === 0 ? 'white' : '#fafafa' }}>
@@ -121,79 +147,142 @@ function RiscoRow({ r, index, onEdit, onDelete }) {
       <td style={tdS}>{r.prazo}</td>
       <td style={{ ...tdS, padding: '4px' }} className="no-print">
         <div style={{ display: 'flex', gap: 4 }}>
-          <button
-            onClick={() => onEdit(index)}
-            style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, border: '1px solid #ddd', background: '#f5f5f5', cursor: 'pointer' }}>
-            ✏️
-          </button>
-          <button
-            onClick={() => onDelete(index)}
-            style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, border: '1px solid #fee2e2', background: '#fef2f2', color: '#dc2626', cursor: 'pointer' }}>
-            ✕
-          </button>
+          <button onClick={() => onEdit(index)} style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, border: '1px solid #ddd', background: '#f5f5f5', cursor: 'pointer' }}>✏️</button>
+          <button onClick={() => onDelete(index)} style={{ fontSize: 11, padding: '2px 7px', borderRadius: 4, border: '1px solid #fee2e2', background: '#fef2f2', color: '#dc2626', cursor: 'pointer' }}>✕</button>
         </div>
       </td>
     </tr>
   )
 }
 
-// ── Formulário inline para adicionar/editar risco ─────────────────────────────
+// ── Formulário inline para adicionar/editar risco ────────────────────────────
 function RiscoForm({ initial, onSave, onCancel }) {
   const empty = { lead: '', tema: '', risco: '', acao: '', resp: '', prazo: '' }
   const [f, setF] = useState(initial || empty)
   const set = (k, v) => setF(p => ({ ...p, [k]: v }))
   const valid = f.lead.trim() && f.risco.trim()
-
   return (
     <tr style={{ background: '#f0f9ff' }}>
       {['lead','tema','risco','acao','resp','prazo'].map(k => (
         <td key={k} style={{ ...tdS, padding: '4px' }}>
-          <input
-            value={f[k]}
-            onChange={e => set(k, e.target.value)}
-            placeholder={k.charAt(0).toUpperCase() + k.slice(1)}
-            style={{ width: '100%', fontSize: 11, padding: '4px 6px', border: '1px solid #ddd', borderRadius: 4, outline: 'none', boxSizing: 'border-box' }}
-          />
+          <input value={f[k]} onChange={e => set(k, e.target.value)} placeholder={k.charAt(0).toUpperCase() + k.slice(1)}
+            style={{ width:'100%', fontSize:11, padding:'4px 6px', border:'1px solid #ddd', borderRadius:4, outline:'none', boxSizing:'border-box' }}/>
         </td>
       ))}
       <td style={{ ...tdS, padding: '4px' }}>
         <div style={{ display: 'flex', gap: 4 }}>
-          <button
-            onClick={() => valid && onSave({ ...f, _gerado: false })}
-            disabled={!valid}
-            style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, border: 'none', background: valid ? '#7C3AED' : '#ddd', color: valid ? 'white' : '#999', cursor: valid ? 'pointer' : 'not-allowed' }}>
-            ✓
-          </button>
-          <button
-            onClick={onCancel}
-            style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, border: '1px solid #ddd', background: '#f5f5f5', cursor: 'pointer' }}>
-            ✕
-          </button>
+          <button onClick={() => valid && onSave({ ...f, _gerado: false })} disabled={!valid}
+            style={{ fontSize:11, padding:'2px 8px', borderRadius:4, border:'none', background: valid ? FENG.purple : '#ddd', color: valid ? 'white' : '#999', cursor: valid ? 'pointer' : 'not-allowed' }}>✓</button>
+          <button onClick={onCancel} style={{ fontSize:11, padding:'2px 8px', borderRadius:4, border:'1px solid #ddd', background:'#f5f5f5', cursor:'pointer' }}>✕</button>
         </div>
       </td>
     </tr>
   )
 }
 
-const thS = {
-  background: '#f5f5f5', padding: '6px 8px', fontSize: 11, fontWeight: 500,
-  color: '#444', border: '1px solid #ddd', textAlign: 'left',
-}
-const tdS = {
-  padding: '6px 8px', fontSize: 12, border: '1px solid #eee',
-  verticalAlign: 'top', lineHeight: 1.4,
+const thS = { background:'#f5f5f5', padding:'8px 10px', fontSize:11, fontWeight:600, color:'#444', border:'1px solid #ddd', textAlign:'left' }
+const tdS = { padding:'7px 10px', fontSize:12, border:'1px solid #eee', verticalAlign:'top', lineHeight:1.4 }
+
+// ── Seção colapsável FENG-style ──────────────────────────────────────────────
+function Sec({ num, titulo, sublabel, open, onToggle, alt, children, headerRight }) {
+  return (
+    <div className="sec-block" style={{
+      borderBottom: `1px solid ${FENG.purple}20`,
+      background: alt ? '#FAFAFA' : 'white',
+    }}>
+      <div onClick={onToggle} style={{
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        padding:'20px 28px', cursor:'pointer', userSelect:'none', gap:14,
+        transition:'background .2s'
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:16, flex:1 }}>
+          <div style={{
+            width:50, height:50, background:FENG.purple, borderRadius:11,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontFamily:'"Bebas Neue", system-ui, sans-serif', fontSize:26, color:'#fff',
+            flexShrink:0, boxShadow:`0 4px 14px ${FENG.purple}40`
+          }}>{num}</div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.3em', textTransform:'uppercase', color:FENG.purpleDark, marginBottom:3 }}>
+              {sublabel || `Seção ${num}`}
+            </div>
+            <div style={{
+              fontFamily:'"Bebas Neue", system-ui, sans-serif',
+              fontSize:'clamp(24px, 3vw, 32px)', lineHeight:1, color:'#1a1a1a', letterSpacing:'.01em'
+            }}>{titulo}</div>
+          </div>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+          {headerRight}
+          <div style={{
+            width:32, height:32, border:`1px solid ${FENG.purple}40`, borderRadius:'50%',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:18, color:FENG.purple, fontWeight:700,
+            transform: open ? 'rotate(90deg)' : 'rotate(0deg)', transition:'transform .35s'
+          }}>▸</div>
+        </div>
+      </div>
+      {open && (
+        <div className="sec-body" style={{ padding:'0 28px 28px' }}>
+          {children}
+        </div>
+      )}
+    </div>
+  )
 }
 
-// ── Componente principal ───────────────────────────────────────────────────────
+// ── Tabela de leads (G12, Outros) reutilizável ───────────────────────────────
+function TabelaLeads({ rows, isG12=false }) {
+  const headers = isG12
+    ? ['Clube / Cliente','Etapa Anterior','Etapa Atual','Movimentos Semana','Próximo Passo','Próx. dt-chave','Dono']
+    : ['Lead','Etapa Anterior','Etapa Atual','Movimento Atual','Próximo Passo','Próx. dt-chave','Dono']
+  return (
+    <div style={{ overflowX:'auto', borderRadius:8, border:'1px solid #eee' }}>
+      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+        <thead><tr>{headers.map(h => <th key={h} style={thS}>{h}</th>)}</tr></thead>
+        <tbody>
+          {rows.map((l, i) => (
+            <tr key={l.id || i} style={{ background: i%2===0 ? 'white' : '#fafafa' }}>
+              <td style={{ ...tdS, fontWeight:600 }}>{l.nome}</td>
+              <td style={tdS}>{l.etapaAnt || l.etapa}</td>
+              <td style={tdS}>
+                <span style={{
+                  background: (ETAPA_COLORS[l.etapa] || '#888') + '22',
+                  color: ETAPA_COLORS[l.etapa] || '#555',
+                  border:`1px solid ${ETAPA_COLORS[l.etapa] || '#888'}66`,
+                  borderRadius:4, padding:'1px 7px', fontSize:11, fontWeight:600
+                }}>{l.etapa}</span>
+              </td>
+              <td style={tdS}>{l.mov || '—'}</td>
+              <td style={tdS}>{l.prox || '—'}</td>
+              <td style={{ ...tdS, whiteSpace:'nowrap', fontSize:11 }}>{l.dt?.replace('2026-','').replace('2025-','') || '—'}</td>
+              <td style={{ ...tdS, fontSize:11 }}>{l.resp || '—'}</td>
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr><td colSpan={7} style={{ ...tdS, color:'#999', textAlign:'center', padding:20 }}>
+              Nenhum registro no período.
+            </td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ── Componente principal ─────────────────────────────────────────────────────
 export default function Radar() {
   const navigate  = useNavigate()
   const location  = useLocation()
   const user      = JSON.parse(localStorage.getItem('iara_user') || '{}')
 
+  const today = new Date()
+  const [dtIni, setDtIni] = useState(isoDate(getMondayOfWeek(today)))
+  const [dtFim, setDtFim] = useState(isoDate(getFridayOfWeek(today)))
+
   const [leads,      setLeads]      = useState([])
   const [acts,       setActs]       = useState([])
-  const [semana,     setSemana]     = useState(getWeek())
-  const [resumo,     setResumo]     = useState({ brasil: '', latam: '', nb: '' })
+  const [resumo,     setResumo]     = useState({ brasil:'', latam:'', nb:'' })
   const [riscos,     setRiscos]     = useState([])
   const [generating, setGenerating] = useState(false)
   const [snapshots,  setSnapshots]  = useState([])
@@ -201,9 +290,21 @@ export default function Radar() {
   const [sidebarOpen,setSidebarOpen]= useState(false)
   const [editIdx,    setEditIdx]    = useState(null)
   const [addingRow,  setAddingRow]  = useState(false)
+  const [exporting,  setExporting]  = useState(false)
+  const [secOpen,    setSecOpen]    = useState({ 1:true, 2:true, 3:false, 4:true, 5:false })
+
+  const reportRef = useRef(null)
 
   useEffect(() => {
-    getLeads().then(l => setLeads(l))
+    // Carrega fonte Bebas Neue (uma vez)
+    if (!document.querySelector('link[data-feng-fonts]')) {
+      const link = document.createElement('link')
+      link.href = 'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap'
+      link.rel = 'stylesheet'
+      link.setAttribute('data-feng-fonts','1')
+      document.head.appendChild(link)
+    }
+    getLeads().then(setLeads)
     getActivities().then(a => {
       setActs(a)
       setRiscos(buildRiscosFromActivities(a))
@@ -211,20 +312,39 @@ export default function Radar() {
     getRadarSnapshots().then(setSnapshots)
   }, [])
 
+  const periodo = formatPeriodo(dtIni, dtFim)
+  const weekNum = getWeekNumber(new Date(dtIni + 'T12:00:00'))
+
   const g12     = leads.filter(l => l.g12 && !l.off)
   const outros  = leads.filter(l => !l.g12 && !l.op && !l.off)
   const ativos  = leads.filter(l => !l.off && !l.op)
+
+  // Movimentos da semana: leads atualizados dentro do período
+  const movsSemana = leads.filter(l => {
+    if (!l.ultima_atualizacao || l.off) return false
+    const d = String(l.ultima_atualizacao).slice(0,10)
+    return d >= dtIni && d <= dtFim
+  }).length
+
+  // Outros agrupados por região
+  const REGIOES = ['Brasil','LATAM','Novos Negócios','Internacional']
+  const outrosPorRegiao = REGIOES.map(r => ({
+    regiao: r,
+    leads: outros.filter(l => (l.regiao || 'Brasil') === r),
+  })).filter(g => g.leads.length > 0)
+
+  function toggleSec(n) { setSecOpen(s => ({ ...s, [n]: !s[n] })) }
+  function expandAll()   { setSecOpen({ 1:true, 2:true, 3:true, 4:true, 5:true }) }
+  function collapseAll() { setSecOpen({ 1:false, 2:false, 3:false, 4:false, 5:false }) }
 
   function handleDeleteRisco(idx) {
     setRiscos(r => r.filter((_, i) => i !== idx))
     if (editIdx === idx) setEditIdx(null)
   }
-
   function handleSaveEdit(idx, updated) {
     setRiscos(r => r.map((item, i) => i === idx ? updated : item))
     setEditIdx(null)
   }
-
   function handleAddRisco(novo) {
     setRiscos(r => [...r, novo])
     setAddingRow(false)
@@ -234,18 +354,17 @@ export default function Radar() {
     setGenerating(true)
     try {
       const ctx = leads.slice(0, 25)
-        .map(l => `${l.nome}|${l.etapa}|${l.resp}|${l.mov?.slice(0, 60)}`)
+        .map(l => `${l.nome}|${l.regiao||'?'}|${l.etapa}|${l.resp}|${(l.mov||'').slice(0, 60)}`)
         .join('\n')
-
       const r = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [{
             role: 'user',
-            content: `Com base nos dados do pipeline abaixo, escreva o "Resumo da Semana" do Radar Pipeline Comercial.\n\n${ctx}\n\nRetorne APENAS:\nBRASIL: [2-3 frases sobre leads brasileiros]\nLATAM: [3-4 frases sobre leads LATAM]\nNB: [1-2 frases sobre novos negócios]`
+            content: `Com base no pipeline FENG abaixo, escreva o "Resumo da Semana" do Radar Pipeline Comercial (período: ${periodo}).\n\n${ctx}\n\nRetorne APENAS:\nBRASIL: [2-3 frases sobre leads brasileiros e movimentos relevantes]\nLATAM: [3-4 frases sobre leads LATAM]\nNB: [1-2 frases sobre novos negócios / internacional]`
           }],
-          system: 'Você escreve relatórios comerciais profissionais em português.'
+          system: 'Você escreve relatórios comerciais profissionais em português brasileiro, tom executivo e direto.'
         })
       })
       const d = await r.json()
@@ -255,277 +374,391 @@ export default function Radar() {
         latam:  txt.match(/LATAM:([\s\S]*?)(?=NB:|$)/i)?.[1]?.trim() || '',
         nb:     txt.match(/NB:([\s\S]*?)$/i)?.[1]?.trim() || '',
       })
-    } catch (e) { console.error(e) }
+    } catch (e) { console.error(e); alert('Erro ao gerar resumo: ' + e.message) }
     setGenerating(false)
   }
 
   async function saveSnapshot() {
     setSaving(true)
-    const title   = `Radar Pipeline — Semana ${semana}`
-    const content = { semana, resumo, riscos, leads: leads.slice(0, 50) }
+    const title   = `Radar Pipeline — Sem ${weekNum} (${periodo})`
+    const content = { dtIni, dtFim, periodo, weekNum, resumo, riscos, leads: leads.slice(0, 50) }
     await saveRadarSnapshot(title, JSON.stringify(content), user.nome)
     const s = await getRadarSnapshots(); setSnapshots(s)
     setSaving(false)
     alert('Snapshot salvo!')
   }
 
+  async function exportPDF() {
+    setExporting(true)
+    const h2p = window.html2pdf
+    if (!h2p) {
+      alert('html2pdf não carregado — usando print do navegador como fallback.')
+      window.print()
+      setExporting(false)
+      return
+    }
+    // Expandir tudo antes de exportar
+    const prev = { ...secOpen }
+    setSecOpen({ 1:true, 2:true, 3:true, 4:true, 5:true })
+    await new Promise(r => setTimeout(r, 300))
+    try {
+      await h2p().set({
+        margin: [8, 8, 8, 8],
+        filename: `Radar-Pipeline-Sem${weekNum}-${dtIni}.pdf`,
+        image: { type:'jpeg', quality:0.95 },
+        html2canvas: { scale:2, useCORS:true, backgroundColor:'#fff', logging:false },
+        jsPDF: { unit:'mm', format:'a4', orientation:'portrait' },
+        pagebreak: { mode:['avoid-all','css','legacy'] },
+      }).from(reportRef.current).save()
+    } catch (e) {
+      console.error(e); alert('Erro ao gerar PDF: ' + e.message)
+    }
+    // Restaura estado anterior
+    setSecOpen(prev)
+    setExporting(false)
+  }
+
+  // ── RENDER ──────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: '100vh', background: _D.bg, fontFamily: "'Inter',system-ui,sans-serif" }}>
+    <div style={{ minHeight:'100vh', background:_D.bg, fontFamily:"'Inter',system-ui,sans-serif" }}>
+      <_SidebarNav open={sidebarOpen} onClose={()=>setSidebarOpen(false)} currentPath={location.pathname}
+        onLogout={()=>{localStorage.removeItem("iara_user");navigate("/login")}} userNome={user.nome}/>
 
-      <_SidebarNav open={sidebarOpen} onClose={()=>setSidebarOpen(false)} currentPath={location.pathname} onLogout={()=>{localStorage.removeItem("iara_user");navigate("/login")}} userNome={user.nome}/>
-
-      {/* ── TOPBAR ── */}
-      <div style={{ height: 52, background: _D.bg2, borderBottom: `1px solid ${_D.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 10 }}>
+      {/* TOPBAR (fora do export) */}
+      <div className="no-print" style={{ height:52, background:_D.bg2, borderBottom:`1px solid ${_D.border}`, display:'flex', alignItems:'center', padding:'0 16px', gap:10, position:'sticky', top:0, zIndex:30 }}>
         <_HamburgerBtn open={sidebarOpen} onClick={()=>setSidebarOpen(o=>!o)}/>
-        <div style={{width:28,height:28,background:_D.p,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:11,fontWeight:800,color:"white",letterSpacing:"-.5px"}}>IA</span></div>
-        <span style={{ fontSize: 14, fontWeight: 700, color: _D.t1 }}>Relatórios</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input
-            value={semana}
-            onChange={e => setSemana(e.target.value)}
-            style={{ fontSize: 11, padding: '4px 10px', border: `1px solid ${_D.border}`, borderRadius: 6, background: _D.bg3, color: _D.t1, width: 200 }}
-          />
-
-          <button
-            onClick={generateResumo}
-            disabled={generating}
-            style={{ padding: '5px 12px', background: _D.p, color: 'white', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer', opacity: generating ? 0.6 : 1 }}>
-            {generating ? 'Gerando...' : '✨ Gerar Resumo com IA'}
+        <div style={{width:28,height:28,background:_D.p,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          <span style={{fontSize:11,fontWeight:800,color:"white",letterSpacing:"-.5px"}}>IA</span>
+        </div>
+        <span style={{ fontSize:14, fontWeight:700, color:_D.t1 }}>Radar Pipeline</span>
+        <div style={{ marginLeft:'auto', display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+          <button onClick={generateResumo} disabled={generating}
+            style={{ padding:'6px 14px', background:_D.p, color:'white', border:'none', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer', opacity:generating?0.6:1 }}>
+            {generating ? 'Gerando...' : '✨ Gerar Resumo IA'}
           </button>
-          <button
-            onClick={saveSnapshot}
-            disabled={saving}
-            style={{ padding: '5px 12px', background: _D.g, color: 'white', border: 'none', borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>
-            💾 Salvar Snapshot
+          <button onClick={saveSnapshot} disabled={saving}
+            style={{ padding:'6px 14px', background:_D.g, color:'white', border:'none', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}>
+            {saving ? 'Salvando...' : '💾 Snapshot'}
           </button>
-          <button
-            onClick={() => window.print()}
-            style={{ padding: '5px 12px', background: _D.bg3, color: _D.p2, border: `1px solid ${_D.border}`, borderRadius: 6, fontSize: 11, cursor: 'pointer' }}>
-            🖨 Imprimir / PDF
+          <button onClick={exportPDF} disabled={exporting}
+            style={{ padding:'6px 14px', background:FENG.orange, color:'white', border:'none', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}>
+            {exporting ? 'Exportando...' : '📄 Exportar PDF'}
           </button>
         </div>
       </div>
 
-      {/* Report — fundo branco para impressão */}
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px', background: 'white', color: '#111', minHeight: 'calc(100vh - 60px)' }}>
-        <style>{`@media print { .no-print{display:none!important} }`}</style>
-
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: 24, paddingBottom: 16, borderBottom: '2px solid #7C3AED' }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#1a1a1a', marginBottom: 4 }}>
-            Radar Pipeline Comercial — Semana {semana}
-          </div>
-          <div style={{ fontSize: 14, color: '#444' }}>Diretoria Comercial & Sucesso do Cliente</div>
-          <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>
-            Data da atualização: {new Date().toLocaleDateString('pt-BR')}
-          </div>
-        </div>
-
-        {/* 1. Resumo */}
-        <h2 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12, paddingBottom: 4, borderBottom: '1px solid #eee' }}>
-          1. Resumo da semana
-        </h2>
-        {resumo.brasil
-          ? <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 10 }}>{resumo.brasil}</p>
-          : (
-            <div className="no-print" style={{ background: '#f9f5ff', border: '1px dashed #AFA9EC', borderRadius: 6, padding: '8px 12px', fontSize: 12, color: '#534AB7', marginBottom: 10 }}>
-              Clique em "Gerar Resumo com IA" para preencher automaticamente.
-            </div>
-          )
+      {/* Estilos globais do report */}
+      <style>{`
+        @media print {
+          .no-print { display:none !important }
+          .sec-body { display:block !important }
         }
-        {resumo.latam && <>
-          <p style={{ fontSize: 13, fontWeight: 600, margin: '12px 0 6px' }}>LATAM</p>
-          <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 10 }}>{resumo.latam}</p>
-        </>}
-        {resumo.nb && <>
-          <p style={{ fontSize: 13, fontWeight: 600, margin: '12px 0 6px' }}>Novos negócios</p>
-          <p style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 10 }}>{resumo.nb}</p>
-        </>}
+        @keyframes feng-pulse { 0%,100% { opacity:.4 } 50% { opacity:.85 } }
+        .feng-orb { animation: feng-pulse 4s ease-in-out infinite; }
+      `}</style>
 
-        {/* Prévia dos riscos no resumo */}
-        {riscos.length > 0 && <>
-          <p style={{ fontSize: 13, fontWeight: 600, margin: '12px 0 4px', color: '#c00' }}>
-            Riscos / dependências:
+      {/* REPORT (área que será exportada) */}
+      <div ref={reportRef} id="radar-report" style={{ maxWidth:1000, margin:'0 auto', background:'white', color:'#111' }}>
+
+        {/* ═══ HERO ═══ */}
+        <div style={{
+          background:`linear-gradient(160deg, ${FENG.bgDark} 0%, ${FENG.bgNavy} 40%, ${FENG.purpleDark} 100%)`,
+          padding:'56px 32px 40px', textAlign:'center', color:'#fff', position:'relative', overflow:'hidden'
+        }}>
+          {/* Orbs decorativos */}
+          <div className="feng-orb" style={{ position:'absolute', top:30, right:50, width:50, height:50, borderRadius:'50%', background:`${FENG.orange}30`, filter:'blur(2px)' }}/>
+          <div className="feng-orb" style={{ position:'absolute', bottom:40, left:60, width:70, height:70, borderRadius:'50%', background:`${FENG.purple}25`, filter:'blur(3px)', animationDelay:'1s' }}/>
+          <div className="feng-orb" style={{ position:'absolute', top:'50%', right:'15%', width:30, height:30, borderRadius:'50%', background:`${FENG.purpleLight}30`, filter:'blur(2px)', animationDelay:'2s' }}/>
+
+          <div style={{ fontSize:13, fontWeight:700, letterSpacing:'.4em', textTransform:'uppercase', color:FENG.purpleLight, marginBottom:14, position:'relative' }}>
+            Diretoria Comercial &amp; Sucesso do Cliente
+          </div>
+          <h1 style={{
+            fontFamily:'"Bebas Neue", system-ui, sans-serif',
+            fontSize:'clamp(42px, 7vw, 76px)', lineHeight:.92, letterSpacing:'.02em',
+            color:'#fff', textShadow:'0 4px 30px rgba(0,0,0,.5)', marginBottom:16, position:'relative'
+          }}>
+            RADAR PIPELINE<br/>
+            <span style={{ color:FENG.orange }}>COMERCIAL</span>
+          </h1>
+          <p style={{ fontSize:20, fontWeight:300, color:FENG.silver, maxWidth:640, margin:'0 auto', position:'relative' }}>
+            {periodo}
           </p>
-          {riscos.map((r, i) => (
-            <p key={i} style={{ fontSize: 13, margin: '2px 0' }}>
-              <strong>{r.lead}:</strong> {r.risco}
-            </p>
-          ))}
-        </>}
 
-        {/* 2. G12/G15 */}
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '28px 0 12px', paddingBottom: 4, borderBottom: '1px solid #eee' }}>
-          2. G12 / G15 – movimentos da semana
-        </h2>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed' }}>
-            <thead>
-              <tr>
-                {['Clube / Cliente','Etapa Anterior','Etapa Atual','Movimentos atuais','Próximo Passo','Próxima dt-chave','Dono'].map(h => (
-                  <th key={h} style={thS}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {g12.map((l, i) => (
-                <tr key={i} style={{ background: i % 2 === 0 ? 'white' : '#fafafa' }}>
-                  <td style={{ ...tdS, fontWeight: 500 }}>{l.nome}</td>
-                  <td style={tdS}>{l.etapaAnt || l.etapa}</td>
-                  <td style={tdS}>
-                    <span style={{ background: (ETAPA_COLORS[l.etapa] || '#888') + '22', color: ETAPA_COLORS[l.etapa] || '#888', border: `1px solid ${ETAPA_COLORS[l.etapa] || '#888'}44`, borderRadius: 4, padding: '1px 6px', fontSize: 11 }}>
-                      {l.etapa}
-                    </span>
-                  </td>
-                  <td style={tdS}>{l.mov}</td>
-                  <td style={tdS}>{l.prox}</td>
-                  <td style={{ ...tdS, whiteSpace: 'nowrap', fontSize: 11 }}>{l.dt?.replace('2026-', '') || '—'}</td>
-                  <td style={{ ...tdS, fontSize: 11 }}>{l.resp}</td>
-                </tr>
-              ))}
-              {g12.length === 0 && (
-                <tr><td colSpan={7} style={{ ...tdS, color: '#999', textAlign: 'center', padding: 16 }}>Nenhuma oportunidade G12/G15 ativa. Marque um deal como G12/G15 na aba Editar do card.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+          {/* Session badge */}
+          <div style={{
+            marginTop:24, display:'inline-flex', alignItems:'center', gap:14,
+            background:`${FENG.purple}25`, border:`1px solid ${FENG.purpleLight}50`,
+            borderRadius:100, padding:'10px 24px', position:'relative'
+          }}>
+            <div style={{ fontFamily:'"Bebas Neue", system-ui, sans-serif', fontSize:34, color:FENG.orange, lineHeight:1 }}>
+              SEM {weekNum}
+            </div>
+            <div style={{ textAlign:'left' }}>
+              <div style={{ fontSize:14, fontWeight:800, textTransform:'uppercase', letterSpacing:'.06em', color:'#fff' }}>
+                Atualização Semanal
+              </div>
+              <div style={{ fontSize:12, fontWeight:300, color:FENG.silver, marginTop:1 }}>
+                Gerado em {new Date().toLocaleDateString('pt-BR')}
+              </div>
+            </div>
+          </div>
 
-        {/* 3. Outros negócios */}
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '28px 0 12px', paddingBottom: 4, borderBottom: '1px solid #eee' }}>
-          3. Outros negócios relevantes
-        </h2>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, tableLayout: 'fixed' }}>
-            <thead>
-              <tr>
-                {['Clube/Cliente','Etapa Anterior','Etapa Atual','Movimentos atuais','Próximo Passo','Próxima dt-chave','Dono'].map(h => (
-                  <th key={h} style={thS}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {outros.map((l, i) => (
-                <tr key={i} style={{ background: i % 2 === 0 ? 'white' : '#fafafa' }}>
-                  <td style={{ ...tdS, fontWeight: 500 }}>{l.nome}</td>
-                  <td style={tdS}>{l.etapaAnt || l.etapa}</td>
-                  <td style={tdS}>
-                    <span style={{ background: (ETAPA_COLORS[l.etapa] || '#888') + '22', color: ETAPA_COLORS[l.etapa] || '#888', border: `1px solid ${ETAPA_COLORS[l.etapa] || '#888'}44`, borderRadius: 4, padding: '1px 6px', fontSize: 11 }}>
-                      {l.etapa}
-                    </span>
-                  </td>
-                  <td style={tdS}>{l.mov}</td>
-                  <td style={tdS}>{l.prox}</td>
-                  <td style={{ ...tdS, fontSize: 11 }}>{l.dt?.replace('2026-', '') || '—'}</td>
-                  <td style={{ ...tdS, fontSize: 11 }}>{l.resp}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* 4. Riscos — EDITÁVEL */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '28px 0 12px' }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, paddingBottom: 4, borderBottom: '1px solid #eee', flex: 1, margin: 0 }}>
-            4. Riscos, bloqueios e dependências
-          </h2>
-          <div className="no-print" style={{ display: 'flex', gap: 6, marginLeft: 16, flexShrink: 0 }}>
-            <button
-              onClick={() => setRiscos(buildRiscosFromActivities(acts))}
-              title="Regenerar riscos a partir das atividades atrasadas"
-              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 5, border: '1px solid #ddd', background: '#f9f5ff', color: '#7C3AED', cursor: 'pointer', fontWeight: 500 }}>
-              🔄 Regerar da IA
-            </button>
-            <button
-              onClick={() => { setAddingRow(true); setEditIdx(null) }}
-              style={{ fontSize: 11, padding: '4px 10px', borderRadius: 5, border: '1px solid #ddd', background: '#f0fdf4', color: '#059669', cursor: 'pointer', fontWeight: 500 }}>
-              + Adicionar
-            </button>
+          {/* Inputs de período (não vão no PDF) */}
+          <div className="no-print" style={{ marginTop:26, display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap', position:'relative' }}>
+            <label style={{ fontSize:11, color:FENG.silver, display:'flex', alignItems:'center', gap:6 }}>
+              De:
+              <input type="date" value={dtIni} onChange={e=>setDtIni(e.target.value)}
+                style={{ fontSize:12, padding:'5px 10px', border:`1px solid ${FENG.purpleLight}50`, borderRadius:6, background:'rgba(255,255,255,.08)', color:'#fff' }}/>
+            </label>
+            <label style={{ fontSize:11, color:FENG.silver, display:'flex', alignItems:'center', gap:6 }}>
+              Até:
+              <input type="date" value={dtFim} onChange={e=>setDtFim(e.target.value)}
+                style={{ fontSize:12, padding:'5px 10px', border:`1px solid ${FENG.purpleLight}50`, borderRadius:6, background:'rgba(255,255,255,.08)', color:'#fff' }}/>
+            </label>
+            <button onClick={() => {
+              setDtIni(isoDate(getMondayOfWeek(new Date())))
+              setDtFim(isoDate(getFridayOfWeek(new Date())))
+            }} style={{
+              fontSize:11, padding:'5px 14px', borderRadius:6, border:`1px solid ${FENG.purpleLight}50`,
+              background:'transparent', color:FENG.purpleLight, cursor:'pointer', fontWeight:600
+            }}>↻ Semana atual</button>
           </div>
         </div>
 
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-          <thead>
-            <tr>
-              {['Tema / Assunto','Liga / Cliente','Risco / Impacto','O que fazer','Responsável','Prazo'].map(h => (
-                <th key={h} style={thS}>{h}</th>
-              ))}
-              <th className="no-print" style={{ ...thS, width: 64 }}>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {riscos.length === 0 && !addingRow && (
+        {/* ═══ STICKY STATS BAR ═══ */}
+        <div style={{
+          background:FENG.purpleDark, display:'flex', justifyContent:'center', flexWrap:'wrap',
+          borderTop:'1px solid rgba(255,255,255,.08)', boxShadow:'0 4px 20px rgba(0,0,0,.4)',
+          position:'sticky', top:0, zIndex:15
+        }}>
+          {[
+            { n: g12.length,      l: 'G12/G15 Ativos',    c: FENG.orange },
+            { n: ativos.length,   l: 'Leads Ativos',      c: '#fff' },
+            { n: movsSemana,      l: 'Movs. no Período',  c: '#fff' },
+            { n: riscos.length,   l: 'Riscos / Bloqueios',c: riscos.length > 5 ? '#FCA5A5' : '#fff' },
+          ].map((s, i) => (
+            <div key={i} style={{
+              textAlign:'center', padding:'14px 30px', position:'relative', minWidth:120,
+              borderLeft: i > 0 ? '1px solid rgba(255,255,255,.12)' : 'none'
+            }}>
+              <div style={{ fontFamily:'"Bebas Neue", system-ui, sans-serif', fontSize:44, color:s.c, lineHeight:1 }}>
+                {s.n}
+              </div>
+              <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.1em', textTransform:'uppercase', color:'rgba(255,255,255,.55)', marginTop:2 }}>
+                {s.l}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ═══ TAB BAR (expandir/colapsar todo) ═══ */}
+        <div className="no-print" style={{
+          background:FENG.bgNavy, padding:'10px 28px',
+          display:'flex', alignItems:'center', justifyContent:'space-between',
+          borderBottom:`1px solid ${FENG.purple}20`
+        }}>
+          <span style={{ fontSize:12, fontWeight:600, color:FENG.silver, letterSpacing:'.08em', textTransform:'uppercase' }}>
+            📋 Navegue pelas 5 seções do relatório
+          </span>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={expandAll} style={tabBtnStyle}>Expandir todo ↓</button>
+            <button onClick={collapseAll} style={tabBtnStyle}>Colapsar todo ↑</button>
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════
+             SEÇÕES (1 a 5)
+        ═══════════════════════════════════════════ */}
+
+        {/* 1ª — Resumo da Semana */}
+        <Sec num="1ª" titulo="Resumo da Semana" sublabel="Visão Executiva" open={secOpen[1]} onToggle={()=>toggleSec(1)} alt={false}>
+          {!resumo.brasil && !resumo.latam && !resumo.nb ? (
+            <div className="no-print" style={{
+              background:'#F9F5FF', border:`1px dashed ${FENG.purpleLight}`, borderRadius:8,
+              padding:'14px 18px', fontSize:13, color:FENG.purpleDark
+            }}>
+              Clique em <strong>✨ Gerar Resumo IA</strong> no topo para preencher esta seção automaticamente com base no pipeline.
+            </div>
+          ) : (
+            <>
+              {resumo.brasil && (
+                <div style={{ marginBottom:18 }}>
+                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🇧🇷 Brasil</div>
+                  <p style={{ fontSize:14, lineHeight:1.7, color:'#222' }}>{resumo.brasil}</p>
+                </div>
+              )}
+              {resumo.latam && (
+                <div style={{ marginBottom:18 }}>
+                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🌎 LATAM</div>
+                  <p style={{ fontSize:14, lineHeight:1.7, color:'#222' }}>{resumo.latam}</p>
+                </div>
+              )}
+              {resumo.nb && (
+                <div style={{ marginBottom:18 }}>
+                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🚀 Novos Negócios / Internacional</div>
+                  <p style={{ fontSize:14, lineHeight:1.7, color:'#222' }}>{resumo.nb}</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Prévia de riscos como teaser */}
+          {riscos.length > 0 && (
+            <div style={{ marginTop:20, padding:14, background:'#FEF3F2', border:`1px solid #FCA5A5`, borderRadius:8 }}>
+              <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:'#B91C1C', textTransform:'uppercase', marginBottom:8 }}>
+                ⚠ Atenção — {riscos.length} {riscos.length === 1 ? 'risco / dependência' : 'riscos / dependências'} ativos
+              </div>
+              <div style={{ fontSize:12, color:'#444' }}>
+                Detalhes completos na <strong>Seção 4</strong>.
+              </div>
+            </div>
+          )}
+        </Sec>
+
+        {/* 2ª — G12/G15 */}
+        <Sec num="2ª" titulo="G12 / G15 — Movimentos da Semana" sublabel="Prioridade Estratégica" open={secOpen[2]} onToggle={()=>toggleSec(2)} alt={true}>
+          {g12.length === 0 ? (
+            <div style={{ padding:20, textAlign:'center', color:'#888', background:'white', border:'1px dashed #ddd', borderRadius:8 }}>
+              Nenhum deal marcado como G12/G15 ainda. Vá em <strong>Pipeline → Editar card → Classificação Estratégica</strong> e ative o toggle G12/G15 nos deals prioritários.
+            </div>
+          ) : (
+            <TabelaLeads rows={g12} isG12={true}/>
+          )}
+        </Sec>
+
+        {/* 3ª — Outros negócios por região */}
+        <Sec num="3ª" titulo="Outros Negócios Relevantes" sublabel="Pipeline por Região" open={secOpen[3]} onToggle={()=>toggleSec(3)} alt={false}>
+          {outrosPorRegiao.length === 0 ? (
+            <div style={{ padding:20, textAlign:'center', color:'#888' }}>Nenhum outro negócio relevante no momento.</div>
+          ) : (
+            outrosPorRegiao.map(g => (
+              <div key={g.regiao} style={{ marginBottom:24 }}>
+                <div style={{
+                  display:'inline-block', marginBottom:10, padding:'4px 14px',
+                  background:`${FENG.purple}15`, border:`1px solid ${FENG.purple}30`,
+                  borderRadius:100, fontSize:12, fontWeight:700, color:FENG.purpleDark,
+                  letterSpacing:'.1em', textTransform:'uppercase'
+                }}>
+                  {g.regiao} · {g.leads.length} {g.leads.length === 1 ? 'lead' : 'leads'}
+                </div>
+                <TabelaLeads rows={g.leads}/>
+              </div>
+            ))
+          )}
+        </Sec>
+
+        {/* 4ª — Riscos (editável) */}
+        <Sec num="4ª" titulo="Riscos, Bloqueios e Dependências" sublabel="Pontos de Atenção" open={secOpen[4]} onToggle={()=>toggleSec(4)} alt={true}
+          headerRight={
+            <div className="no-print" style={{ display:'flex', gap:6 }}>
+              <button onClick={(e)=>{ e.stopPropagation(); setRiscos(buildRiscosFromActivities(acts)) }}
+                title="Regenerar a partir de atividades atrasadas"
+                style={{ fontSize:11, padding:'5px 12px', borderRadius:5, border:`1px solid ${FENG.purple}40`, background:'#F9F5FF', color:FENG.purpleDark, cursor:'pointer', fontWeight:600 }}>
+                🔄 Regerar
+              </button>
+              <button onClick={(e)=>{ e.stopPropagation(); setAddingRow(true); setEditIdx(null) }}
+                style={{ fontSize:11, padding:'5px 12px', borderRadius:5, border:'1px solid #BBF7D0', background:'#F0FDF4', color:'#059669', cursor:'pointer', fontWeight:600 }}>
+                + Adicionar
+              </button>
+            </div>
+          }>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
               <tr>
-                <td colSpan={7} style={{ ...tdS, color: '#10B981', textAlign: 'center', padding: 16, fontWeight: 500 }}>
-                  ✅ Nenhuma atividade atrasada detectada
-                </td>
+                {['Tema / Assunto','Liga / Cliente','Risco / Impacto','O que fazer','Responsável','Prazo'].map(h => <th key={h} style={thS}>{h}</th>)}
+                <th className="no-print" style={{ ...thS, width:64 }}>Ações</th>
               </tr>
-            )}
-            {riscos.map((r, i) => (
-              editIdx === i
-                ? <RiscoForm key={`edit-${i}`} initial={r} onSave={upd => handleSaveEdit(i, upd)} onCancel={() => setEditIdx(null)} />
-                : <RiscoRow key={`row-${i}`} r={r} index={i} onEdit={() => { setEditIdx(i); setAddingRow(false) }} onDelete={() => handleDeleteRisco(i)} />
-            ))}
-            {addingRow && (
-              <RiscoForm onSave={handleAddRisco} onCancel={() => setAddingRow(false)} />
-            )}
-          </tbody>
-        </table>
-
-        {/* 5. Leads ativos */}
-        <h2 style={{ fontSize: 16, fontWeight: 700, margin: '28px 0 12px', paddingBottom: 4, borderBottom: '1px solid #eee' }}>
-          5. Leads ativos
-        </h2>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-          <thead>
-            <tr>
-              {['Lead','Etapa','Movimento atual','Próxima ação','Serviço'].map(h => (
-                <th key={h} style={thS}>{h}</th>
+            </thead>
+            <tbody>
+              {riscos.length === 0 && !addingRow && (
+                <tr><td colSpan={7} style={{ ...tdS, color:'#059669', textAlign:'center', padding:20, fontWeight:600, background:'#F0FDF4' }}>
+                  ✅ Nenhum risco ativo detectado.
+                </td></tr>
+              )}
+              {riscos.map((r, i) => (
+                editIdx === i
+                  ? <RiscoForm key={`edit-${i}`} initial={r} onSave={upd => handleSaveEdit(i, upd)} onCancel={() => setEditIdx(null)}/>
+                  : <RiscoRow key={`row-${i}`} r={r} index={i} onEdit={() => { setEditIdx(i); setAddingRow(false) }} onDelete={() => handleDeleteRisco(i)}/>
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {ativos.map((l, i) => (
-              <tr key={i} style={{ background: i % 2 === 0 ? 'white' : '#fafafa' }}>
-                <td style={{ ...tdS, fontWeight: 500 }}>{l.nome}</td>
-                <td style={tdS}>
-                  <span style={{ background: (ETAPA_COLORS[l.etapa] || '#888') + '22', color: ETAPA_COLORS[l.etapa] || '#888', border: `1px solid ${ETAPA_COLORS[l.etapa] || '#888'}44`, borderRadius: 4, padding: '1px 5px', fontSize: 10 }}>
-                    {l.etapa}
-                  </span>
-                </td>
-                <td style={tdS}>{l.mov?.slice(0, 100)}</td>
-                <td style={tdS}>{l.prox?.slice(0, 80)}</td>
-                <td style={{ ...tdS, fontSize: 11 }}>{l.svc || l.servico || '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              {addingRow && <RiscoForm onSave={handleAddRisco} onCancel={() => setAddingRow(false)}/>}
+            </tbody>
+          </table>
+        </Sec>
 
-        {/* Footer */}
-        <div style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #ddd', fontSize: 12, color: '#555' }}>
-          <p>
-            Conteúdo atualizado por{' '}
-            <strong>{user.nome || 'Equipe Comercial'}</strong>
+        {/* 5ª — Leads ativos */}
+        <Sec num="5ª" titulo="Leads Ativos — Pipeline Completo" sublabel={`${ativos.length} oportunidades em movimento`} open={secOpen[5]} onToggle={()=>toggleSec(5)} alt={false}>
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+            <thead>
+              <tr>
+                {['Lead','Região','Etapa','Movimento Atual','Próxima Ação','Serviço'].map(h => <th key={h} style={thS}>{h}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {ativos.map((l, i) => (
+                <tr key={l.id || i} style={{ background: i%2===0 ? 'white' : '#fafafa' }}>
+                  <td style={{ ...tdS, fontWeight:600 }}>{l.nome}</td>
+                  <td style={{ ...tdS, fontSize:11, color:FENG.purpleDark }}>{l.regiao || '—'}</td>
+                  <td style={tdS}>
+                    <span style={{
+                      background:(ETAPA_COLORS[l.etapa] || '#888') + '22',
+                      color: ETAPA_COLORS[l.etapa] || '#555',
+                      border:`1px solid ${ETAPA_COLORS[l.etapa] || '#888'}66`,
+                      borderRadius:4, padding:'1px 6px', fontSize:10, fontWeight:600
+                    }}>{l.etapa}</span>
+                  </td>
+                  <td style={tdS}>{(l.mov || '').slice(0, 100) || '—'}</td>
+                  <td style={tdS}>{(l.prox || '').slice(0, 80) || '—'}</td>
+                  <td style={{ ...tdS, fontSize:11 }}>{l.svc || l.servico || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Sec>
+
+        {/* ═══ FOOTER ═══ */}
+        <div style={{
+          background:FENG.bgDark, color:FENG.silver,
+          padding:'28px 32px', textAlign:'center',
+          borderTop:`3px solid ${FENG.orange}`
+        }}>
+          <div style={{ fontFamily:'"Bebas Neue", system-ui, sans-serif', fontSize:28, color:'#fff', letterSpacing:'.04em', marginBottom:6 }}>
+            FENG
+          </div>
+          <p style={{ fontSize:13, marginBottom:8, color:'#fff' }}>
+            Conteúdo atualizado pela Gerência Comercial:{' '}
+            <strong style={{ color:FENG.orange }}>{user.nome || 'Equipe Comercial'}</strong>
             {user.cargo ? ` — ${user.cargo}` : ''} ✓
           </p>
-          <p style={{ marginTop: 4, color: '#888' }}>
-            Gerado em {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+          <p style={{ fontSize:11, color:'rgba(255,255,255,.5)', letterSpacing:'.05em' }}>
+            Inteligência e Ação para Aceleração da Receita ·{' '}
+            {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}
           </p>
         </div>
-
-        {snapshots.length > 0 && (
-          <div className="no-print" style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #eee' }}>
-            <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: '#444' }}>Snapshots salvos</p>
-            {snapshots.slice(0, 5).map((s, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f0f0f0', fontSize: 12, color: '#555' }}>
-                <span>{s.title}</span>
-                <span style={{ color: '#999', fontSize: 11 }}>
-                  {new Date(s.created_at).toLocaleDateString('pt-BR')} — {s.created_by}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
+
+      {/* Snapshots (fora do export, com no-print) */}
+      {snapshots.length > 0 && (
+        <div className="no-print" style={{ maxWidth:1000, margin:'24px auto', padding:'18px 28px', background:'white', borderRadius:10, boxShadow:'0 4px 16px rgba(0,0,0,.08)' }}>
+          <div style={{ fontSize:13, fontWeight:700, marginBottom:12, color:'#444', letterSpacing:'.05em', textTransform:'uppercase' }}>
+            📁 Snapshots Salvos ({snapshots.length})
+          </div>
+          {snapshots.slice(0, 8).map((s, i) => (
+            <div key={s.id || i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #f0f0f0', fontSize:12, color:'#555' }}>
+              <span style={{ fontWeight:500 }}>{s.title}</span>
+              <span style={{ color:'#999', fontSize:11 }}>
+                {new Date(s.created_at).toLocaleDateString('pt-BR')} — {s.created_by || '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
+}
+
+const tabBtnStyle = {
+  background:'transparent', border:`1px solid ${FENG.purple}40`,
+  borderRadius:100, padding:'5px 14px', fontSize:12, fontWeight:700, color:FENG.purpleLight,
+  cursor:'pointer', letterSpacing:'.04em', textTransform:'uppercase'
 }
