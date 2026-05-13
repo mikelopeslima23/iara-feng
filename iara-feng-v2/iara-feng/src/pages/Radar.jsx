@@ -1,7 +1,6 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getLeads, getActivities, saveRadarSnapshot, getRadarSnapshots } from '../lib/supabase'
-import { useState } from 'react'
 
 // ── Dark tokens + nav inline ─────────────────────────────────────────────────
 const _D = {
@@ -107,7 +106,7 @@ function buildRiscosFromActivities(acts) {
 }
 
 // ── Linha editável de risco ────────────────────────────────────────────────────
-function RiscoRow({ r, index, onEdit, onDelete, t }) {
+function RiscoRow({ r, index, onEdit, onDelete }) {
   return (
     <tr style={{ background: index % 2 === 0 ? 'white' : '#fafafa' }}>
       <td style={tdS}>
@@ -188,6 +187,7 @@ const tdS = {
 // ── Componente principal ───────────────────────────────────────────────────────
 export default function Radar() {
   const navigate  = useNavigate()
+  const location  = useLocation()
   const user      = JSON.parse(localStorage.getItem('iara_user') || '{}')
 
   const [leads,      setLeads]      = useState([])
@@ -198,15 +198,14 @@ export default function Radar() {
   const [generating, setGenerating] = useState(false)
   const [snapshots,  setSnapshots]  = useState([])
   const [saving,     setSaving]     = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [editIdx,    setEditIdx]    = useState(null)   // índice em edição
-  const [addingRow,  setAddingRow]  = useState(false)  // formulário de novo risco
+  const [sidebarOpen,setSidebarOpen]= useState(false)
+  const [editIdx,    setEditIdx]    = useState(null)
+  const [addingRow,  setAddingRow]  = useState(false)
 
   useEffect(() => {
     getLeads().then(l => setLeads(l))
     getActivities().then(a => {
       setActs(a)
-      // Gera riscos automaticamente a partir das atividades atrasadas
       setRiscos(buildRiscosFromActivities(a))
     })
     getRadarSnapshots().then(setSnapshots)
@@ -216,7 +215,6 @@ export default function Radar() {
   const outros  = leads.filter(l => !l.g12 && !l.op && !l.off)
   const ativos  = leads.filter(l => !l.off && !l.op)
 
-  // ── Handlers de risco ────────────────────────────────────────────────────────
   function handleDeleteRisco(idx) {
     setRiscos(r => r.filter((_, i) => i !== idx))
     if (editIdx === idx) setEditIdx(null)
@@ -232,16 +230,6 @@ export default function Radar() {
     setAddingRow(false)
   }
 
-  function handleRegenerate() {
-    const generated = buildRiscosFromActivities(acts)
-    // Mantém os manuais (_gerado: false) e troca os automáticos
-    setRiscos(prev => [
-      ...prev.filter(r => !r._gerado),
-      ...generated,
-    ])
-  }
-
-  // ── Geração de resumo via IA ──────────────────────────────────────────────────
   async function generateResumo() {
     setGenerating(true)
     try {
@@ -271,7 +259,6 @@ export default function Radar() {
     setGenerating(false)
   }
 
-  // ── Salvar snapshot ───────────────────────────────────────────────────────────
   async function saveSnapshot() {
     setSaving(true)
     const title   = `Radar Pipeline — Semana ${semana}`
@@ -282,15 +269,14 @@ export default function Radar() {
     alert('Snapshot salvo!')
   }
 
-  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: '100vh', background: _D.bg, fontFamily: "'Inter',system-ui,sans-serif" }}>
 
-      <_SidebarNav open={_sidebarOpen} onClose={()=>_setSidebarOpen(false)} currentPath={_location.pathname} onLogout={()=>{localStorage.removeItem("iara_user");navigate("/login")}} userNome={user.nome}/>
+      <_SidebarNav open={sidebarOpen} onClose={()=>setSidebarOpen(false)} currentPath={location.pathname} onLogout={()=>{localStorage.removeItem("iara_user");navigate("/login")}} userNome={user.nome}/>
 
       {/* ── TOPBAR ── */}
       <div style={{ height: 52, background: _D.bg2, borderBottom: `1px solid ${_D.border}`, display: 'flex', alignItems: 'center', padding: '0 16px', gap: 10, position: 'sticky', top: 0, zIndex: 10 }}>
-        <_HamburgerBtn open={_sidebarOpen} onClick={()=>_setSidebarOpen(o=>!o)}/>
+        <_HamburgerBtn open={sidebarOpen} onClick={()=>setSidebarOpen(o=>!o)}/>
         <div style={{width:28,height:28,background:_D.p,borderRadius:7,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}><span style={{fontSize:11,fontWeight:800,color:"white",letterSpacing:"-.5px"}}>IA</span></div>
         <span style={{ fontSize: 14, fontWeight: 700, color: _D.t1 }}>Relatórios</span>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -398,7 +384,7 @@ export default function Radar() {
                 </tr>
               ))}
               {g12.length === 0 && (
-                <tr><td colSpan={7} style={{ ...tdS, color: '#999', textAlign: 'center', padding: 16 }}>Nenhuma oportunidade G12/G15 ativa</td></tr>
+                <tr><td colSpan={7} style={{ ...tdS, color: '#999', textAlign: 'center', padding: 16 }}>Nenhuma oportunidade G12/G15 ativa. Marque um deal como G12/G15 na aba Editar do card.</td></tr>
               )}
             </tbody>
           </table>
@@ -514,7 +500,7 @@ export default function Radar() {
           </tbody>
         </table>
 
-        {/* Footer — dinâmico, baseado no usuário logado */}
+        {/* Footer */}
         <div style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #ddd', fontSize: 12, color: '#555' }}>
           <p>
             Conteúdo atualizado por{' '}
@@ -526,7 +512,6 @@ export default function Radar() {
           </p>
         </div>
 
-        {/* Snapshots salvos */}
         {snapshots.length > 0 && (
           <div className="no-print" style={{ marginTop: 32, paddingTop: 16, borderTop: '1px solid #eee' }}>
             <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 8, color: '#444' }}>Snapshots salvos</p>
