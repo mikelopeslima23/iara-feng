@@ -48,6 +48,24 @@ function normalizeEtapa(raw, fallback = 'Prospecção') {
   return fallback
 }
 
+// ─── Filtro híbrido atividade ↔ lead (Sprint B) ──────────────────────────────
+// Prioridade 1 (path novo): match exato pelo lead_id (FK)
+// Prioridade 2-4 (fallback p/ atividades legacy sem lead_id): match EXATO de texto
+//   - nunca usa substring/.includes (evita contaminação Inter ↔ Internacional)
+function actBelongsToLead(a, lead) {
+  if (!a || !lead) return false
+  // 1. Path novo — match exato pelo id
+  if (a.lead_id) return a.lead_id === lead.id
+  // 2. Fallback p/ atividades sem lead_id (legacy)
+  const actLead = (a.lead || '').toLowerCase().trim()
+  if (!actLead) return false
+  const contaKey = (lead.conta || lead.nome || '').toLowerCase().trim()
+  const nomeKey  = (lead.nome || '').toLowerCase().trim()
+  if (nomeKey && actLead === nomeKey) return true
+  if (lead.servico) return actLead === `${contaKey} — ${lead.servico.toLowerCase().trim()}`
+  return actLead === contaKey
+}
+
 const PARALELO_OPTIONS = [
   { label: 'Proposta',    color: '#A855F7' },
   { label: 'Negociação',  color: '#FF6B1A' },
@@ -130,7 +148,7 @@ function healthScore(lead, acts, contactsMap) {
 
   const atrasadas = acts.filter(a => {
     if (a.ok || !a.dt) return false
-    if (!a.lead?.toLowerCase().includes(contaKey)) return false
+    if (!actBelongsToLead(a, lead)) return false
     const dt = new Date(a.dt); dt.setHours(0, 0, 0, 0)
     return dt < hoje
   })
@@ -175,7 +193,7 @@ function CardIndicators({ lead, acts, contactsMap, t }) {
 
   const atrasadas = acts.filter(a => {
     if (a.ok || !a.dt) return false
-    if (!a.lead?.toLowerCase().includes(contaKey)) return false
+    if (!actBelongsToLead(a, lead)) return false
     const dt = new Date(a.dt); dt.setHours(0, 0, 0, 0)
     return dt < hoje
   })
@@ -190,7 +208,7 @@ function CardIndicators({ lead, acts, contactsMap, t }) {
   if (!lead.off && !lead.op) {
     const pendLead = acts.filter(a => {
       if (a.ok) return false
-      return a.lead?.toLowerCase().includes(contaKey)
+      return actBelongsToLead(a, lead)
     })
     if (pendLead.length === 0)
       indicators.push({ icon: '⚡', label: 'Sem próx. atividade', color: '#7C3AED' })
@@ -350,11 +368,12 @@ function NovoLeadWizard({ t, leads, user, onSave, onClose }) {
   const [saving, setSaving] = useState(false)
 
   // Contas existentes para autocomplete
+  // Inclui ativos, geladeira e go-live — qualquer conta cadastrada deve aparecer
   const contasExistentes = [...new Set(leads.map(l => l.conta || l.nome).filter(Boolean))].sort()
   const sugestoes = showSugg
     ? (contaInput.trim().length === 0
-        ? contasExistentes.slice(0, 10)
-        : contasExistentes.filter(c => c.toLowerCase().includes(contaInput.toLowerCase())).slice(0, 8))
+        ? contasExistentes.slice(0, 30)
+        : contasExistentes.filter(c => c.toLowerCase().includes(contaInput.toLowerCase())))
     : []
 
   // Lead selecionado existente
@@ -727,26 +746,15 @@ function RankingModal({ leads, acts, contactsMap, onClose }) {
     let semContato=0, semAtividade=0, atrasadas=0
 
     mlTodos.forEach(l => {
-      const ck=(l.conta||l.nome||'').toLowerCase(), nk=(l.nome||'').toLowerCase(), sk=(l.servico||'').toLowerCase()
+      const ck=(l.conta||l.nome||'').toLowerCase()
       const cc=contactsMap[ck]||[]
       // Sem contato → conta para todos (pipeline + go-live)
       if(!cc.some(c=>c.tipo==='contato')) semContato++
 
-      const pend=acts.filter(a=>{
-        if(a.ok)return false; const al=(a.lead||'').toLowerCase()
-        if(nk&&al===nk)return true
-        if(sk)return al.includes(ck)&&al.includes(sk)
-        return al.includes(ck)&&!al.includes(' — ')
-      })
+      const pend = acts.filter(a => !a.ok && actBelongsToLead(a, l))
 
-      // Sem próxima atividade → só pipeline OU go-live em renovação (≤120 dias)
-      if(!l.op) {
-        if(pend.length===0) semAtividade++
-      } else {
-        const diasVenc = l.vencimento ? Math.ceil((new Date(l.vencimento) - new Date()) / (1000*60*60*24)) : null
-        const emRenovacao = diasVenc !== null && diasVenc <= 120
-        if(emRenovacao && pend.length===0) semAtividade++
-      }
+      // Sem próxima atividade → conta para todos (pipeline + go-live)
+      if(pend.length===0) semAtividade++
 
       // Atrasadas → conta para todos
       if(pend.some(a=>a.dt&&a.dt<hojeISO)) atrasadas++
@@ -892,23 +900,11 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
   const nomeKey  = (lead.nome || '').toLowerCase()   // "Flamengo — ST Completo"
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
 
-  // ── Timeline — filtra por oportunidade específica (nome completo) ─────────
-  // Prioridade: match pelo nome completo da oportunidade
-  // Fallback: match só pela conta (para atividades antigas sem serviço no lead)
+  // ── Timeline — usa helper híbrido (lead_id primeiro, exact text fallback) ──
+  // Resolve contaminação por substring (Inter ↔ Internacional) e mantém visibilidade
+  // de atividades legacy via exact text match quando lead_id é null.
   const allActs = acts
-    .filter(a => {
-      const actLead = (a.lead || '').toLowerCase().trim()
-      // 1. Match exato pelo nome completo da oportunidade (mais confiável)
-      if (nomeKey && actLead === nomeKey) return true
-      // 2. Card com serviço: atividade deve referenciar EXATAMENTE "conta — serviço"
-      if (lead.servico) {
-        const nomeCompleto = `${contaKey} — ${lead.servico.toLowerCase()}`
-        return actLead === nomeCompleto
-      }
-      // 3. Card sem serviço (só prospecção genérica): match exato só pela conta
-      // e atividade NÃO pode ter " — " (seria de outra oportunidade da mesma conta)
-      return actLead === contaKey
-    })
+    .filter(a => actBelongsToLead(a, lead))
     .sort((a, b) => {
       if (!a.ok && b.ok)  return -1
       if (a.ok  && !b.ok) return  1
@@ -1017,6 +1013,7 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
         ok:        false,
         criado:    hojeLocal,
         lead:      leadLabel,
+        lead_id:   lead.id,         // ← Sprint B: FK direta ao lead
         descricao: novaAtv.descricao.trim(),
         dt:        novaAtv.dt,
         resp:      novaAtv.resp,
@@ -1040,8 +1037,13 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
       onActivityAdded && onActivityAdded(nA)
       onLeadUpdate(leadAtualizado)
     } catch (e) {
-      console.error('Erro ao salvar atividade:', e)
-      alert('Erro ao salvar. Tente novamente.')
+      console.error('Erro ao salvar atividade:', e, '| lead:', lead, '| activity:', nA)
+      alert(
+        `❌ Erro ao salvar a atividade:\n\n` +
+        `${e?.message || 'erro desconhecido'}\n\n` +
+        `Atividade não foi gravada. Detalhes técnicos no console (F12).\n` +
+        `Pode tentar de novo ou recarregar a página.`
+      )
     }
     setSalvandoAtv(false)
   }
@@ -1675,7 +1677,8 @@ export default function Pipeline() {
       // Mostra briefing em todo login (sem filtro de data)
       {
         const primeiroNome = user.nome?.split(' ')[0] || 'Parceiro'
-        const meusLeads = lAged.filter(l => !l.off && !l.op && respMatch(l.resp, user.nome || ''))
+        // Inclui Go-Live nos contadores (pendências e atrasadas afetam todo o pipeline + operação)
+        const meusLeads = lAged.filter(l => !l.off && respMatch(l.resp, user.nome || ''))
         const hojeISO = hoje2
 
         const semContato = meusLeads.filter(l => {
@@ -1683,34 +1686,14 @@ export default function Pipeline() {
           return !cc.some(c => c.tipo === 'contato')
         })
         const semAtividade = meusLeads.filter(l => {
-          // Go-Live só conta se estiver em renovação (≤120 dias)
-          if (l.op) {
-            const diasVenc = l.vencimento ? Math.ceil((new Date(l.vencimento) - new Date()) / (1000*60*60*24)) : null
-            if (diasVenc === null || diasVenc > 120) return false
-          }
-          const nome = (l.nome || '').toLowerCase()
-          const contaK = (l.conta || l.nome || '').toLowerCase()
-          const servK = (l.servico || '').toLowerCase()
-          const pend = a.filter(act => {
-            if (act.ok) return false
-            const al = (act.lead || '').toLowerCase()
-            if (nome && al === nome) return true
-            if (servK) return al.includes(contaK) && al.includes(servK)
-            return al.includes(contaK) && !al.includes(' — ')
-          })
+          const pend = a.filter(act => !act.ok && actBelongsToLead(act, l))
           return pend.length === 0
         })
         const comAtrasadas = meusLeads.filter(l => {
-          const nome = (l.nome || '').toLowerCase()
-          const contaK = (l.conta || l.nome || '').toLowerCase()
-          const servK = (l.servico || '').toLowerCase()
           return a.some(act => {
             if (act.ok) return false
             if (!act.dt || act.dt >= hojeISO) return false
-            const al = (act.lead || '').toLowerCase()
-            if (nome && al === nome) return true
-            if (servK) return al.includes(contaK) && al.includes(servK)
-            return al.includes(contaK) && !al.includes(' — ')
+            return actBelongsToLead(act, l)
           })
         })
         const alertas = []
@@ -1908,6 +1891,7 @@ export default function Pipeline() {
         ok:        false,
         criado:    hoje,
         lead:      nome,
+        lead_id:   nL.id,           // ← Sprint B: FK direta ao lead recém-criado
         descricao: primeiraAtv.descricao.trim(),
         dt:        primeiraAtv.dt || hoje,
         resp:      form.resp || user.nome,
@@ -1936,19 +1920,30 @@ export default function Pipeline() {
 
       // Atualiza ultima_atualizacao do lead correspondente → zera o contador de dias
       const hoje = new Date().toISOString().split('T')[0]
-      const leadNome = act.lead || ''
-      const leadMatch = leads.find(l =>
-        leadNome.toLowerCase().includes((l.conta || l.nome || '').toLowerCase()) ||
-        (l.conta || l.nome || '').toLowerCase().includes(leadNome.toLowerCase())
-      )
+      // Sprint B: prefere lookup por lead_id (FK). Fallback bidirecional por nome se faltar.
+      let leadMatch = null
+      if (act.lead_id) {
+        leadMatch = leads.find(l => l.id === act.lead_id)
+      }
+      if (!leadMatch) {
+        const leadNome = act.lead || ''
+        leadMatch = leads.find(l =>
+          leadNome.toLowerCase().includes((l.conta || l.nome || '').toLowerCase()) ||
+          (l.conta || l.nome || '').toLowerCase().includes(leadNome.toLowerCase())
+        )
+      }
       if (leadMatch) {
         const atualizado = { ...leadMatch, ultima_atualizacao: hoje, dias: 0 }
         await upsertLead(atualizado)
         setLeads(prev => prev.map(l => l.id === leadMatch.id ? atualizado : l))
       }
     } catch (e) {
-      console.error('Erro ao concluir atividade:', e)
-      alert('Erro ao concluir atividade. Tente novamente.')
+      console.error('Erro ao concluir atividade:', e, '| activity:', act)
+      alert(
+        `❌ Erro ao concluir a atividade:\n\n` +
+        `${e?.message || 'erro desconhecido'}\n\n` +
+        `Detalhes no console (F12).`
+      )
     }
   }
 
@@ -1994,16 +1989,7 @@ export default function Pipeline() {
   const ativosFiltrados = (() => {
     if (!filterEstado) return ativosBusca
     return ativosBusca.filter(l => {
-      const contaKey = (l.conta || l.nome || '').toLowerCase()
-      const servKey  = (l.servico || '').toLowerCase()
-      const nomeKey  = (l.nome || '').toLowerCase()
-      const pendL = acts.filter(a => {
-        if (a.ok) return false
-        const al = (a.lead || '').toLowerCase()
-        if (nomeKey && al === nomeKey) return true
-        if (servKey) return al.includes(contaKey) && al.includes(servKey)
-        return al.includes(contaKey) && !al.includes(' — ')
-      })
+      const pendL = acts.filter(a => !a.ok && actBelongsToLead(a, l))
       const contaContacts = contactsMap[(l.conta || l.nome || '').toLowerCase()] || []
       switch (filterEstado) {
         case 'atrasados':
@@ -2229,17 +2215,8 @@ export default function Pipeline() {
               leads.filter(l => !l.off).forEach(l => {
                 const cc = contactsMap[(l.conta || l.nome || '').toLowerCase()] || []
                 if (!cc.some(c => c.tipo === 'contato')) total++
-                const nomeK = (l.nome || '').toLowerCase()
-                const contaK = (l.conta || l.nome || '').toLowerCase()
-                const servK = (l.servico || '').toLowerCase()
-                const pend = acts.filter(a => {
-                  if (a.ok) return false
-                  const al = (a.lead || '').toLowerCase()
-                  if (nomeK && al === nomeK) return true
-                  if (servK) return al.includes(contaK) && al.includes(servK)
-                  return al.includes(contaK) && !al.includes(' — ')
-                })
-                if (!l.op && pend.length === 0) total++
+                const pend = acts.filter(a => !a.ok && actBelongsToLead(a, l))
+                if (pend.length === 0) total++
                 if (pend.some(a => a.dt && a.dt < hojeISO)) total++
               })
               return (
@@ -2376,16 +2353,7 @@ export default function Pipeline() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: `${D.bg3}80`, border: `1px solid ${D.border}`, borderTop: 'none', borderRadius: '0 0 10px 10px', padding: 7, minHeight: 60 }}>
                     {cards.length === 0 && <div style={{ textAlign: 'center', color: D.border, fontSize: 11, padding: '16px 0' }}>vazio</div>}
                     {cards.map(l => {
-                      const pendLead = acts.filter(a => {
-                        if (a.ok) return false
-                        const al = (a.lead || '').toLowerCase()
-                        const nomeL = (l.nome || '').toLowerCase()
-                        const contaL = (l.conta || l.nome || '').toLowerCase()
-                        const servL = (l.servico || '').toLowerCase()
-                        if (nomeL && al === nomeL) return true
-                        if (servL) return al.includes(contaL) && al.includes(servL)
-                        return al.includes(contaL) && !al.includes(' — ')
-                      })
+                      const pendLead = acts.filter(a => !a.ok && actBelongsToLead(a, l))
                       const contaOps   = contasAtivas[l.conta || l.nome] || 1
                       const hs         = healthScore(l, acts, contactsMap)
                       const temFup     = pendLead.some(a => a.tipo === 'FUP' || a.tipo === 'Fazer Contato')
