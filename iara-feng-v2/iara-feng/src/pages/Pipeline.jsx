@@ -1491,6 +1491,64 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
                   </select>
                 </div>
               </div>
+
+              {/* ── G12/G15 + Região + País — classificação estratégica para Radar Semanal ── */}
+              <div style={{
+                background: form.g12 ? `${t.purple}10` : t.bg,
+                border: `1px solid ${form.g12 ? t.purple : t.border}`,
+                borderRadius: 10,
+                padding: '12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                transition: 'all .15s'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: form.g12 ? t.purple : t.text }}>
+                      ⭐ G12/G15 — Deal prioritário
+                    </div>
+                    <div style={{ fontSize: 10, color: t.textMuted, marginTop: 2 }}>
+                      Aparece em destaque no Radar Semanal
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => set('g12', !form.g12)}
+                    style={{
+                      width: 44, height: 24, borderRadius: 12,
+                      background: form.g12 ? t.purple : t.border,
+                      border: 'none', cursor: 'pointer', position: 'relative',
+                      transition: 'all .15s', flexShrink: 0
+                    }}>
+                    <div style={{
+                      position: 'absolute', top: 2, left: form.g12 ? 22 : 2,
+                      width: 20, height: 20, borderRadius: '50%',
+                      background: 'white', transition: 'all .15s',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                    }}/>
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 4, fontWeight: 600 }}>REGIÃO</div>
+                    <select value={form.regiao || ''} onChange={e => set('regiao', e.target.value)}
+                      style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 10px', color: t.text, fontSize: 12, outline: 'none' }}>
+                      <option value="">— Selecione —</option>
+                      <option value="Brasil">Brasil</option>
+                      <option value="LATAM">LATAM</option>
+                      <option value="Novos Negócios">Novos Negócios</option>
+                      <option value="Internacional">Internacional</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 4, fontWeight: 600 }}>PAÍS</div>
+                    <input value={form.pais || ''} onChange={e => set('pais', e.target.value)} placeholder="Brasil, Argentina..."
+                      style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${t.border}`, borderRadius: 8, padding: '8px 10px', color: t.text, fontSize: 12, outline: 'none' }} />
+                  </div>
+                </div>
+              </div>
+
               {!lead.op && (
                 <div>
                   <div style={{ fontSize: 11, color: t.orange, marginBottom: 5, fontWeight: 600 }}>⚠️ RISCO</div>
@@ -1857,13 +1915,14 @@ export default function Pipeline() {
       dt:                 form.dt   || '',
       op:                 false,
       off:                false,
-      g12:                false,
+      g12:                form.g12 || false,
       risco:              '',
       vencimento:         '',
       paralelo:           '',
       valor:              form.valor || '',
       ultima_atualizacao: hoje,
       pais:               form.pais || '',
+      regiao:             form.regiao || '',
     }
 
     // 1. Salva no banco PRIMEIRO — se falhar, usuário precisa saber antes de fechar o modal
@@ -2399,7 +2458,20 @@ export default function Pipeline() {
                             <span style={{ color: D.border2 }}>·</span>
                             <span style={{ color: hs >= 70 ? D.g : hs >= 40 ? D.y : D.r, fontWeight: 600 }}>❤ {hs}</span>
                             {contaOps > 1 && <><span style={{ color: D.border2 }}>·</span><span style={{ color: D.b }}>{contaOps}op</span></>}
-                            {l.g12 && <span style={{ color: D.y, marginLeft: 2 }}>⭐</span>}
+                            {l.g12 && (
+                              <span style={{
+                                background: `${D.p}25`,
+                                color: D.p2,
+                                border: `1px solid ${D.p}66`,
+                                borderRadius: 4,
+                                padding: '1px 6px',
+                                fontSize: 9,
+                                fontWeight: 700,
+                                marginLeft: 4,
+                                letterSpacing: '.02em',
+                                whiteSpace: 'nowrap'
+                              }}>⭐ G12/G15</span>
+                            )}
                           </div>
 
                           {/* L4: Máx 2 tags — prioridade: abandono > atrasadas > sem próx > sem contato */}
