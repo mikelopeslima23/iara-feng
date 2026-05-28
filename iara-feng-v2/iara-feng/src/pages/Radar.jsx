@@ -737,9 +737,8 @@ export default function Radar() {
             FENG
           </div>
           <p style={{ fontSize:13, marginBottom:8, color:'#fff' }}>
-            Conteúdo atualizado pela Gerência Comercial:{' '}
-            <strong style={{ color:FENG.orange }}>{user.nome || 'Equipe Comercial'}</strong>
-            {user.cargo ? ` — ${user.cargo}` : ''} ✓
+            Conteúdo produzido pela Equipe Comercial da FENG,{' '}
+            liderada por <strong style={{ color:FENG.orange }}>Mike Lopes</strong> ✓
           </p>
           <p style={{ fontSize:11, color:'rgba(255,255,255,.5)', letterSpacing:'.05em' }}>
             Inteligência e Ação para Aceleração da Receita ·{' '}
