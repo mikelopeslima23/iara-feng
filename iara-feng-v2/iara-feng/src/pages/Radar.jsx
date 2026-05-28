@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getLeads, getActivities, saveRadarSnapshot, getRadarSnapshots } from '../lib/supabase'
+import { getQuinzenaInstitucional, REUNIOES_SOCIOS } from '../lib/radar-helpers'
+import RadarWizard from './RadarWizard'
 
 // ── Dark tokens + nav inline ─────────────────────────────────────────────────
 const _D = {
@@ -277,21 +279,27 @@ export default function Radar() {
   const user      = JSON.parse(localStorage.getItem('iara_user') || '{}')
 
   const today = new Date()
-  const [dtIni, setDtIni] = useState(isoDate(getMondayOfWeek(today)))
-  const [dtFim, setDtFim] = useState(isoDate(getFridayOfWeek(today)))
+  // Quinzena institucional (padrão: janela atual baseada no calendário dos sócios)
+  const quinzenaDefault = getQuinzenaInstitucional(today)
+  const [dtIni, setDtIni] = useState(quinzenaDefault.dtIni)
+  const [dtFim, setDtFim] = useState(quinzenaDefault.dtFim)
 
-  const [leads,      setLeads]      = useState([])
-  const [acts,       setActs]       = useState([])
-  const [resumo,     setResumo]     = useState({ brasil:'', latam:'', nb:'' })
-  const [riscos,     setRiscos]     = useState([])
-  const [generating, setGenerating] = useState(false)
-  const [snapshots,  setSnapshots]  = useState([])
-  const [saving,     setSaving]     = useState(false)
-  const [sidebarOpen,setSidebarOpen]= useState(false)
-  const [editIdx,    setEditIdx]    = useState(null)
-  const [addingRow,  setAddingRow]  = useState(false)
-  const [exporting,  setExporting]  = useState(false)
-  const [secOpen,    setSecOpen]    = useState({ 1:true, 2:true, 3:false, 4:true, 5:false })
+  const [leads,       setLeads]      = useState([])
+  const [acts,        setActs]       = useState([])
+  const [resumo,      setResumo]     = useState({ brasil:'', latam:'', nb:'' })
+  const [riscos,      setRiscos]     = useState([])
+  const [snapshots,   setSnapshots]  = useState([])
+  const [saving,      setSaving]     = useState(false)
+  const [sidebarOpen, setSidebarOpen]= useState(false)
+  const [editIdx,     setEditIdx]    = useState(null)
+  const [addingRow,   setAddingRow]  = useState(false)
+  const [exporting,   setExporting]  = useState(false)
+  const [secOpen,     setSecOpen]    = useState({ 1:true, 2:true, 3:false, 4:true, 5:false })
+  const [wizardOpen,  setWizardOpen] = useState(false)
+  // Narrativas aprovadas (vindas do wizard)
+  const [narrativas,  setNarrativas] = useState(null)
+  // Info da quinzena para banner
+  const quinzenaInfo = getQuinzenaInstitucional(new Date(dtIni + 'T12:00:00'))
 
   const reportRef = useRef(null)
 
@@ -432,9 +440,9 @@ export default function Radar() {
         </div>
         <span style={{ fontSize:14, fontWeight:700, color:_D.t1 }}>Radar Pipeline</span>
         <div style={{ marginLeft:'auto', display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
-          <button onClick={generateResumo} disabled={generating}
-            style={{ padding:'6px 14px', background:_D.p, color:'white', border:'none', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer', opacity:generating?0.6:1 }}>
-            {generating ? 'Gerando...' : '✨ Gerar Resumo IA'}
+          <button onClick={() => setWizardOpen(true)}
+            style={{ padding:'6px 14px', background:_D.p, color:'white', border:'none', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}>
+            🎯 Iniciar Wizard Quinzenal
           </button>
           <button onClick={saveSnapshot} disabled={saving}
             style={{ padding:'6px 14px', background:_D.g, color:'white', border:'none', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}>
@@ -502,6 +510,24 @@ export default function Radar() {
                 Gerado em {new Date().toLocaleDateString('pt-BR')}
               </div>
             </div>
+          </div>
+
+          {/* Banner próxima reunião dos sócios */}
+          <div className="no-print" style={{
+            marginTop:14, display:'inline-flex', alignItems:'center', gap:8,
+            background: quinzenaInfo.diasParaFechamento <= 1 ? `${FENG.orange}30` : `rgba(255,255,255,.08)`,
+            border: `1px solid ${quinzenaInfo.diasParaFechamento <= 1 ? FENG.orange : 'rgba(255,255,255,.2)'}`,
+            borderRadius:100, padding:'7px 18px', fontSize:12, color:'#fff'
+          }}>
+            <span>{quinzenaInfo.diasParaFechamento <= 0 ? '🔴' : quinzenaInfo.diasParaFechamento <= 3 ? '🟠' : '📅'}</span>
+            <span>
+              Próxima reunião dos sócios:{' '}
+              <strong>seg, {new Date(quinzenaInfo.reuniaoProxima + 'T12:00:00').toLocaleDateString('pt-BR', { day:'numeric', month:'long' })}</strong>
+              {' · '}Fechamento:{' '}
+              <strong style={{ color: quinzenaInfo.diasParaFechamento <= 3 ? FENG.orange : '#fff' }}>
+                {quinzenaInfo.diasParaFechamento <= 0 ? 'hoje' : `em ${quinzenaInfo.diasParaFechamento} dias`}
+              </strong>
+            </span>
           </div>
 
           {/* Inputs de período (não vão no PDF) */}
@@ -573,51 +599,33 @@ export default function Radar() {
 
         {/* 1ª — Resumo da Semana */}
         <Sec num="1ª" titulo="Resumo da Semana" sublabel="Visão Executiva" open={secOpen[1]} onToggle={()=>toggleSec(1)} alt={false}>
-          {!resumo.brasil && !resumo.latam && !resumo.nb ? (
-            <div className="no-print" style={{
-              background:'#F9F5FF', border:`1px dashed ${FENG.purpleLight}`, borderRadius:8,
-              padding:'14px 18px', fontSize:13, color:FENG.purpleDark
-            }}>
-              Clique em <strong>✨ Gerar Resumo IA</strong> no topo para preencher esta seção automaticamente com base no pipeline.
-            </div>
-          ) : (
-            <>
-              {resumo.brasil && (
-                <div style={{ marginBottom:18 }}>
-                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🇧🇷 Brasil</div>
-                  <p style={{ fontSize:14, lineHeight:1.7, color:'#222' }}>{resumo.brasil}</p>
-                </div>
-              )}
-              {resumo.latam && (
-                <div style={{ marginBottom:18 }}>
-                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🌎 LATAM</div>
-                  <p style={{ fontSize:14, lineHeight:1.7, color:'#222' }}>{resumo.latam}</p>
-                </div>
-              )}
-              {resumo.nb && (
-                <div style={{ marginBottom:18 }}>
-                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🚀 Novos Negócios / Internacional</div>
-                  <p style={{ fontSize:14, lineHeight:1.7, color:'#222' }}>{resumo.nb}</p>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Prévia de riscos como teaser */}
+          {(() => {
+            const s1 = narrativas?.sec1 || resumo
+            const hasContent = s1.brasil || s1.latam || s1.nb
+            if (!hasContent) return (
+              <div className="no-print" style={{ background:'#F9F5FF', border:`1px dashed ${FENG.purpleLight}`, borderRadius:8, padding:'14px 18px', fontSize:13, color:FENG.purpleDark }}>
+                Clique em <strong>🎯 Iniciar Wizard Quinzenal</strong> no topo para gerar o relatório seção a seção.
+              </div>
+            )
+            return (
+              <>
+                {s1.brasil && <div style={{ marginBottom:18 }}><div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🇧🇷 Brasil</div><p style={{ fontSize:14, lineHeight:1.7, color:'#222' }}>{s1.brasil}</p></div>}
+                {s1.latam  && <div style={{ marginBottom:18 }}><div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🌎 LATAM</div><p style={{ fontSize:14, lineHeight:1.7, color:'#222' }}>{s1.latam}</p></div>}
+                {s1.nb     && <div style={{ marginBottom:18 }}><div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🚀 Novos Negócios / Internacional</div><p style={{ fontSize:14, lineHeight:1.7, color:'#222' }}>{s1.nb}</p></div>}
+              </>
+            )
+          })()}
           {riscos.length > 0 && (
-            <div style={{ marginTop:20, padding:14, background:'#FEF3F2', border:`1px solid #FCA5A5`, borderRadius:8 }}>
-              <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:'#B91C1C', textTransform:'uppercase', marginBottom:8 }}>
-                ⚠ Atenção — {riscos.length} {riscos.length === 1 ? 'risco / dependência' : 'riscos / dependências'} ativos
-              </div>
-              <div style={{ fontSize:12, color:'#444' }}>
-                Detalhes completos na <strong>Seção 4</strong>.
-              </div>
+            <div style={{ marginTop:20, padding:14, background:'#FEF3F2', border:'1px solid #FCA5A5', borderRadius:8 }}>
+              <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:'#B91C1C', textTransform:'uppercase', marginBottom:8 }}>⚠ Atenção — {riscos.length} {riscos.length === 1 ? 'risco / dependência' : 'riscos / dependências'} ativos</div>
+              <div style={{ fontSize:12, color:'#444' }}>Detalhes completos na <strong>Seção 4</strong>.</div>
             </div>
           )}
         </Sec>
 
         {/* 2ª — G12/G15 */}
-        <Sec num="2ª" titulo="G12 / G15 — Movimentos da Semana" sublabel="Prioridade Estratégica" open={secOpen[2]} onToggle={()=>toggleSec(2)} alt={true}>
+        <Sec num="2ª" titulo="G12 / G15 — Movimentos da Quinzena" sublabel="Prioridade Estratégica" open={secOpen[2]} onToggle={()=>toggleSec(2)} alt={true}>
+          {narrativas?.sec2 && <p style={{ fontSize:14, lineHeight:1.7, color:'#333', marginBottom:16 }}>{narrativas.sec2}</p>}
           {g12.length === 0 ? (
             <div style={{ padding:20, textAlign:'center', color:'#888', background:'white', border:'1px dashed #ddd', borderRadius:8 }}>
               Nenhum deal marcado como G12/G15 ainda. Vá em <strong>Pipeline → Editar card → Classificação Estratégica</strong> e ative o toggle G12/G15 nos deals prioritários.
@@ -643,6 +651,9 @@ export default function Radar() {
                   {g.regiao} · {g.leads.length} {g.leads.length === 1 ? 'lead' : 'leads'}
                 </div>
                 <TabelaLeads rows={g.leads}/>
+                {narrativas?.sec3?.[g.regiao] && (
+                  <p style={{ fontSize:14, lineHeight:1.7, color:'#333', marginTop:12 }}>{narrativas.sec3[g.regiao]}</p>
+                )}
               </div>
             ))
           )}
@@ -752,6 +763,31 @@ export default function Radar() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Wizard quinzenal */}
+      {wizardOpen && (
+        <RadarWizard
+          leads={leads}
+          activities={acts}
+          dtIni={dtIni}
+          dtFim={dtFim}
+          periodo={periodo}
+          weekNum={weekNum}
+          onClose={() => setWizardOpen(false)}
+          onSave={async (blocks) => {
+            // Aplica narrativas aprovadas ao relatório
+            setNarrativas(blocks.narrativas)
+            setRiscos(blocks.riscos || [])
+            // Salva snapshot
+            const title = `Radar Pipeline — Sem ${weekNum} (${periodo})`
+            await saveRadarSnapshot(title, JSON.stringify(blocks), user.nome)
+            const s = await getRadarSnapshots(); setSnapshots(s)
+            setWizardOpen(false)
+            // Expande as seções que têm conteúdo
+            setSecOpen({ 1:true, 2:true, 3:true, 4:true, 5:true })
+          }}
+        />
       )}
     </div>
   )
