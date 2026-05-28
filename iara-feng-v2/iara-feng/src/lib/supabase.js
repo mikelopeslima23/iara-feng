@@ -76,6 +76,16 @@ export async function getRadarSnapshots() {
   return data || []
 }
 
+export async function getRadarSnapshotById(id) {
+  const { data, error } = await supabase
+    .from('iara_radars')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) throw error
+  return data
+}
+
 // ─── MEMORIES ────────────────────────────────────────────────────────────────
 
 export async function getMemories(userId) {
