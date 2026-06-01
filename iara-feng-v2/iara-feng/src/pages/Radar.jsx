@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { getLeads, getActivities, saveRadarSnapshot, getRadarSnapshots } from '../lib/supabase'
+import { getLeads, getActivities, saveRadarSnapshot, getRadarSnapshots, createRadarShare } from '../lib/supabase'
 import { getQuinzenaInstitucional, REUNIOES_SOCIOS } from '../lib/radar-helpers'
 import RadarWizard from './RadarWizard'
 
@@ -300,6 +300,12 @@ export default function Radar() {
   const [narrativas,  setNarrativas] = useState(null)
   // Info da quinzena para banner
   const quinzenaInfo = getQuinzenaInstitucional(new Date(dtIni + 'T12:00:00'))
+  // Link de compartilhamento público
+  const [lastSnapshotId,  setLastSnapshotId]  = useState(null)
+  const [shareLink,       setShareLink]       = useState(null)
+  const [shareModal,      setShareModal]      = useState(false)
+  const [generatingLink,  setGeneratingLink]  = useState(false)
+  const [linkCopied,      setLinkCopied]      = useState(false)
 
   const reportRef = useRef(null)
 
@@ -426,6 +432,31 @@ export default function Radar() {
     setExporting(false)
   }
 
+  async function generateShareLink() {
+    if (!lastSnapshotId) {
+      alert('Salve o Radar primeiro antes de gerar o link (feche o wizard com "Fechar e Salvar").')
+      return
+    }
+    setGeneratingLink(true)
+    try {
+      const share = await createRadarShare(lastSnapshotId, user.nome)
+      const url = `${window.location.origin}/report/${share.id}`
+      setShareLink({ url, expiresAt: share.expires_at })
+      setShareModal(true)
+    } catch (e) {
+      alert('Erro ao gerar link: ' + e.message)
+    }
+    setGeneratingLink(false)
+  }
+
+  function copyShareLink() {
+    if (!shareLink) return
+    navigator.clipboard.writeText(shareLink.url).then(() => {
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2500)
+    })
+  }
+
   // ── RENDER ──────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight:'100vh', background:_D.bg, fontFamily:"'Inter',system-ui,sans-serif" }}>
@@ -443,6 +474,11 @@ export default function Radar() {
           <button onClick={() => setWizardOpen(true)}
             style={{ padding:'6px 14px', background:_D.p, color:'white', border:'none', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}>
             🎯 Iniciar Wizard Quinzenal
+          </button>
+          <button onClick={generateShareLink} disabled={generatingLink || !lastSnapshotId}
+            title={!lastSnapshotId ? 'Salve o Radar primeiro' : 'Gerar link para sócios'}
+            style={{ padding:'6px 14px', background: lastSnapshotId ? '#059669' : _D.bg3, color: lastSnapshotId ? 'white' : _D.t3, border:`1px solid ${lastSnapshotId ? '#059669' : _D.border}`, borderRadius:6, fontSize:12, fontWeight:600, cursor: lastSnapshotId ? 'pointer' : 'not-allowed' }}>
+            {generatingLink ? '⏳' : '🔗'} Gerar link
           </button>
           <button onClick={saveSnapshot} disabled={saving}
             style={{ padding:'6px 14px', background:_D.g, color:'white', border:'none', borderRadius:6, fontSize:12, fontWeight:600, cursor:'pointer' }}>
@@ -477,6 +513,11 @@ export default function Radar() {
           <div className="feng-orb" style={{ position:'absolute', top:30, right:50, width:50, height:50, borderRadius:'50%', background:`${FENG.orange}30`, filter:'blur(2px)' }}/>
           <div className="feng-orb" style={{ position:'absolute', bottom:40, left:60, width:70, height:70, borderRadius:'50%', background:`${FENG.purple}25`, filter:'blur(3px)', animationDelay:'1s' }}/>
           <div className="feng-orb" style={{ position:'absolute', top:'50%', right:'15%', width:30, height:30, borderRadius:'50%', background:`${FENG.purpleLight}30`, filter:'blur(2px)', animationDelay:'2s' }}/>
+
+          {/* Logo FENG */}
+          <div style={{ marginBottom:20, position:'relative' }}>
+            <img src="/feng-logo.png" alt="FENG" style={{ height:52, width:'auto', opacity:.95 }}/>
+          </div>
 
           <div style={{ fontSize:13, fontWeight:700, letterSpacing:'.4em', textTransform:'uppercase', color:FENG.purpleLight, marginBottom:14, position:'relative' }}>
             Diretoria Comercial &amp; Sucesso do Cliente
@@ -733,8 +774,8 @@ export default function Radar() {
           padding:'28px 32px', textAlign:'center',
           borderTop:`3px solid ${FENG.orange}`
         }}>
-          <div style={{ fontFamily:'"Bebas Neue", system-ui, sans-serif', fontSize:28, color:'#fff', letterSpacing:'.04em', marginBottom:6 }}>
-            FENG
+          <div style={{ marginBottom:10 }}>
+            <img src="/feng-logo.png" alt="FENG" style={{ height:36, width:'auto', opacity:.85 }}/>
           </div>
           <p style={{ fontSize:13, marginBottom:8, color:'#fff' }}>
             Conteúdo produzido pela Equipe Comercial da FENG,{' '}
@@ -775,18 +816,50 @@ export default function Radar() {
           weekNum={weekNum}
           onClose={() => setWizardOpen(false)}
           onSave={async (blocks) => {
-            // Aplica narrativas aprovadas ao relatório
             setNarrativas(blocks.narrativas)
             setRiscos(blocks.riscos || [])
-            // Salva snapshot
             const title = `Radar Pipeline — Sem ${weekNum} (${periodo})`
-            await saveRadarSnapshot(title, JSON.stringify(blocks), user.nome)
+            const snap = await saveRadarSnapshot(title, JSON.stringify(blocks), user.nome)
+            if (snap?.id) setLastSnapshotId(snap.id) // captura ID para o link
             const s = await getRadarSnapshots(); setSnapshots(s)
             setWizardOpen(false)
-            // Expande as seções que têm conteúdo
             setSecOpen({ 1:true, 2:true, 3:true, 4:true, 5:true })
           }}
         />
+      )}
+
+      {/* Modal de link de compartilhamento */}
+      {shareModal && shareLink && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.65)', zIndex:60, display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+          <div style={{ background:'white', borderRadius:14, padding:28, maxWidth:520, width:'100%', boxShadow:'0 24px 80px rgba(0,0,0,.4)' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+              <div style={{ width:44, height:44, borderRadius:10, background:'#F0FDF4', border:'1px solid #BBF7D0', display:'flex', alignItems:'center', justifyContent:'center', fontSize:22 }}>🔗</div>
+              <div>
+                <div style={{ fontSize:16, fontWeight:700, color:'#111' }}>Link gerado com sucesso</div>
+                <div style={{ fontSize:12, color:'#6B7280', marginTop:2 }}>Compartilhe com os sócios pelo WhatsApp ou e-mail</div>
+              </div>
+              <button onClick={() => setShareModal(false)} style={{ marginLeft:'auto', background:'none', border:'none', fontSize:20, cursor:'pointer', color:'#9CA3AF' }}>✕</button>
+            </div>
+            <div style={{ background:'#F9FAFB', border:'1px solid #E5E7EB', borderRadius:8, padding:'10px 14px', marginBottom:14, wordBreak:'break-all', fontSize:13, color:'#374151', fontFamily:'monospace' }}>
+              {shareLink.url}
+            </div>
+            <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+              <button onClick={copyShareLink}
+                style={{ flex:1, padding:'9px', borderRadius:7, border:'none', background: linkCopied ? '#059669' : _D.p, color:'white', fontWeight:700, fontSize:13, cursor:'pointer' }}>
+                {linkCopied ? '✓ Copiado!' : '📋 Copiar link'}
+              </button>
+              <a href={shareLink.url} target="_blank" rel="noopener noreferrer"
+                style={{ padding:'9px 14px', borderRadius:7, border:`1px solid ${_D.border}`, background:'transparent', color:_D.t1, fontWeight:600, fontSize:13, cursor:'pointer', textDecoration:'none', display:'flex', alignItems:'center', gap:4 }}>
+                👁 Prévia
+              </a>
+            </div>
+            <div style={{ fontSize:11, color:'#9CA3AF', textAlign:'center' }}>
+              🔒 Acesso apenas via este link · válido até{' '}
+              <strong style={{ color:'#6B7280' }}>{new Date(shareLink.expiresAt).toLocaleDateString('pt-BR')}</strong>
+              {' '}(30 dias) · somente visualização
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
