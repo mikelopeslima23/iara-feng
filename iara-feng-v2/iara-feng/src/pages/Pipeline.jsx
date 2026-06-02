@@ -1829,7 +1829,16 @@ export default function Pipeline() {
     const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
     // Normaliza etapa pra evitar fantasmas. Preserva etapa anterior como fallback.
     const etapaNormalizada = normalizeEtapa(form.etapa, anterior?.etapa || 'Prospecção')
-    const formAtualizado = { ...form, etapa: etapaNormalizada, ultima_atualizacao: hoje, dias: 0 }
+    // Sync automático op/off pela etapa — evita cards invisíveis ao mover para Go-Live
+    const isGoLive = etapaNormalizada === 'Operação / Go-Live'
+    const formAtualizado = {
+      ...form,
+      etapa: etapaNormalizada,
+      op:    isGoLive,
+      off:   isGoLive ? false : form.off,
+      ultima_atualizacao: hoje,
+      dias:  0,
+    }
     await upsertLead(formAtualizado)
     setLeads(prev => prev.map(l => l.id === form.id ? formAtualizado : l))
 
