@@ -76,33 +76,6 @@ export async function getRadarSnapshots() {
   return data || []
 }
 
-export async function getRadarSnapshotById(id) {
-  const { data, error } = await supabase
-    .from('iara_radars').select('*').eq('id', id).single()
-  if (error) throw error
-  return data
-}
-
-// Cria um link de compartilhamento público para um snapshot (30 dias de validade)
-export async function createRadarShare(radarId, createdBy) {
-  const { data, error } = await supabase
-    .from('iara_radar_shares')
-    .insert({ radar_id: radarId, created_by: createdBy })
-    .select('id, expires_at')
-    .single()
-  if (error) throw error
-  return data // { id: uuid, expires_at: timestamp }
-}
-
-// Desativa um link de compartilhamento (revoga acesso)
-export async function revokeRadarShare(shareId) {
-  const { error } = await supabase
-    .from('iara_radar_shares')
-    .update({ active: false })
-    .eq('id', shareId)
-  if (error) throw error
-}
-
 // ─── MEMORIES ────────────────────────────────────────────────────────────────
 
 export async function getMemories(userId) {
@@ -226,4 +199,63 @@ export async function deleteLead(id) {
     .delete()
     .eq('id', id)
   if (error) throw error
+}
+
+// ─── CS · CUSTOMER SUCCESS ────────────────────────────────────────────────────
+
+export async function getCsAtividades(conta = null) {
+  let q = supabase.from('cs_atividades').select('*').order('data', { ascending: false })
+  if (conta) q = q.eq('conta', conta)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}
+export async function upsertCsAtividade(atv) {
+  const { data, error } = await supabase.from('cs_atividades').upsert(atv, { onConflict: 'id' }).select().single()
+  if (error) throw error
+  return data
+}
+export async function deleteCsAtividade(id) {
+  const { error } = await supabase.from('cs_atividades').delete().eq('id', id)
+  if (error) throw error
+}
+export async function getCsStakeholders(conta = null) {
+  let q = supabase.from('cs_stakeholders').select('*').order('nome')
+  if (conta) q = q.eq('conta', conta)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}
+export async function upsertCsStakeholder(sk) {
+  const { error } = await supabase.from('cs_stakeholders').upsert(sk, { onConflict: 'id' })
+  if (error) throw error
+}
+export async function deleteCsStakeholder(id) {
+  const { error } = await supabase.from('cs_stakeholders').delete().eq('id', id)
+  if (error) throw error
+}
+export async function getCsNpsCiclos(conta = null) {
+  let q = supabase.from('cs_nps_ciclos').select('*').order('criado_em', { ascending: false })
+  if (conta) q = q.eq('conta', conta)
+  const { data, error } = await q
+  if (error) throw error
+  return data || []
+}
+export async function createCsNpsCiclo(ciclo) {
+  const { data, error } = await supabase.from('cs_nps_ciclos').insert(ciclo).select().single()
+  if (error) throw error
+  return data
+}
+export async function getCsNpsRespostas(cicloId) {
+  const { data, error } = await supabase.from('cs_nps_respostas').select('*').eq('ciclo_id', cicloId)
+  if (error) throw error
+  return data || []
+}
+export async function getCsNpsRespostasByConta(conta) {
+  const { data: ciclos } = await supabase.from('cs_nps_ciclos').select('id').eq('conta', conta)
+  if (!ciclos || ciclos.length === 0) return []
+  const ids = ciclos.map(c => c.id)
+  const { data, error } = await supabase.from('cs_nps_respostas').select('*').in('ciclo_id', ids)
+  if (error) throw error
+  return data || []
 }
