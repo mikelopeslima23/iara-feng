@@ -76,6 +76,32 @@ export async function getRadarSnapshots() {
   return data || []
 }
 
+export async function getRadarSnapshotById(id) {
+  const { data, error } = await supabase
+    .from('iara_radars').select('*').eq('id', id).single()
+  if (error) throw error
+  return data
+}
+
+// Cria link de compartilhamento público (30 dias de validade)
+export async function createRadarShare(radarId, createdBy) {
+  const { data, error } = await supabase
+    .from('iara_radar_shares')
+    .insert({ radar_id: radarId, created_by: createdBy })
+    .select('id, expires_at')
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function revokeRadarShare(shareId) {
+  const { error } = await supabase
+    .from('iara_radar_shares')
+    .update({ active: false })
+    .eq('id', shareId)
+  if (error) throw error
+}
+
 // ─── MEMORIES ────────────────────────────────────────────────────────────────
 
 export async function getMemories(userId) {
