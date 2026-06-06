@@ -8,6 +8,9 @@ import Pipeline from './pages/Pipeline'
 import Conhecimento from './pages/Conhecimento'
 import Contatos from './pages/Contatos'
 import Configuracoes from './pages/Configuracoes'
+import CS from './pages/CS'
+import CSCliente from './pages/CSCliente'
+import ReportPublic from './pages/ReportPublic'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const raw  = localStorage.getItem('iara_user')
@@ -21,13 +24,23 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Rotas públicas — sem login */}
+        <Route path="/report/:token"  element={<ReportPublic />} />
+
+        {/* Autenticação */}
         <Route path="/login"          element={<Login />} />
-        <Route path="/chat"           element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-        <Route path="/radar"          element={<ProtectedRoute><Radar /></ProtectedRoute>} />
+
+        {/* Rotas protegidas */}
         <Route path="/pipeline"       element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
-        <Route path="/conhecimento"   element={<ProtectedRoute><Conhecimento /></ProtectedRoute>} />
+        <Route path="/chat"           element={<ProtectedRoute><Chat /></ProtectedRoute>} />
         <Route path="/contatos"       element={<ProtectedRoute><Contatos /></ProtectedRoute>} />
+        <Route path="/cs"             element={<ProtectedRoute><CS /></ProtectedRoute>} />
+        <Route path="/cs/:conta"      element={<ProtectedRoute><CSCliente /></ProtectedRoute>} />
+        <Route path="/radar"          element={<ProtectedRoute><Radar /></ProtectedRoute>} />
+        <Route path="/conhecimento"   element={<ProtectedRoute><Conhecimento /></ProtectedRoute>} />
         <Route path="/configuracoes"  element={<ProtectedRoute adminOnly><Configuracoes /></ProtectedRoute>} />
+
+        {/* Fallbacks */}
         <Route path="/"               element={<Navigate to="/pipeline" replace />} />
         <Route path="*"               element={<Navigate to="/pipeline" replace />} />
       </Routes>
