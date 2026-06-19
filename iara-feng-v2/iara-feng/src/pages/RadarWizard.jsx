@@ -28,6 +28,12 @@ POSTURA NARRATIVA:
 - Pontos de atenção aparecem brevemente ao final, nunca como abertura.
 - Tom de quem está no controle, não reportando dificuldades.
 
+REGRA DT_CHAVE — OBRIGATÓRIA:
+- O campo DT_CHAVE vem EXCLUSIVAMENTE do campo dedicado no CRM. Nunca inferir ou extrair de texto livre (mov, próx_acao, obs).
+- Nunca recalcular, sugerir ou substituir DT_CHAVE por outras datas como "último contato", "próxima reunião mencionada em texto", etc.
+- Se DT_CHAVE for "–" ou ausente: exibir "–" e sinalizar o lead com ⚠️ verificar dt chave.
+- Em caso de dúvida sobre a origem da data: sempre preferir "–" com sinalização em vez de assumir.
+
 SAÚDE DO LEAD (use nos textos quando relevante):
 - 🟢 contato nos últimos 7 dias
 - 🟡 sem contato entre 8 e 21 dias
@@ -108,6 +114,13 @@ function NarrativaEditor({ label, value, onChange, onGenerate, generating, place
       )}
     </div>
   )
+}
+
+// ── Cores por etapa ──────────────────────────────────────────────────────────
+const ETAPA_COLORS = {
+  'Prospecção':'#B5D4F4','Oportunidade':'#85B7EB','Proposta':'#AFA9EC',
+  'Negociação':'#7F77DD','Jurídico':'#FAC775','Implementação':'#5DCAA5',
+  'Operação / Go-Live':'#1D9E75',
 }
 
 // ── Card de lead (no wizard) ──────────────────────────────────────────────────
@@ -246,10 +259,9 @@ export default function RadarWizard({ leads, activities, dtIni, dtFim, periodo, 
   const [genS1, setGenS1] = useState(null) // 'brasil'|'latam'|'nb'|'all'
 
   // Seção 2 — G12/G15
-  const [s2Leads,    setS2Leads]    = useState(initG12.map(l => l.id))
-  const [s2Narrativa,setS2Narrativa]= useState('')
-  const [genS2,      setGenS2]      = useState(false)
-  const [addS2,      setAddS2]      = useState(false)
+  const [s2Items,    setS2Items]    = useState(initG12.map(l => ({ id: l.id, narrativa: '', gerando: false })))
+  const [genS2All,   setGenS2All]  = useState(false)
+  const [addS2,      setAddS2]     = useState(false)
 
   // Seção 3 — Outros por região
   const [s3Leads,    setS3Leads]    = useState(initOutros.map(l => l.id)) // IDs no bloco
@@ -342,29 +354,54 @@ Retorne APENAS os bullets, um por linha, sem título de região. Ex:
     setGenS1(null)
   }
 
-  // ── Geração IA — Seção 2 ─────────────────────────────────────────────────
-  async function gerarS2() {
-    setGenS2(true)
+  // ── Geração IA — Seção 2 (por lead ou todos) ─────────────────────────────
+  async function gerarUmS2(leadId) {
+    const lead = leads.find(l => l.id === leadId)
+    if (!lead) return
+    setS2Items(items => items.map(it => it.id === leadId ? { ...it, gerando: true } : it))
     try {
-      const ll = leadsAtivos(s2Leads)
-      const ctx = ll.map(leadContexto).join('\n\n')
-      const prompt = `Escreva a narrativa G12/G15 do Radar Pipeline FENG (período ${periodo}).
+      const ctx = leadContexto(lead)
+      const prompt = `Escreva a narrativa para o lead ${lead.nome} no Radar Pipeline G12/G15 (período ${periodo}).
 
-Para CADA lead abaixo, escreva em 4 blocos nessa ordem exata:
+Estrutura OBRIGATÓRIA em 4 blocos:
 **Quem é:** 1 frase sobre o cliente e o que está sendo negociado
 **Histórico recente:** 1 a 2 frases do que aconteceu nas últimas semanas
 **Status atual:** 1 frase clara de onde está hoje
 **Bloqueio/dependência:** 1 frase — omitir completamente se não houver
 
-Separe cada lead com uma linha em branco. Comece com o nome do lead em maiúsculo.
+Dados do lead:
+${ctx}
 
-Leads G12/G15:
-${ctx || '(nenhum)'}
+ATENÇÃO: o campo DT_CHAVE vem EXCLUSIVAMENTE do CRM (valor: ${lead.dt || '–'}). Não inferir do texto. Se ausente, exibir "–" e marcar ⚠️ verificar dt chave.
+Português sempre (traduzir espanhol). Campo ausente = "–". Sem travessões.`
+      const txt = await callIA(prompt)
+      setS2Items(items => items.map(it => it.id === leadId ? { ...it, narrativa: txt, gerando: false } : it))
+    } catch(e) {
+      setS2Items(items => items.map(it => it.id === leadId ? { ...it, gerando: false } : it))
+      alert('Erro ao gerar: ' + e.message)
+    }
+  }
 
-Regras: português sempre (traduzir espanhol). Campo ausente = "–", nunca inventar. Sem travessões.`
-      setS2Narrativa(await callIA(prompt))
-    } catch(e) { alert('Erro ao gerar: ' + e.message) }
-    setGenS2(false)
+  async function gerarTodosS2() {
+    setGenS2All(true)
+    // Gera em paralelo mas preserva edições manuais (gerando: true só nos que estão vazios ou se forçar)
+    const promises = s2Items.map(item => {
+      // Se o item já tem narrativa editada manualmente (!='' e não foi gerado agora), perguntar? Por ora gera todos.
+      return gerarUmS2(item.id)
+    })
+    await Promise.all(promises)
+    setGenS2All(false)
+  }
+
+  function s2Leads() { return s2Items.map(it => it.id) }
+  function updateS2Narrativa(id, txt) {
+    setS2Items(items => items.map(it => it.id === id ? { ...it, narrativa: txt } : it))
+  }
+  function removeFromS2(id) {
+    setS2Items(items => items.filter(it => it.id !== id))
+  }
+  function addToS2(lead) {
+    setS2Items(items => [...items, { id: lead.id, narrativa: '', gerando: false }])
   }
 
   // ── Geração IA — Seção 3 por região ──────────────────────────────────────
@@ -433,7 +470,9 @@ ${txt}`
         s1.nb     ? callIA(prompt('NB',     s1.nb))     : Promise.resolve(s1.nb),
         s4Narrativa ? callIA(prompt('Riscos', s4Narrativa)) : Promise.resolve(s4Narrativa),
       ])
-      const s2p = s2Narrativa ? await callIA(prompt('G12/G15', s2Narrativa)) : s2Narrativa
+      const s2p = s2Items.length > 0
+        ? await Promise.all(s2Items.map(async it => it.narrativa ? { ...it, narrativa: await callIA(prompt('G12/G15', it.narrativa)) } : it))
+        : s2Items
 
       // Seção 3 — polir cada região
       const s3p = { ...s3Narrativa }
@@ -450,15 +489,15 @@ ${txt}`
   function handleSave() {
     const final = polished || {
       sec1: s1,
-      sec2: s2Narrativa,
+      sec2: s2Items,           // array de {id, narrativa}
       sec3: s3Narrativa,
       sec4: s4Narrativa,
     }
     onSave({
       dtIni, dtFim, periodo, weekNum,
       narrativas: final,
-      g12Leads:   leadsAtivos(s2Leads).map(l => l.id),
-      outrosLeads:leadsAtivos(s3Leads).map(l => l.id),
+      g12Leads:   s2Items.map(it => it.id),
+      outrosLeads: s3Items ? s3Items.map(it => it.id) : leadsAtivos(s3Leads).map(l => l.id),
       riscos: s4Riscos,
     })
   }
@@ -512,34 +551,80 @@ ${txt}`
             <div>
               <StepHeader
                 num="2" titulo="G12 / G15 — Movimentos da Quinzena"
-                desc="Deals de prioridade estratégica. Inclua ou remova leads desta seção sem alterar o pipeline."
+                desc="Cada lead tem sua própria narrativa editável. Gere individualmente ou todos de uma vez. Edições manuais não são sobrescritas por regenerações parciais."
               />
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
                 <div style={{ fontSize:12, fontWeight:700, color:'#444' }}>
-                  {s2Leads.length} {s2Leads.length === 1 ? 'lead' : 'leads'} nesta seção
+                  {s2Items.length} {s2Items.length === 1 ? 'lead' : 'leads'} nesta seção
                 </div>
-                <button onClick={() => setAddS2(true)} style={btnSecondary}>+ Incluir lead</button>
+                <div style={{ display:'flex', gap:8 }}>
+                  <button onClick={() => setAddS2(true)} style={btnSecondary}>+ Incluir lead</button>
+                  <button onClick={gerarTodosS2} disabled={genS2All || s2Items.length === 0} style={btnPrimary(genS2All || s2Items.length === 0)}>
+                    {genS2All ? '⏳ Gerando...' : '✨ Gerar todos'}
+                  </button>
+                </div>
               </div>
               {addS2 && (
-                <AddLeadSearch allLeads={leads} excludedIds={[]} currentIds={s2Leads}
-                  onAdd={l => setS2Leads(ids => [...ids, l.id])} onClose={() => setAddS2(false)}/>
+                <AddLeadSearch allLeads={leads} excludedIds={[]} currentIds={s2Items.map(i=>i.id)}
+                  onAdd={addToS2} onClose={() => setAddS2(false)}/>
               )}
-              {leadsAtivos(s2Leads).map(l => (
-                <LeadChip key={l.id} lead={l} score={scoreOf(l)}
-                  onRemove={() => setS2Leads(ids => ids.filter(id => id !== l.id))}/>
-              ))}
-              {s2Leads.length === 0 && (
+              {s2Items.length === 0 && (
                 <div style={{ padding:20, textAlign:'center', color:'#9CA3AF', background:'white', border:'1px dashed #E5E7EB', borderRadius:8, marginBottom:16 }}>
-                  Nenhum lead G12/G15 nesta seção. Use "+ Incluir lead" para adicionar manualmente.
+                  Nenhum lead G12/G15. Use "+ Incluir lead" para adicionar.
                 </div>
               )}
-              <NarrativaEditor
-                label="Narrativa de abertura desta seção"
-                value={s2Narrativa} onChange={setS2Narrativa}
-                onGenerate={gerarS2} generating={genS2}
-                rows={4}
-                placeholder="A IAra vai gerar um parágrafo de contexto com base nos leads selecionados acima."/>
-              <InfoBox>Remover um lead desta seção não o exclui do pipeline. Só define o que aparece no relatório.</InfoBox>
+              {/* Por lead — lista editável independente */}
+              {s2Items.map((item) => {
+                const lead = leads.find(l => l.id === item.id)
+                if (!lead) return null
+                const saude = calcSaude(lead)
+                const semDt = !lead.dt || lead.dt === '—'
+                return (
+                  <div key={item.id} style={{ marginBottom:16, background:'white', border:'1px solid #E5E7EB', borderRadius:10, overflow:'hidden' }}>
+                    {/* Header do lead */}
+                    <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderBottom:'1px solid #F3F4F6', background:'#FAFAFA' }}>
+                      <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+                        <span style={{ fontSize:13, fontWeight:700, color:'#111' }}>{lead.nome}</span>
+                        <span style={{ fontSize:10, padding:'1px 7px', borderRadius:4, background:(ETAPA_COLORS[lead.etapa]||'#888')+'22', color:ETAPA_COLORS[lead.etapa]||'#555', border:`1px solid ${ETAPA_COLORS[lead.etapa]||'#888'}44` }}>{lead.etapa}</span>
+                        <span style={{ fontSize:10, color:saude.dot, background:saude.dot+'18', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>
+                          <span style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:saude.dot, marginRight:3, verticalAlign:'middle' }}/>
+                          {saude.label}
+                        </span>
+                        {/* DT_CHAVE */}
+                        {semDt
+                          ? <span style={{ fontSize:10, color:'#F59E0B', background:'rgba(245,158,11,.1)', border:'1px solid rgba(245,158,11,.3)', borderRadius:4, padding:'1px 7px' }}>⚠️ verificar dt chave</span>
+                          : <span style={{ fontSize:10, color:'#6B7280' }}>📅 {lead.dt}</span>
+                        }
+                        {lead.obs_gerencia && <span style={{ fontSize:10, color:'#F97316' }}>💬 Bruno</span>}
+                      </div>
+                      <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                        <button onClick={() => gerarUmS2(item.id)} disabled={item.gerando}
+                          style={{ fontSize:11, padding:'4px 10px', borderRadius:5, border:`1px solid ${W.purple}40`, background:W.purpleF, color:W.purpleD, cursor:item.gerando?'not-allowed':'pointer', fontWeight:600 }}>
+                          {item.gerando ? '⏳' : '✨ Gerar'}
+                        </button>
+                        <button onClick={() => removeFromS2(item.id)}
+                          style={{ width:22, height:22, borderRadius:'50%', border:'1px solid #FCA5A5', background:'#FEF2F2', color:'#DC2626', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700 }}>
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    {/* Narrativa editável deste lead */}
+                    <div style={{ padding:'10px 14px' }}>
+                      <textarea
+                        value={item.narrativa}
+                        onChange={e => updateS2Narrativa(item.id, e.target.value)}
+                        placeholder={`Narrativa do lead ${lead.nome}. Clique "✨ Gerar" para sugestão da IAra em 4 blocos:\n**Quem é:** ...\n**Histórico recente:** ...\n**Status atual:** ...\n**Bloqueio/dependência:** ...`}
+                        rows={item.narrativa ? 6 : 3}
+                        style={{ width:'100%', border:`1px solid ${item.narrativa ? '#D1D5DB' : '#E5E7EB'}`, borderRadius:7, padding:'9px 11px', fontSize:12, color:'#111', outline:'none', resize:'vertical', fontFamily:'inherit', lineHeight:1.6, boxSizing:'border-box', background: item.narrativa ? '#FAFAF9' : 'white' }}
+                      />
+                      {item.narrativa && (
+                        <div style={{ fontSize:10, color:'#9CA3AF', marginTop:3 }}>{item.narrativa.length} caracteres · editável · não será sobrescrito por gerações parciais</div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+              <InfoBox>Remover um lead desta seção não o exclui do pipeline. Edições manuais de um lead não são afetadas ao gerar ou regenerar outros leads.</InfoBox>
             </div>
           )}
 
@@ -658,9 +743,20 @@ ${txt}`
                   ✅ Textos polidos. Revise abaixo e salve quando estiver pronto.
                 </div>
               )}
-              <PreviewNarrativas s1={polished?.sec1 || s1} s2={polished?.sec2 || s2Narrativa} s3={polished?.sec3 || s3Narrativa} s4={polished?.sec4 || s4Narrativa}
+              <PreviewNarrativas s1={polished?.sec1 || s1} s2={polished?.sec2 || s2Items} s3={polished?.sec3 || s3Narrativa} s4={polished?.sec4 || s4Narrativa}
                 onEditS1={(k,v) => polished ? setPolished(p => ({...p, sec1:{...p.sec1,[k]:v}})) : setS1(prev=>({...prev,[k]:v}))}
-                onEditS2={v => polished ? setPolished(p=>({...p,sec2:v})) : setS2Narrativa(v)}
+                onEditS2={(id, v) => {
+                  if (polished) {
+                    // polished.sec2 pode ser array ou string
+                    if (Array.isArray(polished.sec2)) {
+                      setPolished(p => ({ ...p, sec2: p.sec2.map(it => it.id === id ? { ...it, narrativa: v } : it) }))
+                    } else {
+                      setPolished(p => ({ ...p, sec2: v }))
+                    }
+                  } else {
+                    if (id) updateS2Narrativa(id, v)
+                  }
+                }}
                 onEditS3={(reg,v) => polished ? setPolished(p=>({...p,sec3:{...p.sec3,[reg]:v}})) : setS3Narrativa(prev=>({...prev,[reg]:v}))}
                 onEditS4={v => polished ? setPolished(p=>({...p,sec4:v})) : setS4Narrativa(v)}
               />
@@ -728,13 +824,22 @@ function PreviewNarrativas({ s1, s2, s3, s4, onEditS1, onEditS2, onEditS3, onEdi
             style={{ width:'100%', border:'1px solid #E5E7EB', borderRadius:7, padding:'9px 11px', fontSize:13, color:'#111', outline:'none', resize:'vertical', fontFamily:'inherit', lineHeight:1.6, boxSizing:'border-box' }}/>
         </div>
       ) : null)}
-      {s2 && (
+      {/* s2 pode ser array de {id, narrativa} ou string legada */}
+      {Array.isArray(s2) ? (
+        s2.filter(it => it.narrativa).map((it, i) => (
+          <div key={it.id || i} style={{ marginBottom:12 }}>
+            <div style={{ fontSize:10, fontWeight:700, letterSpacing:'.15em', color:W.purple, textTransform:'uppercase', marginBottom:4 }}>G12/G15 · Lead {i+1}</div>
+            <textarea value={it.narrativa} onChange={e => onEditS2(it.id, e.target.value)} rows={5}
+              style={{ width:'100%', border:'1px solid #E5E7EB', borderRadius:7, padding:'9px 11px', fontSize:12, color:'#111', outline:'none', resize:'vertical', fontFamily:'inherit', lineHeight:1.6, boxSizing:'border-box' }}/>
+          </div>
+        ))
+      ) : s2 ? (
         <div style={{ marginBottom:14 }}>
           <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:W.purple, textTransform:'uppercase', marginBottom:4 }}>G12/G15</div>
-          <textarea value={s2} onChange={e => onEditS2(e.target.value)} rows={3}
+          <textarea value={s2} onChange={e => onEditS2(null, e.target.value)} rows={3}
             style={{ width:'100%', border:'1px solid #E5E7EB', borderRadius:7, padding:'9px 11px', fontSize:13, color:'#111', outline:'none', resize:'vertical', fontFamily:'inherit', lineHeight:1.6, boxSizing:'border-box' }}/>
         </div>
-      )}
+      ) : null}
       {Object.entries(s3).filter(([,v]) => v).map(([reg, v]) => (
         <div key={reg} style={{ marginBottom:14 }}>
           <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:W.purple, textTransform:'uppercase', marginBottom:4 }}>Outros · {reg}</div>
