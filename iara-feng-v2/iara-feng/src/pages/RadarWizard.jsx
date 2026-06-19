@@ -16,25 +16,45 @@ const W = {
 // ── Sistema prompt base — anti-tiques de IA ──────────────────────────────────
 const SYSTEM_PROMPT = `Você é o gerente comercial sênior da FENG escrevendo o Radar Pipeline Quinzenal para os sócios da empresa.
 
-TOM: executivo, direto, como se estivesse verbalizando numa reunião de conselho. Português brasileiro corporativo natural, sem afetação.
+CONTEXTO:
+Os sócios não estão no dia a dia comercial. Contexto e histórico são essenciais — precisam entender cada oportunidade sem precisar perguntar.
+Modelo de negócio: participação percentual na receita dos clientes. Não use métricas financeiras estimadas.
+O time preenche o CRM em português ou espanhol. O relatório final deve ser SEMPRE em português. Traduza qualquer entrada em espanhol.
 
-POSTURA NARRATIVA — REGRA PRINCIPAL:
-- Comece sempre pelos avanços, conquistas e movimentos positivos da quinzena.
-- Enquadre o pipeline com perspectiva construtiva e de progresso.
-- Pontos de atenção ou pendências devem aparecer brevemente ao final, como "próximos passos" ou "pontos que precisam de definição", nunca como abertura.
-- Nunca abra um parágrafo com risco, bloqueio ou problema. O leitor precisa ver primeiro o que está avançando.
-- Tom de quem está no controle da situação, não de quem está reportando dificuldades.
+TOM: executivo, direto, como numa reunião de conselho. Português brasileiro corporativo natural.
+
+POSTURA NARRATIVA:
+- Comece sempre pelos avanços e movimentos positivos.
+- Pontos de atenção aparecem brevemente ao final, nunca como abertura.
+- Tom de quem está no controle, não reportando dificuldades.
+
+SAÚDE DO LEAD (use nos textos quando relevante):
+- 🟢 contato nos últimos 7 dias
+- 🟡 sem contato entre 8 e 21 dias
+- 🔴 sem contato há mais de 21 dias, FUP vencido sem conclusão
+
+PRÓXIMO PASSO (formato obrigatório):
+- Padrão: [Ação] · [Responsável] · [DD/MM]
+- Atrasado: ⚠️ [Ação] · [Responsável] · [DD/MM] (atrasado)
+- Em branco: Definir próximo passo · [Responsável] · —
+
+QUADRO DE RISCOS — três níveis:
+- 🔴 Risco: etapa Negociação/Jurídico/Go-Live + sem contato >15 dias, OU proposta avançada com retorno atrasado sem justificativa
+- 🟡 Atenção: etapa avançada + sem contato 8–14 dias, OU dependência externa explícita sem prazo
+- 🔍 Revisar: situação ambígua — contexto sugere demora esperada (cliente sinalizou, due diligence em curso). Sinalizar para revisão humana antes de publicar.
+Na dúvida: usar 🔍 Revisar, nunca 🔴 direto.
+
+REGRAS FIXAS:
+- Campo ausente = "–", nunca inventar dados.
+- Leads duplicados são permitidos — mesmo cliente pode ter múltiplas oportunidades. Tratar cada um de forma independente.
 
 PROIBIÇÕES ABSOLUTAS:
-- Travessões em-dash (—). Use vírgula, ponto ou reestruture a frase.
-- "É importante notar", "vale destacar", "cabe ressaltar", "em resumo", "em síntese"
-- "Notavelmente", "indubitavelmente", "diante do exposto", "em meio a um cenário"
-- "Não somente... mas também", "torna-se imperativo", "é fundamental que"
-- Aberturas genéricas de parágrafo. Comece direto pelo fato.
-- Adjetivos vazios sem dado que os justifique: "robusto", "expressivo", "significativo"
-- Emojis no texto narrativo.
+- Travessões (—). Use vírgula, ponto ou reestruture.
+- "É importante notar", "vale destacar", "cabe ressaltar", "em resumo", "notavelmente", "diante do exposto", "em meio a um cenário", "torna-se imperativo"
+- Adjetivos vazios sem dado: "robusto", "expressivo", "significativo"
+- Emojis no texto narrativo (exceto os de saúde e próximo passo definidos acima).
 
-FORMATO: parágrafos curtos. Voz ativa. Frases diretas. Máximo 3 frases por parágrafo.`
+FORMATO: voz ativa. Frases diretas. Máximo 3 frases por parágrafo.`
 
 // ── Chamada à API (usa o endpoint /api/chat do projeto) ──────────────────────
 async function callIA(userContent, parseJson = false) {
@@ -91,7 +111,16 @@ function NarrativaEditor({ label, value, onChange, onGenerate, generating, place
 }
 
 // ── Card de lead (no wizard) ──────────────────────────────────────────────────
+function calcSaude(lead) {
+  if (!lead.ultima_atualizacao) return { dot:'#9CA3AF', label:'Sem data' }
+  const dias = Math.floor((Date.now() - new Date(lead.ultima_atualizacao + 'T12:00:00')) / 86400000)
+  if (dias <= 7)  return { dot:'#10B981', label:`${dias}d` }
+  if (dias <= 21) return { dot:'#F59E0B', label:`${dias}d` }
+  return { dot:'#EF4444', label:`${dias}d` }
+}
+
 function LeadChip({ lead, onRemove, score }) {
+  const saude = calcSaude(lead)
   const etapaColor = {
     'Prospecção':'#B5D4F4','Oportunidade':'#85B7EB','Proposta':'#AFA9EC',
     'Negociação':'#7F77DD','Jurídico':'#FAC775','Implementação':'#5DCAA5','Operação / Go-Live':'#1D9E75',
@@ -110,6 +139,11 @@ function LeadChip({ lead, onRemove, score }) {
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+        {/* Saúde */}
+        <div title={`Último contato: ${saude.label}`} style={{ display:'flex', alignItems:'center', gap:3, fontSize:10, color:saude.dot, background: saude.dot + '18', borderRadius:4, padding:'2px 6px', fontWeight:700 }}>
+          <div style={{ width:6, height:6, borderRadius:'50%', background:saude.dot, flexShrink:0 }}/>
+          {saude.label}
+        </div>
         {score !== undefined && (
           <div style={{ fontSize: 10, color: W.t3, background: '#F3F4F6', borderRadius: 4, padding: '2px 6px' }}>
             ⭐ {score}
@@ -224,7 +258,7 @@ export default function RadarWizard({ leads, activities, dtIni, dtFim, periodo, 
   const [addS3,      setAddS3]      = useState(null) // qual região está adicionando
 
   // Seção 4 — Riscos
-  const initRiscos = buildRiscosAuto(activities)
+  const initRiscos = buildRiscosAuto(activities, leads)
   const [s4Riscos,   setS4Riscos]   = useState(initRiscos)
   const [s4Narrativa,setS4Narrativa]= useState('')
   const [genS4,      setGenS4]      = useState(false)
@@ -260,30 +294,47 @@ export default function RadarWizard({ leads, activities, dtIni, dtFim, periodo, 
       const ctx = filtro.map(leadContexto).join('\n')
       const periodoTxt = periodo || formatPeriodoLongo(dtIni, dtFim)
 
+      const instrucao = `FORMATO OBRIGATÓRIO — bullets com ícone por região. Máximo 4 bullets por região. Omitir região sem leads.
+
+Ícones (escolha um por bullet baseado no status):
+✅ Avanço — lead mudou de etapa ou ação concreta foi realizada
+🔄 Em andamento — atividade aconteceu mas sem mudança de etapa
+🚀 Novo — lead criado ou nova oportunidade identificada no período
+⚠️ Atenção — sem movimento esperado ou dependência externa identificada
+
+Formato de cada bullet:
+[ícone] [Nome do Lead] ([Serviço/Projeto se conhecido]) — [o que aconteceu, 1 frase direta]`
+
       if (regiao === 'all') {
-        const prompt = `Escreva o Resumo Executivo do Radar Pipeline Quinzenal da FENG para o período ${periodoTxt}.
+        const prompt = `Gere os Highlights da Visão Executiva do Radar Pipeline FENG para o período ${periodoTxt}.
+
+${instrucao}
 
 Leads do pipeline:
 ${ctx}
 
-Retorne APENAS um JSON válido neste formato (sem texto antes ou depois):
+Retorne APENAS um JSON válido (sem texto antes ou depois):
 {
-  "brasil": "Parágrafo de 2 a 3 frases sobre os leads brasileiros e os movimentos da quinzena.",
-  "latam": "Parágrafo de 2 a 3 frases sobre os leads LATAM e os movimentos da quinzena.",
-  "nb": "Frase sobre novos negócios e/ou internacional."
+  "brasil": "- ✅ Lead A (Serviço) — o que aconteceu\\n- 🔄 Lead B — em andamento",
+  "latam":  "- ✅ Lead C — avançou para negociação",
+  "nb":     "- 🚀 Lead D — novo contato realizado"
 }
 
-IMPORTANTE: texto direto, executivo, sem tiques de IA, sem travessões.`
+Se uma região não tiver leads ativos, retorne string vazia para ela.`
         const json = await callIA(prompt, true)
         setS1({ brasil: json.brasil || '', latam: json.latam || '', nb: json.nb || '' })
       } else {
-        const labelMap = { brasil:'Brasil', latam:'LATAM', nb:'Novos Negócios / Internacional' }
-        const prompt = `Escreva 2 a 3 frases sobre os leads da região ${labelMap[regiao]} para o Radar Pipeline Quinzenal (período ${periodoTxt}).
+        const labelMap = { brasil:'🇧🇷 Brasil', latam:'🌎 LATAM', nb:'🚀 Novos Negócios / Internacional' }
+        const prompt = `Gere os Highlights para a região ${labelMap[regiao]} do Radar Pipeline FENG (período ${periodoTxt}).
 
-Leads:
-${ctx || '(sem leads nesta região)'}
+${instrucao}
 
-Texto direto, executivo, sem tiques de IA, sem travessões. Apenas o parágrafo, sem título.`
+Leads desta região:
+${ctx || '(sem leads ativos nesta região)'}
+
+Retorne APENAS os bullets, um por linha, sem título de região. Ex:
+- ✅ Lead A — avançou para negociação após reunião do conselho
+- 🔄 Lead B — contato realizado, aguarda retorno do jurídico`
         const txt = await callIA(prompt)
         setS1(prev => ({ ...prev, [regiao]: txt }))
       }
@@ -296,13 +347,21 @@ Texto direto, executivo, sem tiques de IA, sem travessões. Apenas o parágrafo,
     setGenS2(true)
     try {
       const ll = leadsAtivos(s2Leads)
-      const ctx = ll.map(leadContexto).join('\n')
-      const prompt = `Escreva 2 a 3 frases de abertura para a seção "G12/G15 — Movimentos da Quinzena" do Radar Pipeline (período ${periodo}).
+      const ctx = ll.map(leadContexto).join('\n\n')
+      const prompt = `Escreva a narrativa G12/G15 do Radar Pipeline FENG (período ${periodo}).
 
-Leads G12/G15 selecionados:
+Para CADA lead abaixo, escreva em 4 blocos nessa ordem exata:
+**Quem é:** 1 frase sobre o cliente e o que está sendo negociado
+**Histórico recente:** 1 a 2 frases do que aconteceu nas últimas semanas
+**Status atual:** 1 frase clara de onde está hoje
+**Bloqueio/dependência:** 1 frase — omitir completamente se não houver
+
+Separe cada lead com uma linha em branco. Comece com o nome do lead em maiúsculo.
+
+Leads G12/G15:
 ${ctx || '(nenhum)'}
 
-Destaque os movimentos mais relevantes. Texto executivo direto, sem tiques, sem travessões. Só o parágrafo.`
+Regras: português sempre (traduzir espanhol). Campo ausente = "–", nunca inventar. Sem travessões.`
       setS2Narrativa(await callIA(prompt))
     } catch(e) { alert('Erro ao gerar: ' + e.message) }
     setGenS2(false)
@@ -314,12 +373,22 @@ Destaque os movimentos mais relevantes. Texto executivo direto, sem tiques, sem 
     try {
       const leadsRegiao = leadsAtivos(s3Leads).filter(l => (l.regiao || 'Brasil') === regiao)
       const ctx = leadsRegiao.map(leadContexto).join('\n')
-      const prompt = `Escreva 1 a 2 frases de abertura para o grupo "${regiao}" na seção "Outros Negócios Relevantes" do Radar Pipeline (período ${periodo}).
+      const prompt = `Gere os highlights dos "Outros Negócios Relevantes" para a região ${regiao} do Radar Pipeline FENG (período ${periodo}).
 
-Leads:
-${ctx || '(sem leads nesta região)'}
+FORMATO — bullets com ícone. Máximo 4 bullets.
+Ícones:
+✅ Avanço — mudou de etapa ou ação concreta realizada
+🔄 Em andamento — atividade sem mudança de etapa
+🚀 Novo — nova oportunidade identificada
+⚠️ Atenção — sem movimento ou dependência externa
 
-Texto executivo direto, sem tiques, sem travessões. Só o parágrafo.`
+Formato de cada bullet:
+[ícone] [Nome do Lead] ([Serviço se houver]) — [o que aconteceu, 1 frase]
+
+Leads desta região:
+${ctx || '(sem leads)'}
+
+Retorne APENAS os bullets, um por linha, sem título. Português sempre (traduzir espanhol).`
       const txt = await callIA(prompt)
       setS3Narrativa(prev => ({ ...prev, [regiao]: txt }))
     } catch(e) { alert('Erro ao gerar: ' + e.message) }
@@ -713,20 +782,81 @@ function RiscoInlineForm({ initial, onSave, onCancel }) {
 }
 
 // ── Gera riscos a partir de atividades atrasadas ──────────────────────────────
-function buildRiscosAuto(activities) {
+function buildRiscosAuto(activities, leads = []) {
   const hoje = new Date(); hoje.setHours(0,0,0,0)
-  return (activities || []).filter(a => {
+
+  // Mapa de leads para acesso rápido por conta/nome
+  const leadMap = {}
+  leads.forEach(l => { if (l.nome) leadMap[l.nome.toLowerCase()] = l })
+
+  const ETAPAS_AVANCADAS = ['Negociação', 'Jurídico', 'Implementação', 'Operação / Go-Live']
+  const ETAPAS_RISCO     = ['Negociação', 'Jurídico', 'Operação / Go-Live']
+
+  const riscos = []
+
+  // Riscos a partir de atividades vencidas
+  const atvsVencidas = (activities || []).filter(a => {
     if (a.ok || !a.dt) return false
     return new Date(a.dt + 'T12:00:00') < hoje
-  }).slice(0, 20).map(a => ({
-    lead:    a.lead || '—',
-    tema:    a.tipo || 'Atividade atrasada',
-    risco:   (a.descricao || '').slice(0, 100) || 'Atividade em atraso',
-    acao:    'Verificar status e reagendar.',
-    resp:    a.resp || '—',
-    prazo:   formatDate(a.dt),
-    _gerado: true,
-  }))
+  })
+
+  atvsVencidas.slice(0, 20).forEach(a => {
+    const lead = leadMap[a.lead?.toLowerCase()]
+    const etapa = lead?.etapa || ''
+    const dias  = lead?.ultima_atualizacao
+      ? Math.floor((hoje - new Date(lead.ultima_atualizacao + 'T12:00:00')) / 86400000)
+      : 99
+
+    let nivel = '🟡'
+    if (ETAPAS_RISCO.includes(etapa) && dias > 15) nivel = '🔴'
+    else if (ETAPAS_AVANCADAS.includes(etapa) && dias <= 14) nivel = '🟡'
+    else if (etapa && dias > 15) nivel = '🔍'
+    else nivel = '🟡'
+
+    riscos.push({
+      nivel,
+      lead:    a.lead || '—',
+      tema:    nivel === '🔴' ? 'Risco' : nivel === '🟡' ? 'Atenção' : 'Revisar',
+      risco:   (a.descricao || '').slice(0, 100) || 'Atividade em atraso',
+      acao:    nivel === '🔍' ? 'Revisar contexto antes de classificar.' : 'Verificar status e reagendar.',
+      resp:    a.resp || '—',
+      prazo:   formatDate(a.dt),
+      _gerado: true,
+    })
+  })
+
+  // Riscos de leads em etapas avançadas sem atividade recente (sem atividade vencida)
+  leads.filter(l => {
+    if (l.off || l.op) return false
+    if (!ETAPAS_AVANCADAS.includes(l.etapa)) return false
+    const dias = l.ultima_atualizacao
+      ? Math.floor((hoje - new Date(l.ultima_atualizacao + 'T12:00:00')) / 86400000)
+      : 99
+    return dias > 8
+  }).forEach(l => {
+    const dias = l.ultima_atualizacao
+      ? Math.floor((hoje - new Date(l.ultima_atualizacao + 'T12:00:00')) / 86400000)
+      : 99
+    const jaAdicionado = riscos.some(r => r.lead === l.nome)
+    if (jaAdicionado) return
+    const nivel = (ETAPAS_RISCO.includes(l.etapa) && dias > 15) ? '🔴'
+                : (dias >= 8 && dias <= 14) ? '🟡'
+                : '🔍'
+    riscos.push({
+      nivel,
+      lead:    l.nome,
+      tema:    nivel === '🔴' ? 'Risco' : nivel === '🟡' ? 'Atenção' : 'Revisar',
+      risco:   `${l.etapa} — sem contato há ${dias} dias`,
+      acao:    nivel === '🔍' ? 'Revisar contexto antes de classificar.' : 'Retomar contato e definir próximo passo.',
+      resp:    l.resp || '—',
+      prazo:   '—',
+      _gerado: true,
+    })
+  })
+
+  // Ordenar: 🔴 primeiro, 🟡 depois, 🔍 por último
+  const ordem = { '🔴': 0, '🟡': 1, '🔍': 2 }
+  return riscos.sort((a, b) => (ordem[a.nivel] ?? 3) - (ordem[b.nivel] ?? 3))
 }
 
 function formatDate(str) {
