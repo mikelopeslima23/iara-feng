@@ -282,7 +282,11 @@ export function leadContexto(lead) {
   ]
   if (lead.valor) partes.push(`valor: ${lead.valor}`)
   if (lead.mov)   partes.push(`mov: ${String(lead.mov).slice(0, 80)}`)
-  if (lead.prox)  partes.push(`próx: ${String(lead.prox).slice(0, 60)}`)
+  if (lead.prox)  partes.push(`próx_acao: ${String(lead.prox).slice(0, 60)}`)
+
+  // DT_CHAVE deve vir EXCLUSIVAMENTE do campo dedicado no CRM.
+  // Nunca inferir do texto de mov, prox ou obs.
+  partes.push(`DT_CHAVE: ${lead.dt || '–'}`)
 
   let ctx = partes.join(' | ')
 
