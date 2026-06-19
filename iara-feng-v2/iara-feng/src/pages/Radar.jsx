@@ -234,33 +234,74 @@ function Sec({ num, titulo, sublabel, open, onToggle, alt, children, headerRight
 }
 
 // ── Tabela de leads (G12, Outros) reutilizável ───────────────────────────────
+// ── Saúde do lead (thresholds Bruno: 7 / 21 dias) ────────────────────────────
+function saudeLead(l) {
+  if (!l.ultima_atualizacao) return { icon:'🔴', color:'#EF4444' }
+  const dias = Math.floor((Date.now() - new Date(l.ultima_atualizacao + 'T12:00:00')) / 86400000)
+  if (dias <= 7)  return { icon:'🟢', color:'#10B981', dias }
+  if (dias <= 21) return { icon:'🟡', color:'#F59E0B', dias }
+  return { icon:'🔴', color:'#EF4444', dias }
+}
+
+// ── Renderiza texto que pode ser prosa ou bullets (- ✅ 🔄 🚀 ⚠️) ────────────
+function RenderNarrativa({ text }) {
+  if (!text) return null
+  const linhas = text.split('\n').filter(l => l.trim())
+  const isBullet = linhas.some(l => /^[-•]\s|^[✅🔄🚀⚠️]/.test(l.trim()))
+  if (!isBullet) return <p style={{ fontSize:14, lineHeight:1.7, color:'#222', margin:0 }}>{text}</p>
+  return (
+    <ul style={{ margin:0, paddingLeft:0, listStyle:'none' }}>
+      {linhas.map((l, i) => (
+        <li key={i} style={{ fontSize:14, lineHeight:1.7, color:'#222', padding:'2px 0', display:'flex', gap:6 }}>
+          <span style={{ flexShrink:0 }}>{l.trim().replace(/^[-•]\s*/,'').match(/^[✅🔄🚀⚠️]/)?.[0] || '•'}</span>
+          <span>{l.trim().replace(/^[-•]\s*/, '').replace(/^[✅🔄🚀⚠️]\s*/, '')}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
 function TabelaLeads({ rows, isG12=false }) {
   const headers = isG12
-    ? ['Clube / Cliente','Etapa Anterior','Etapa Atual','Movimentos Semana','Próximo Passo','Próx. dt-chave','Dono']
-    : ['Lead','Etapa Anterior','Etapa Atual','Movimento Atual','Próximo Passo','Próx. dt-chave','Dono']
+    ? ['','Clube / Cliente','Etapa Atual','Movimentos Semana','Próximo Passo','Próx. dt-chave','Dono']
+    : ['','Lead','Etapa Atual','Movimento Atual','Próximo Passo','Próx. dt-chave','Dono']
   return (
     <div style={{ overflowX:'auto', borderRadius:8, border:'1px solid #eee' }}>
       <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-        <thead><tr>{headers.map(h => <th key={h} style={thS}>{h}</th>)}</tr></thead>
+        <thead><tr>{headers.map((h,i) => <th key={i} style={{ ...thS, width: h==='' ? 28 : undefined }}>{h}</th>)}</tr></thead>
         <tbody>
-          {rows.map((l, i) => (
-            <tr key={l.id || i} style={{ background: i%2===0 ? 'white' : '#fafafa' }}>
-              <td style={{ ...tdS, fontWeight:600 }}>{l.nome}</td>
-              <td style={tdS}>{l.etapaAnt || l.etapa}</td>
-              <td style={tdS}>
-                <span style={{
-                  background: (ETAPA_COLORS[l.etapa] || '#888') + '22',
-                  color: ETAPA_COLORS[l.etapa] || '#555',
-                  border:`1px solid ${ETAPA_COLORS[l.etapa] || '#888'}66`,
-                  borderRadius:4, padding:'1px 7px', fontSize:11, fontWeight:600
-                }}>{l.etapa}</span>
-              </td>
-              <td style={tdS}>{l.mov || '—'}</td>
-              <td style={tdS}>{l.prox || '—'}</td>
-              <td style={{ ...tdS, whiteSpace:'nowrap', fontSize:11 }}>{l.dt?.replace('2026-','').replace('2025-','') || '—'}</td>
-              <td style={{ ...tdS, fontSize:11 }}>{l.resp || '—'}</td>
-            </tr>
-          ))}
+          {rows.map((l, i) => {
+            const s = saudeLead(l)
+            const proxAtrasado = l.dt && new Date(l.dt + 'T12:00:00') < new Date()
+            return (
+              <tr key={l.id || i} style={{ background: i%2===0 ? 'white' : '#fafafa' }}>
+                <td style={{ ...tdS, textAlign:'center', fontSize:14, padding:'4px 6px' }} title={`Último contato: ${s.dias !== undefined ? s.dias + 'd' : 'sem data'}`}>
+                  {s.icon}
+                </td>
+                <td style={{ ...tdS, fontWeight:600 }}>{l.nome}</td>
+                <td style={tdS}>
+                  <span style={{
+                    background: (ETAPA_COLORS[l.etapa] || '#888') + '22',
+                    color: ETAPA_COLORS[l.etapa] || '#555',
+                    border:`1px solid ${ETAPA_COLORS[l.etapa] || '#888'}66`,
+                    borderRadius:4, padding:'1px 7px', fontSize:11, fontWeight:600
+                  }}>{l.etapa}</span>
+                </td>
+                <td style={tdS}>{l.mov || '—'}</td>
+                <td style={tdS}>
+                  {proxAtrasado && <span style={{ color:'#F59E0B', marginRight:4 }}>⚠️</span>}
+                  {l.prox || '—'}
+                  {l.prox && l.resp && l.dt && (
+                    <div style={{ fontSize:10, color:'#999', marginTop:2 }}>
+                      {l.resp} · {l.dt?.slice(5).replace('-','/')}
+                    </div>
+                  )}
+                </td>
+                <td style={{ ...tdS, whiteSpace:'nowrap', fontSize:11 }}>{l.dt?.replace('2026-','').replace('2025-','') || '—'}</td>
+                <td style={{ ...tdS, fontSize:11 }}>{l.resp || '—'}</td>
+              </tr>
+            )
+          })}
           {rows.length === 0 && (
             <tr><td colSpan={7} style={{ ...tdS, color:'#999', textAlign:'center', padding:20 }}>
               Nenhum registro no período.
@@ -650,9 +691,9 @@ export default function Radar() {
             )
             return (
               <>
-                {s1.brasil && <div style={{ marginBottom:18 }}><div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🇧🇷 Brasil</div><p style={{ fontSize:14, lineHeight:1.7, color:'#222' }}>{s1.brasil}</p></div>}
-                {s1.latam  && <div style={{ marginBottom:18 }}><div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🌎 LATAM</div><p style={{ fontSize:14, lineHeight:1.7, color:'#222' }}>{s1.latam}</p></div>}
-                {s1.nb     && <div style={{ marginBottom:18 }}><div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🚀 Novos Negócios / Internacional</div><p style={{ fontSize:14, lineHeight:1.7, color:'#222' }}>{s1.nb}</p></div>}
+                {s1.brasil && <div style={{ marginBottom:18 }}><div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🇧🇷 Brasil</div><RenderNarrativa text={s1.brasil}/></div>}
+                {s1.latam  && <div style={{ marginBottom:18 }}><div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🌎 LATAM</div><RenderNarrativa text={s1.latam}/></div>}
+                {s1.nb     && <div style={{ marginBottom:18 }}><div style={{ fontSize:11, fontWeight:700, letterSpacing:'.2em', color:FENG.orangeDark, textTransform:'uppercase', marginBottom:6 }}>🚀 Novos Negócios / Internacional</div><RenderNarrativa text={s1.nb}/></div>}
               </>
             )
           })()}
