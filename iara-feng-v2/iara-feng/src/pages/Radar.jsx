@@ -707,7 +707,26 @@ export default function Radar() {
 
         {/* 2ª — G12/G15 */}
         <Sec num="2ª" titulo="G12 / G15 — Movimentos da Quinzena" sublabel="Prioridade Estratégica" open={secOpen[2]} onToggle={()=>toggleSec(2)} alt={true}>
-          {narrativas?.sec2 && <p style={{ fontSize:14, lineHeight:1.7, color:'#333', marginBottom:16 }}>{narrativas.sec2}</p>}
+          {/* sec2 pode ser array [{id, narrativa}] (wizard novo) ou string (legado) */}
+          {Array.isArray(narrativas?.sec2) ? (
+            narrativas.sec2.filter(it => it.narrativa).map((it, i) => {
+              const lead = leads.find(l => l.id === it.id)
+              return (
+                <div key={it.id || i} style={{ marginBottom:18, paddingBottom:18, borderBottom: i < narrativas.sec2.length-1 ? '1px solid #f0f0f0' : 'none' }}>
+                  {lead && (
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                      <span style={{ fontSize:11, fontWeight:800, letterSpacing:'.15em', textTransform:'uppercase', color:'#222' }}>{lead.nome}</span>
+                      <span style={{ fontSize:10, padding:'1px 6px', borderRadius:4, background:(ETAPA_COLORS[lead.etapa]||'#888')+'22', color:ETAPA_COLORS[lead.etapa]||'#555', border:`1px solid ${ETAPA_COLORS[lead.etapa]||'#888'}44`, fontWeight:600 }}>{lead.etapa}</span>
+                      {!lead.dt && <span style={{ fontSize:10, color:'#F59E0B' }}>⚠️ verificar dt chave</span>}
+                    </div>
+                  )}
+                  <div style={{ fontSize:13, lineHeight:1.75, color:'#333', whiteSpace:'pre-line' }}>{it.narrativa}</div>
+                </div>
+              )
+            })
+          ) : narrativas?.sec2 ? (
+            <p style={{ fontSize:14, lineHeight:1.7, color:'#333', marginBottom:16 }}>{narrativas.sec2}</p>
+          ) : null}
           {g12.length === 0 ? (
             <div style={{ padding:20, textAlign:'center', color:'#888', background:'white', border:'1px dashed #ddd', borderRadius:8 }}>
               Nenhum deal marcado como G12/G15 ainda. Vá em <strong>Pipeline → Editar card → Classificação Estratégica</strong> e ative o toggle G12/G15 nos deals prioritários.
