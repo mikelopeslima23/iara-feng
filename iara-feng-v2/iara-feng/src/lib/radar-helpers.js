@@ -273,7 +273,7 @@ ${textoBruto}`
  * @param {object} lead
  * @returns {string}
  */
-export function leadContexto(lead) {
+export function leadContexto(lead, activities = []) {
   const partes = [
     lead.nome || lead.conta,
     lead.regiao || '?',
@@ -284,14 +284,29 @@ export function leadContexto(lead) {
   if (lead.mov)   partes.push(`mov: ${String(lead.mov).slice(0, 80)}`)
   if (lead.prox)  partes.push(`próx_acao: ${String(lead.prox).slice(0, 60)}`)
 
-  // DT_CHAVE deve vir EXCLUSIVAMENTE do campo dedicado no CRM.
-  // Nunca inferir do texto de mov, prox ou obs.
+  // DT_CHAVE: campo dedicado do CRM — nunca inferir de texto livre
   partes.push(`DT_CHAVE: ${lead.dt || '–'}`)
 
   let ctx = partes.join(' | ')
 
+  // Última atividade registrada — garante leitura da info mais recente
+  if (activities.length > 0) {
+    const atvsDoLead = activities
+      .filter(a =>
+        (a.lead_id && a.lead_id === lead.id) ||
+        (a.lead && a.lead.toLowerCase() === (lead.nome || lead.conta || '').toLowerCase())
+      )
+      .sort((a, b) => (b.criado || b.dt || '').localeCompare(a.criado || a.dt || ''))
+
+    if (atvsDoLead.length > 0) {
+      const ult = atvsDoLead[0]
+      const dataUlt = ult.criado?.slice(0, 10) || ult.dt || '—'
+      ctx += `\nÚltima atividade (${dataUlt}): ${(ult.descricao || ult.tipo || '').slice(0, 100)}`
+    }
+  }
+
   if (lead.obs_gerencia && lead.obs_gerencia.trim()) {
-    ctx += `\n   [Bruno]: ${lead.obs_gerencia.trim()}`
+    ctx += `\n[Bruno]: ${lead.obs_gerencia.trim()}`
   }
   return ctx
 }
