@@ -539,20 +539,25 @@ ${txt}`
   }
 
   // ── Fechar e salvar ───────────────────────────────────────────────────────
-  function handleSave() {
-    const final = polished || {
-      sec1: s1,
-      sec2: s2Items,           // array de {id, narrativa}
-      sec3: s3Narrativa,
-      sec4: s4Narrativa,
+  async function handleSave() {
+    try {
+      const final = polished || {
+        sec1: s1,
+        sec2: s2Items,
+        sec3: s3Narrativa,
+        sec4: s4Narrativa,
+      }
+      await onSave({
+        dtIni, dtFim, periodo, weekNum,
+        narrativas: final,
+        g12Leads:    s2Items.map(it => it.id),
+        outrosLeads: leadsAtivos(s3Leads).map(l => l.id),
+        riscos:      s4Riscos,
+      })
+    } catch(e) {
+      console.error('Erro ao salvar Radar:', e)
+      alert('Erro ao salvar: ' + (e?.message || 'tente novamente'))
     }
-    onSave({
-      dtIni, dtFim, periodo, weekNum,
-      narrativas: final,
-      g12Leads:   s2Items.map(it => it.id),
-      outrosLeads: s3Items ? s3Items.map(it => it.id) : leadsAtivos(s3Leads).map(l => l.id),
-      riscos: s4Riscos,
-    })
   }
 
   // ── RENDER ────────────────────────────────────────────────────────────────
