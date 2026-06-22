@@ -270,12 +270,15 @@ export default function RadarWizard({ leads, activities, dtIni, dtFim, periodo, 
   const [addS3,      setAddS3]      = useState(null) // qual região está adicionando
 
   // Seção 4 — Riscos
-  const initRiscos = buildRiscosAuto(activities, leads)
+  const initRiscos = []  // lista vazia — Bruno adiciona manualmente com sugestão da IA
   const [s4Riscos,   setS4Riscos]   = useState(initRiscos)
   const [s4Narrativa,setS4Narrativa]= useState('')
   const [genS4,      setGenS4]      = useState(false)
   const [editRisco,  setEditRisco]  = useState(null)
-  const [addRisco,   setAddRisco]   = useState(false)
+  const [addRisco,       setAddRisco]       = useState(false)
+  const [addS1Regiao,    setAddS1Regiao]    = useState(null)   // 'brasil'|'latam'|'nb'|null
+  const [addRiscoLead,   setAddRiscoLead]   = useState(false)  // show lead search for risks
+  const [genRiscoLead,   setGenRiscoLead]   = useState(false)  // generating risk for selected lead
 
   // Revisão final
   const [polishing, setPolishing]   = useState(false)
@@ -303,7 +306,7 @@ export default function RadarWizard({ leads, activities, dtIni, dtFim, periodo, 
         regiao === 'latam'  ? leads.filter(l => l.regiao === 'LATAM' && !l.off) :
                               leads.filter(l => ['Novos Negócios','Internacional'].includes(l.regiao) && !l.off)
 
-      const ctx = filtro.map(leadContexto).join('\n')
+      const ctx = filtro.map(l => leadContexto(l, activities)).join('\n')
       const periodoTxt = periodo || formatPeriodoLongo(dtIni, dtFim)
 
       const instrucao = `FORMATO OBRIGATÓRIO — bullets com ícone por região. Máximo 4 bullets por região. Omitir região sem leads.
@@ -360,20 +363,19 @@ Retorne APENAS os bullets, um por linha, sem título de região. Ex:
     if (!lead) return
     setS2Items(items => items.map(it => it.id === leadId ? { ...it, gerando: true } : it))
     try {
-      const ctx = leadContexto(lead)
+      const ctx = leadContexto(lead, activities)
       const prompt = `Escreva a narrativa para o lead ${lead.nome} no Radar Pipeline G12/G15 (período ${periodo}).
 
-Estrutura OBRIGATÓRIA em 4 blocos:
-**Quem é:** 1 frase sobre o cliente e o que está sendo negociado
-**Histórico recente:** 1 a 2 frases do que aconteceu nas últimas semanas
+Estrutura OBRIGATÓRIA em 3 blocos (sem bloco "Quem é"):
+**Histórico recente:** 1 a 2 frases do que aconteceu nas últimas semanas — use a "Última atividade" registrada como base
 **Status atual:** 1 frase clara de onde está hoje
 **Bloqueio/dependência:** 1 frase — omitir completamente se não houver
 
-Dados do lead:
+Dados do lead (priorize as informações mais recentes):
 ${ctx}
 
-ATENÇÃO: o campo DT_CHAVE vem EXCLUSIVAMENTE do CRM (valor: ${lead.dt || '–'}). Não inferir do texto. Se ausente, exibir "–" e marcar ⚠️ verificar dt chave.
-Português sempre (traduzir espanhol). Campo ausente = "–". Sem travessões.`
+ATENÇÃO: DT_CHAVE vem EXCLUSIVAMENTE do CRM (valor: ${lead.dt || '–'}). Não inferir do texto.
+Português sempre. Campo ausente = "–". Sem travessões.`
       const txt = await callIA(prompt)
       setS2Items(items => items.map(it => it.id === leadId ? { ...it, narrativa: txt, gerando: false } : it))
     } catch(e) {
@@ -404,12 +406,63 @@ Português sempre (traduzir espanhol). Campo ausente = "–". Sem travessões.`
     setS2Items(items => [...items, { id: lead.id, narrativa: '', gerando: false }])
   }
 
+  // ── Adicionar lead ao resumo executivo (Seção 1) ──────────────────────────
+  async function addLeadToS1(regiao, lead) {
+    setGenS1(regiao)
+    setAddS1Regiao(null)
+    try {
+      const ctx = leadContexto(lead, activities)
+      const prompt = `Gere UM bullet para o resumo executivo da região ${regiao} (período ${periodo}).
+
+Formato: [ícone] [Nome] ([Serviço se houver]) — [o que aconteceu, 1 frase direta]
+Ícones: ✅ Avanço 🔄 Em andamento 🚀 Novo ⚠️ Atenção
+
+Dados (use a informação mais recente):
+${ctx}
+
+Retorne APENAS o bullet, sem explicações adicionais.`
+      const bullet = (await callIA(prompt)).trim()
+      setS1(prev => ({
+        ...prev,
+        [regiao]: prev[regiao] ? `${prev[regiao]}\n${bullet}` : bullet
+      }))
+    } catch(e) { alert('Erro: ' + e.message) }
+    setGenS1(null)
+  }
+
+  // ── Gerar risco a partir de lead selecionado (Seção 4) ────────────────────
+  async function gerarRiscoDoLead(lead) {
+    setGenRiscoLead(true)
+    try {
+      const ctx = leadContexto(lead, activities)
+      const prompt = `Analise este lead e identifique o principal risco ou bloqueio para o Radar Pipeline FENG.
+
+Dados do lead (priorize o mais recente):
+${ctx}
+
+Retorne APENAS um JSON válido:
+{
+  "nivel": "🔴",
+  "tema": "Tipo do risco em 3 palavras",
+  "risco": "Descrição objetiva do risco em 1 frase direta",
+  "acao": "O que fazer para resolver em 1 frase",
+  "prazo": "DD/MM ou –"
+}
+Níveis: 🔴 Risco real e imediato | 🟡 Atenção necessária | 🔍 Verificar antes de publicar
+Português sempre. Sem travessões.`
+      const json = await callIA(prompt, true)
+      setAddRisco({ ...json, lead: lead.nome, resp: lead.resp || '—', _gerado: true })
+    } catch(e) { alert('Erro ao gerar risco: ' + e.message) }
+    setGenRiscoLead(false)
+    setAddRiscoLead(false)
+  }
+
   // ── Geração IA — Seção 3 por região ──────────────────────────────────────
   async function gerarS3Regiao(regiao) {
     setGenS3(regiao)
     try {
       const leadsRegiao = leadsAtivos(s3Leads).filter(l => (l.regiao || 'Brasil') === regiao)
-      const ctx = leadsRegiao.map(leadContexto).join('\n')
+      const ctx = leadsRegiao.map(l => leadContexto(l, activities)).join('\n')
       const prompt = `Gere os highlights dos "Outros Negócios Relevantes" para a região ${regiao} do Radar Pipeline FENG (período ${periodo}).
 
 FORMATO — bullets com ícone. Máximo 4 bullets.
@@ -540,8 +593,28 @@ ${txt}`
                 </button>
               </div>
               <NarrativaEditor label="🇧🇷 Brasil" value={s1.brasil} onChange={v => setS1(p => ({...p, brasil:v}))} onGenerate={() => gerarS1('brasil')} generating={genS1==='brasil'} rows={4}/>
+              {addS1Regiao === 'brasil' ? (
+                <AddLeadSearch allLeads={leads} excludedIds={[]} currentIds={[]}
+                  onAdd={l => addLeadToS1('brasil', l)} onClose={() => setAddS1Regiao(null)}/>
+              ) : (
+                <button onClick={() => setAddS1Regiao('brasil')} style={{ ...btnSecondary, marginBottom:12, fontSize:11 }}>+ Incluir lead — Brasil</button>
+              )}
+
               <NarrativaEditor label="🌎 LATAM" value={s1.latam} onChange={v => setS1(p => ({...p, latam:v}))} onGenerate={() => gerarS1('latam')} generating={genS1==='latam'} rows={4}/>
+              {addS1Regiao === 'latam' ? (
+                <AddLeadSearch allLeads={leads} excludedIds={[]} currentIds={[]}
+                  onAdd={l => addLeadToS1('latam', l)} onClose={() => setAddS1Regiao(null)}/>
+              ) : (
+                <button onClick={() => setAddS1Regiao('latam')} style={{ ...btnSecondary, marginBottom:12, fontSize:11 }}>+ Incluir lead — LATAM</button>
+              )}
+
               <NarrativaEditor label="🚀 Novos Negócios / Internacional" value={s1.nb} onChange={v => setS1(p => ({...p, nb:v}))} onGenerate={() => gerarS1('nb')} generating={genS1==='nb'} rows={3}/>
+              {addS1Regiao === 'nb' ? (
+                <AddLeadSearch allLeads={leads} excludedIds={[]} currentIds={[]}
+                  onAdd={l => addLeadToS1('nb', l)} onClose={() => setAddS1Regiao(null)}/>
+              ) : (
+                <button onClick={() => setAddS1Regiao('nb')} style={{ ...btnSecondary, marginBottom:12, fontSize:11 }}>+ Incluir lead — NB / Internacional</button>
+              )}
               <InfoBox>Os textos gerados pela IAra são sugestões. Edite à vontade antes de aprovar.</InfoBox>
             </div>
           )}
@@ -613,7 +686,7 @@ ${txt}`
                       <textarea
                         value={item.narrativa}
                         onChange={e => updateS2Narrativa(item.id, e.target.value)}
-                        placeholder={`Narrativa do lead ${lead.nome}. Clique "✨ Gerar" para sugestão da IAra em 4 blocos:\n**Quem é:** ...\n**Histórico recente:** ...\n**Status atual:** ...\n**Bloqueio/dependência:** ...`}
+                        placeholder={`Narrativa do lead ${lead.nome}. Clique "✨ Gerar" para sugestão da IAra em 3 blocos:\n**Histórico recente:** ...\n**Status atual:** ...\n**Bloqueio/dependência:** ...`}
                         rows={item.narrativa ? 6 : 3}
                         style={{ width:'100%', border:`1px solid ${item.narrativa ? '#D1D5DB' : '#E5E7EB'}`, borderRadius:7, padding:'9px 11px', fontSize:12, color:'#111', outline:'none', resize:'vertical', fontFamily:'inherit', lineHeight:1.6, boxSizing:'border-box', background: item.narrativa ? '#FAFAF9' : 'white' }}
                       />
@@ -687,15 +760,42 @@ ${txt}`
                 onGenerate={gerarS4} generating={genS4}
                 rows={3}
                 placeholder="Parágrafo de abertura contextualizando os riscos desta quinzena..."/>
-              <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:10 }}>
-                <button onClick={() => setAddRisco(true)} style={btnSecondary}>+ Adicionar risco</button>
+              <div style={{ display:'flex', justifyContent:'flex-end', marginBottom:10, gap:8 }}>
+                <button onClick={() => { setAddRiscoLead(true); setAddRisco(false) }}
+                  disabled={genRiscoLead}
+                  style={{ ...btnPrimary(genRiscoLead), fontSize:11, padding:'5px 12px' }}>
+                  {genRiscoLead ? '⏳ Analisando lead...' : '+ Adicionar risco de um lead'}
+                </button>
               </div>
-              {addRisco && (
-                <RiscoInlineForm onSave={r => { setS4Riscos(rs => [...rs, r]); setAddRisco(false) }} onCancel={() => setAddRisco(false)}/>
+              {/* Busca de lead para gerar risco */}
+              {addRiscoLead && (
+                <div style={{ marginBottom:12 }}>
+                  <AddLeadSearch allLeads={leads} excludedIds={[]} currentIds={[]}
+                    onAdd={gerarRiscoDoLead}
+                    onClose={() => setAddRiscoLead(false)}/>
+                </div>
               )}
-              {s4Riscos.length === 0 && !addRisco && (
+              {/* Formulário de risco pré-preenchido pela IA — Bruno revisa e confirma */}
+              {addRisco && typeof addRisco === 'object' && !addRisco._confirmar && (
+                <div style={{ background:'#EFF6FF', border:'1px solid #BFDBFE', borderRadius:10, padding:14, marginBottom:12 }}>
+                  <div style={{ fontSize:12, fontWeight:700, color:'#1D4ED8', marginBottom:10, display:'flex', alignItems:'center', gap:6 }}>
+                    <span>{addRisco.nivel}</span> Risco sugerido para <strong>{addRisco.lead}</strong> — revise e confirme
+                  </div>
+                  <RiscoInlineForm
+                    initial={addRisco}
+                    onSave={r => { setS4Riscos(rs => [...rs, r]); setAddRisco(false) }}
+                    onCancel={() => setAddRisco(false)}/>
+                </div>
+              )}
+              {/* Formulário manual (addRisco = true booleano) */}
+              {addRisco === true && (
+                <RiscoInlineForm
+                  onSave={r => { setS4Riscos(rs => [...rs, r]); setAddRisco(false) }}
+                  onCancel={() => setAddRisco(false)}/>
+              )}
+              {s4Riscos.length === 0 && !addRiscoLead && addRisco === false && (
                 <div style={{ padding:16, textAlign:'center', color:'#059669', background:'#F0FDF4', border:'1px solid #BBF7D0', borderRadius:8 }}>
-                  ✅ Nenhum risco identificado nesta quinzena.
+                  Nenhum risco adicionado. Use "+ Adicionar risco de um lead" para identificar e incluir automaticamente.
                 </div>
               )}
               {s4Riscos.map((r, i) => (
