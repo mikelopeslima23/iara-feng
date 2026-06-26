@@ -273,7 +273,27 @@ ${textoBruto}`
  * @param {object} lead
  * @returns {string}
  */
+/**
+ * Retorna a próxima atividade pendente de um lead com prazo mais próximo.
+ * Fonte: iara_activities onde ok=false e dt está preenchido.
+ * Usada para alimentar Próximos Passos e DT_CHAVE no Radar.
+ */
+export function getProximaAtvPendente(lead, activities = []) {
+  const leadName = (lead.nome || lead.conta || '').toLowerCase().trim()
+  return (activities || [])
+    .filter(a =>
+      !a.ok && a.dt &&
+      ((a.lead_id && a.lead_id === lead.id) ||
+       (a.lead && a.lead.toLowerCase().trim() === leadName))
+    )
+    .sort((a, b) => a.dt.localeCompare(b.dt)) // prazo mais próximo primeiro
+    [0] || null
+}
+
 export function leadContexto(lead, activities = []) {
+  const leadName = (lead.nome || lead.conta || '').toLowerCase().trim()
+  const proxAtv  = getProximaAtvPendente(lead, activities)
+
   const partes = [
     lead.nome || lead.conta,
     lead.regiao || '?',
@@ -281,31 +301,34 @@ export function leadContexto(lead, activities = []) {
     `dono: ${lead.resp || '—'}`,
   ]
   if (lead.valor) partes.push(`valor: ${lead.valor}`)
-  if (lead.mov)   partes.push(`mov: ${String(lead.mov).slice(0, 80)}`)
-  if (lead.prox)  partes.push(`próx_acao: ${String(lead.prox).slice(0, 60)}`)
 
-  // DT_CHAVE: campo dedicado do CRM — nunca inferir de texto livre
-  partes.push(`DT_CHAVE: ${lead.dt || '–'}`)
+  // MOVIMENTOS ATUAIS: iara_leads.mov — campo manual, contexto narrativo
+  if (lead.mov) partes.push(`mov: ${String(lead.mov).slice(0, 120)}`)
+
+  // PRÓXIMOS PASSOS: descrição da próxima atividade pendente (iara_activities)
+  partes.push(`PRÓXIMOS PASSOS: ${proxAtv?.descricao?.slice(0, 80) || '–'}`)
+
+  // DT_CHAVE: prazo da próxima atividade pendente (iara_activities.dt)
+  // Nunca inferir de texto livre — valor já calculado automaticamente aqui
+  partes.push(`DT_CHAVE: ${proxAtv?.dt || '–'}`)
 
   let ctx = partes.join(' | ')
 
-  // Última atividade registrada — garante leitura da info mais recente
-  if (activities.length > 0) {
-    const atvsDoLead = activities
-      .filter(a =>
-        (a.lead_id && a.lead_id === lead.id) ||
-        (a.lead && a.lead.toLowerCase() === (lead.nome || lead.conta || '').toLowerCase())
-      )
-      .sort((a, b) => (b.criado || b.dt || '').localeCompare(a.criado || a.dt || ''))
+  // Última atividade registrada (contexto histórico — qualquer status)
+  const ultimaAtv = (activities || [])
+    .filter(a =>
+      (a.lead_id && a.lead_id === lead.id) ||
+      (a.lead && a.lead.toLowerCase().trim() === leadName)
+    )
+    .sort((a, b) => (b.criado || b.dt || '').localeCompare(a.criado || a.dt || ''))
+    [0]
 
-    if (atvsDoLead.length > 0) {
-      const ult = atvsDoLead[0]
-      const dataUlt = ult.criado?.slice(0, 10) || ult.dt || '—'
-      ctx += `\nÚltima atividade (${dataUlt}): ${(ult.descricao || ult.tipo || '').slice(0, 100)}`
-    }
+  if (ultimaAtv) {
+    const dataUlt = ultimaAtv.criado?.slice(0, 10) || ultimaAtv.dt || '—'
+    ctx += `\nÚltima atividade (${dataUlt}): ${(ultimaAtv.descricao || ultimaAtv.tipo || '').slice(0, 100)}`
   }
 
-  if (lead.obs_gerencia && lead.obs_gerencia.trim()) {
+  if (lead.obs_gerencia?.trim()) {
     ctx += `\n[Bruno]: ${lead.obs_gerencia.trim()}`
   }
   return ctx
