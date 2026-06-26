@@ -418,7 +418,6 @@ function NovoLeadWizard({ t, leads, user, onSave, onClose }) {
         risco:              '',
         vencimento:         '',
         paralelo:           '',
-        obs_gerencia:       '',
         ultima_atualizacao: hoje,
       }
       await onSave(card, ctxForm.descAtv ? {
@@ -1493,7 +1492,25 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
                 </div>
               </div>
 
-              {/* ── G12/G15 + Região + País — classificação estratégica para Radar Semanal ── */}
+              {/* ── MOVIMENTOS ATUAIS — campo manual para o Radar Quinzenal ── */}
+              <div>
+                <div style={{ fontSize: 11, color: t.textMuted, marginBottom: 5, fontWeight: 600 }}>
+                  📝 MOVIMENTOS ATUAIS
+                </div>
+                <textarea
+                  value={form.mov || ''}
+                  onChange={e => set('mov', e.target.value)}
+                  rows={3}
+                  placeholder="Descreva o estado atual: o que aconteceu, qual o contexto da última interação, dependências em aberto..."
+                  style={{ width: '100%', background: t.surfaceInput, border: `1px solid ${form.mov ? t.purple + '55' : t.border}`, borderRadius: 8, padding: '9px 12px', color: t.text, fontSize: 13, outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5, boxSizing: 'border-box' }}
+                />
+                <div style={{ fontSize: 10, color: t.textMuted, marginTop: 4 }}>
+                  Campo manual · aparece no Radar Quinzenal como contexto do lead
+                  {form.mov && ` · ${form.mov.length} caracteres`}
+                </div>
+              </div>
+
+              {/* ── G12/G15 + Região + País ── */}
               <div style={{
                 background: form.g12 ? `${t.purple}10` : t.bg,
                 border: `1px solid ${form.g12 ? t.purple : t.border}`,
@@ -1566,33 +1583,6 @@ function Modal({ lead, acts, onClose, onSave, onLeadUpdate, onReativar, onConclu
                   {!form.vencimento && <div style={{ fontSize: 11, color: t.textHint, marginTop: 4 }}>Preencha para alertas de renovação</div>}
                 </div>
               )}
-              {/* Observações da Gerência — contexto qualitativo p/ Radar Quinzenal */}
-              <div style={{
-                background: form.obs_gerencia ? `${t.orange}08` : t.bg,
-                border: `1px solid ${form.obs_gerencia ? `${t.orange}66` : t.border}`,
-                borderRadius: 10, padding: '12px',
-              }}>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
-                  <div style={{ fontSize:12, fontWeight:700, color: form.obs_gerencia ? t.orange : t.text }}>
-                    💬 Observações da Gerência
-                  </div>
-                  <div style={{ fontSize:10, color:t.textMuted, fontWeight:500 }}>Bruno · entra no Radar Quinzenal</div>
-                </div>
-                <textarea
-                  value={form.obs_gerencia || ''}
-                  onChange={e => set('obs_gerencia', e.target.value)}
-                  placeholder="Contexto qualitativo que não está nas atividades: reuniões off, sinalizações do cliente, observações estratégicas... A IAra usa isso no resumo do Radar."
-                  rows={3}
-                  style={{ width:'100%', background:t.surfaceInput, border:`1px solid ${t.border}`, borderRadius:8, padding:'9px 12px', color:t.text, fontSize:12, outline:'none', resize:'vertical', fontFamily:'inherit', lineHeight:1.5, boxSizing:'border-box' }}
-                />
-                {form.obs_gerencia && (
-                  <div style={{ fontSize:10, color:t.textMuted, marginTop:6, display:'flex', alignItems:'center', gap:6 }}>
-                    <span style={{ width:6, height:6, borderRadius:'50%', background:t.orange, display:'inline-block' }}/>
-                    {form.obs_gerencia.length} caracteres · incluído no contexto do Radar
-                  </div>
-                )}
-              </div>
-
               {/* Enviar para Geladeira */}
               {!lead.off && !lead.op && (
                 <button onClick={() => { if (confirm('Enviar para a Geladeira?')) onSave({ ...form, off: true }) }}
@@ -1829,16 +1819,7 @@ export default function Pipeline() {
     const hoje = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
     // Normaliza etapa pra evitar fantasmas. Preserva etapa anterior como fallback.
     const etapaNormalizada = normalizeEtapa(form.etapa, anterior?.etapa || 'Prospecção')
-    // Sync automático op/off pela etapa — evita cards invisíveis ao mover para Go-Live
-    const isGoLive = etapaNormalizada === 'Operação / Go-Live'
-    const formAtualizado = {
-      ...form,
-      etapa: etapaNormalizada,
-      op:    isGoLive,
-      off:   isGoLive ? false : form.off,
-      ultima_atualizacao: hoje,
-      dias:  0,
-    }
+    const formAtualizado = { ...form, etapa: etapaNormalizada, ultima_atualizacao: hoje, dias: 0 }
     await upsertLead(formAtualizado)
     setLeads(prev => prev.map(l => l.id === form.id ? formAtualizado : l))
 
@@ -1960,7 +1941,6 @@ export default function Pipeline() {
       ultima_atualizacao: hoje,
       pais:               form.pais || '',
       regiao:             form.regiao || '',
-      obs_gerencia:       form.obs_gerencia || '',
     }
 
     // 1. Salva no banco PRIMEIRO — se falhar, usuário precisa saber antes de fechar o modal
