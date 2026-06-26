@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { getLeads, getActivities, saveRadarSnapshot, getRadarSnapshots, createRadarShare } from '../lib/supabase'
-import { getQuinzenaInstitucional, REUNIOES_SOCIOS } from '../lib/radar-helpers'
+import { getQuinzenaInstitucional, REUNIOES_SOCIOS, getProximaAtvPendente } from '../lib/radar-helpers'
 import RadarWizard from './RadarWizard'
 
 // ── Dark tokens + nav inline ─────────────────────────────────────────────────
@@ -372,6 +372,17 @@ export default function Radar() {
 
   const g12     = leads.filter(l => l.g12 && !l.off)
   const outros  = leads.filter(l => !l.g12 && !l.op && !l.off)
+
+  // Enriquece lead com prox/dt da próxima atividade pendente (iara_activities)
+  function enrichLead(lead) {
+    const proxAtv = getProximaAtvPendente(lead, acts)
+    return {
+      ...lead,
+      prox: proxAtv?.descricao || null,
+      dt:   proxAtv?.dt        || null,
+      _proxResp: proxAtv?.resp || null,
+    }
+  }
   const ativos  = leads.filter(l => !l.off && !l.op)
 
   // Movimentos da semana: leads atualizados dentro do período
@@ -732,7 +743,7 @@ export default function Radar() {
               Nenhum deal marcado como G12/G15 ainda. Vá em <strong>Pipeline → Editar card → Classificação Estratégica</strong> e ative o toggle G12/G15 nos deals prioritários.
             </div>
           ) : (
-            <TabelaLeads rows={g12} isG12={true}/>
+            <TabelaLeads rows={g12.map(enrichLead)} isG12={true}/>
           )}
         </Sec>
 
@@ -751,7 +762,7 @@ export default function Radar() {
                 }}>
                   {g.regiao} · {g.leads.length} {g.leads.length === 1 ? 'lead' : 'leads'}
                 </div>
-                <TabelaLeads rows={g.leads}/>
+                <TabelaLeads rows={g.leads.map(enrichLead)}/>
                 {narrativas?.sec3?.[g.regiao] && (
                   <p style={{ fontSize:14, lineHeight:1.7, color:'#333', marginTop:12 }}>{narrativas.sec3[g.regiao]}</p>
                 )}
@@ -876,14 +887,23 @@ export default function Radar() {
           weekNum={weekNum}
           onClose={() => setWizardOpen(false)}
           onSave={async (blocks) => {
-            setNarrativas(blocks.narrativas)
-            setRiscos(blocks.riscos || [])
-            const title = `Radar Pipeline — Sem ${weekNum} (${periodo})`
-            const snap = await saveRadarSnapshot(title, JSON.stringify(blocks), user.nome)
-            if (snap?.id) setLastSnapshotId(snap.id) // captura ID para o link
-            const s = await getRadarSnapshots(); setSnapshots(s)
-            setWizardOpen(false)
-            setSecOpen({ 1:true, 2:true, 3:true, 4:true, 5:true })
+            try {
+              setNarrativas(blocks.narrativas)
+              setRiscos(blocks.riscos || [])
+              const title = `Radar Pipeline — Sem ${weekNum} (${periodo})`
+              const snap = await saveRadarSnapshot(title, JSON.stringify(blocks), user.nome)
+              if (snap?.id) setLastSnapshotId(snap.id)
+              const s = await getRadarSnapshots()
+              setSnapshots(s)
+            } catch(e) {
+              console.error('[IAra] Erro ao salvar snapshot do Radar:', e)
+              // Mesmo com erro no snapshot, fecha o wizard e aplica os dados em tela
+              alert('Relatório aplicado. Erro ao salvar snapshot: ' + (e?.message || e) + '\nVerifique o console para detalhes.')
+            } finally {
+              // SEMPRE fecha o wizard independente do resultado
+              setWizardOpen(false)
+              setSecOpen({ 1:true, 2:true, 3:true, 4:true, 5:true })
+            }
           }}
         />
       )}
