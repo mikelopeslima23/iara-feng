@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { scoreRelevancia, leadContexto, formatPeriodoLongo } from '../lib/radar-helpers'
+import { scoreRelevancia, leadContexto, formatPeriodoLongo, getProximaAtvPendente } from '../lib/radar-helpers'
 
 // ── Tokens ───────────────────────────────────────────────────────────────────
 const W = {
@@ -28,11 +28,11 @@ POSTURA NARRATIVA:
 - Pontos de atenção aparecem brevemente ao final, nunca como abertura.
 - Tom de quem está no controle, não reportando dificuldades.
 
-REGRA DT_CHAVE — OBRIGATÓRIA:
-- O campo DT_CHAVE vem EXCLUSIVAMENTE do campo dedicado no CRM. Nunca inferir ou extrair de texto livre (mov, próx_acao, obs).
-- Nunca recalcular, sugerir ou substituir DT_CHAVE por outras datas como "último contato", "próxima reunião mencionada em texto", etc.
-- Se DT_CHAVE for "–" ou ausente: exibir "–" e sinalizar o lead com ⚠️ verificar dt chave.
-- Em caso de dúvida sobre a origem da data: sempre preferir "–" com sinalização em vez de assumir.
+REGRA DT_CHAVE e PRÓXIMOS PASSOS — OBRIGATÓRIA:
+- DT_CHAVE = prazo da próxima atividade pendente em iara_activities. O valor já vem calculado no contexto como "DT_CHAVE: [data]". Nunca inferir de texto livre.
+- PRÓXIMOS PASSOS = descrição da próxima atividade pendente em iara_activities. O valor já vem calculado no contexto como "PRÓXIMOS PASSOS: [texto]". Nunca inferir de texto livre.
+- Se DT_CHAVE for "–": o lead não tem atividade pendente com prazo cadastrada. Exibir "–" e sinalizar ⚠️ sem próxima atividade.
+- Nunca recalcular, sugerir ou substituir esses valores por outras datas ou textos encontrados em mov ou obs.
 
 SAÚDE DO LEAD (use nos textos quando relevante):
 - 🟢 contato nos últimos 7 dias
@@ -132,8 +132,10 @@ function calcSaude(lead) {
   return { dot:'#EF4444', label:`${dias}d` }
 }
 
-function LeadChip({ lead, onRemove, score }) {
-  const saude = calcSaude(lead)
+function LeadChip({ lead, onRemove, score, activities = [] }) {
+  const saude  = calcSaude(lead)
+  const proxAtv = getProximaAtvPendente(lead, activities)
+  const semProxAtv = !proxAtv
   const etapaColor = {
     'Prospecção':'#B5D4F4','Oportunidade':'#85B7EB','Proposta':'#AFA9EC',
     'Negociação':'#7F77DD','Jurídico':'#FAC775','Implementação':'#5DCAA5','Operação / Go-Live':'#1D9E75',
@@ -364,6 +366,7 @@ Retorne APENAS os bullets, um por linha, sem título de região. Ex:
     setS2Items(items => items.map(it => it.id === leadId ? { ...it, gerando: true } : it))
     try {
       const ctx = leadContexto(lead, activities)
+      const proxAtv2 = getProximaAtvPendente(lead, activities)
       const prompt = `Escreva a narrativa para o lead ${lead.nome} no Radar Pipeline G12/G15 (período ${periodo}).
 
 Estrutura OBRIGATÓRIA em 3 blocos (sem bloco "Quem é"):
@@ -374,7 +377,10 @@ Estrutura OBRIGATÓRIA em 3 blocos (sem bloco "Quem é"):
 Dados do lead (priorize as informações mais recentes):
 ${ctx}
 
-ATENÇÃO: DT_CHAVE vem EXCLUSIVAMENTE do CRM (valor: ${lead.dt || '–'}). Não inferir do texto.
+ATENÇÃO:
+- DT_CHAVE = prazo da próxima atividade pendente: ${proxAtv2?.dt || '–'}
+- PRÓXIMOS PASSOS = ${proxAtv2?.descricao?.slice(0, 60) || '– (sem atividade pendente cadastrada)'}
+- Nunca inferir datas ou próximos passos de texto livre.
 Português sempre. Campo ausente = "–". Sem travessões.`
       const txt = await callIA(prompt)
       setS2Items(items => items.map(it => it.id === leadId ? { ...it, narrativa: txt, gerando: false } : it))
@@ -539,7 +545,7 @@ ${txt}`
   }
 
   // ── Fechar e salvar ───────────────────────────────────────────────────────
-  async function handleSave() {
+  function handleSave() {
     try {
       const final = polished || {
         sec1: s1,
@@ -547,16 +553,23 @@ ${txt}`
         sec3: s3Narrativa,
         sec4: s4Narrativa,
       }
-      await onSave({
+      const blocks = {
         dtIni, dtFim, periodo, weekNum,
         narrativas: final,
         g12Leads:    s2Items.map(it => it.id),
         outrosLeads: leadsAtivos(s3Leads).map(l => l.id),
         riscos:      s4Riscos,
-      })
+      }
+      // chama onSave sem await — Radar.jsx gerencia o fluxo async com finally
+      const result = onSave(blocks)
+      if (result && typeof result.catch === 'function') {
+        result.catch(e => {
+          console.error('[IAra] Erro no onSave do wizard:', e)
+        })
+      }
     } catch(e) {
-      console.error('Erro ao salvar Radar:', e)
-      alert('Erro ao salvar: ' + (e?.message || 'tente novamente'))
+      console.error('[IAra] Erro ao preparar dados do Radar:', e)
+      alert('Erro ao fechar wizard: ' + (e?.message || e))
     }
   }
 
@@ -655,8 +668,8 @@ ${txt}`
               {s2Items.map((item) => {
                 const lead = leads.find(l => l.id === item.id)
                 if (!lead) return null
-                const saude = calcSaude(lead)
-                const semDt = !lead.dt || lead.dt === '—'
+                const saude   = calcSaude(lead)
+                const proxAtv = getProximaAtvPendente(lead, activities)
                 return (
                   <div key={item.id} style={{ marginBottom:16, background:'white', border:'1px solid #E5E7EB', borderRadius:10, overflow:'hidden' }}>
                     {/* Header do lead */}
@@ -668,10 +681,10 @@ ${txt}`
                           <span style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:saude.dot, marginRight:3, verticalAlign:'middle' }}/>
                           {saude.label}
                         </span>
-                        {/* DT_CHAVE */}
-                        {semDt
-                          ? <span style={{ fontSize:10, color:'#F59E0B', background:'rgba(245,158,11,.1)', border:'1px solid rgba(245,158,11,.3)', borderRadius:4, padding:'1px 7px' }}>⚠️ verificar dt chave</span>
-                          : <span style={{ fontSize:10, color:'#6B7280' }}>📅 {lead.dt}</span>
+                        {/* DT_CHAVE — vem da próxima atividade pendente */}
+                        {proxAtv
+                          ? <span style={{ fontSize:10, color:'#6B7280' }}>📅 {proxAtv.dt} · {(proxAtv.descricao||'').slice(0,28)}</span>
+                          : <span style={{ fontSize:10, color:'#F59E0B', background:'rgba(245,158,11,.1)', border:'1px solid rgba(245,158,11,.3)', borderRadius:4, padding:'1px 7px' }}>⚠️ sem próx. atividade</span>
                         }
                         {lead.obs_gerencia && <span style={{ fontSize:10, color:'#F97316' }}>💬 Bruno</span>}
                       </div>
