@@ -642,46 +642,41 @@ ${txt}`
             <div>
               <StepHeader
                 num="2" titulo="G12 / G15 — Movimentos da Quinzena"
-                desc="Cada lead tem sua própria narrativa editável. Gere individualmente ou todos de uma vez. Edições manuais não são sobrescritas por regenerações parciais."
+                desc="Selecione os leads que entram nesta seção. Cada um tem narrativa editável independente."
               />
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:14 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:'#444' }}>
-                  {s2Items.length} {s2Items.length === 1 ? 'lead' : 'leads'} nesta seção
+
+              {/* Leads incluídos na seção */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#444', textTransform:'uppercase', letterSpacing:'.08em' }}>
+                  Incluídos ({s2Items.length})
                 </div>
-                <div style={{ display:'flex', gap:8 }}>
-                  <button onClick={() => setAddS2(true)} style={btnSecondary}>+ Incluir lead</button>
-                  <button onClick={gerarTodosS2} disabled={genS2All || s2Items.length === 0} style={btnPrimary(genS2All || s2Items.length === 0)}>
-                    {genS2All ? '⏳ Gerando...' : '✨ Gerar todos'}
-                  </button>
-                </div>
+                <button onClick={gerarTodosS2} disabled={genS2All || s2Items.length === 0}
+                  style={btnPrimary(genS2All || s2Items.length === 0)}>
+                  {genS2All ? '⏳ Gerando...' : '✨ Gerar todos'}
+                </button>
               </div>
-              {addS2 && (
-                <AddLeadSearch allLeads={leads} excludedIds={[]} currentIds={s2Items.map(i=>i.id)}
-                  onAdd={addToS2} onClose={() => setAddS2(false)}/>
-              )}
+
               {s2Items.length === 0 && (
-                <div style={{ padding:20, textAlign:'center', color:'#9CA3AF', background:'white', border:'1px dashed #E5E7EB', borderRadius:8, marginBottom:16 }}>
-                  Nenhum lead G12/G15. Use "+ Incluir lead" para adicionar.
+                <div style={{ padding:16, textAlign:'center', color:'#9CA3AF', background:'white', border:'1px dashed #E5E7EB', borderRadius:8, marginBottom:16 }}>
+                  Nenhum lead selecionado. Adicione abaixo.
                 </div>
               )}
-              {/* Por lead — lista editável independente */}
+
               {s2Items.map((item) => {
                 const lead = leads.find(l => l.id === item.id)
                 if (!lead) return null
                 const saude   = calcSaude(lead)
                 const proxAtv = getProximaAtvPendente(lead, activities)
                 return (
-                  <div key={item.id} style={{ marginBottom:16, background:'white', border:'1px solid #E5E7EB', borderRadius:10, overflow:'hidden' }}>
-                    {/* Header do lead */}
+                  <div key={item.id} style={{ marginBottom:12, background:'white', border:'1px solid #E5E7EB', borderRadius:10, overflow:'hidden' }}>
                     <div style={{ display:'flex', alignItems:'center', gap:10, padding:'10px 14px', borderBottom:'1px solid #F3F4F6', background:'#FAFAFA' }}>
-                      <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, minWidth:0 }}>
+                      <div style={{ flex:1, display:'flex', alignItems:'center', gap:8, minWidth:0, flexWrap:'wrap' }}>
                         <span style={{ fontSize:13, fontWeight:700, color:'#111' }}>{lead.nome}</span>
                         <span style={{ fontSize:10, padding:'1px 7px', borderRadius:4, background:(ETAPA_COLORS[lead.etapa]||'#888')+'22', color:ETAPA_COLORS[lead.etapa]||'#555', border:`1px solid ${ETAPA_COLORS[lead.etapa]||'#888'}44` }}>{lead.etapa}</span>
                         <span style={{ fontSize:10, color:saude.dot, background:saude.dot+'18', borderRadius:4, padding:'1px 6px', fontWeight:700 }}>
                           <span style={{ display:'inline-block', width:6, height:6, borderRadius:'50%', background:saude.dot, marginRight:3, verticalAlign:'middle' }}/>
                           {saude.label}
                         </span>
-                        {/* DT_CHAVE — vem da próxima atividade pendente */}
                         {proxAtv
                           ? <span style={{ fontSize:10, color:'#6B7280' }}>📅 {proxAtv.dt} · {(proxAtv.descricao||'').slice(0,28)}</span>
                           : <span style={{ fontSize:10, color:'#F59E0B', background:'rgba(245,158,11,.1)', border:'1px solid rgba(245,158,11,.3)', borderRadius:4, padding:'1px 7px' }}>⚠️ sem próx. atividade</span>
@@ -699,23 +694,58 @@ ${txt}`
                         </button>
                       </div>
                     </div>
-                    {/* Narrativa editável deste lead */}
                     <div style={{ padding:'10px 14px' }}>
                       <textarea
                         value={item.narrativa}
                         onChange={e => updateS2Narrativa(item.id, e.target.value)}
                         placeholder={`Narrativa do lead ${lead.nome}. Clique "✨ Gerar" para sugestão da IAra em 3 blocos:\n**Histórico recente:** ...\n**Status atual:** ...\n**Bloqueio/dependência:** ...`}
-                        rows={item.narrativa ? 6 : 3}
+                        rows={item.narrativa ? 5 : 2}
                         style={{ width:'100%', border:`1px solid ${item.narrativa ? '#D1D5DB' : '#E5E7EB'}`, borderRadius:7, padding:'9px 11px', fontSize:12, color:'#111', outline:'none', resize:'vertical', fontFamily:'inherit', lineHeight:1.6, boxSizing:'border-box', background: item.narrativa ? '#FAFAF9' : 'white' }}
                       />
-                      {item.narrativa && (
-                        <div style={{ fontSize:10, color:'#9CA3AF', marginTop:3 }}>{item.narrativa.length} caracteres · editável · não será sobrescrito por gerações parciais</div>
-                      )}
                     </div>
                   </div>
                 )
               })}
-              <InfoBox>Remover um lead desta seção não o exclui do pipeline. Edições manuais de um lead não são afetadas ao gerar ou regenerar outros leads.</InfoBox>
+
+              {/* Lista completa de leads disponíveis para adicionar */}
+              <div style={{ marginTop:16, background:'#F9F5FF', border:`1px solid ${W.purple}25`, borderRadius:10, overflow:'hidden' }}>
+                <div style={{ padding:'10px 14px', borderBottom:`1px solid ${W.purple}15`, display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:11, fontWeight:700, color:W.purpleD, textTransform:'uppercase', letterSpacing:'.08em' }}>
+                    Leads disponíveis para adicionar
+                  </span>
+                  <span style={{ fontSize:10, color:W.t3 }}>
+                    — {leads.filter(l => !l.off && !l.op && !s2Items.find(i => i.id === l.id)).length} leads
+                  </span>
+                </div>
+                <div style={{ maxHeight:280, overflowY:'auto', padding:8 }}>
+                  {leads
+                    .filter(l => !l.off && !l.op && !s2Items.find(i => i.id === l.id))
+                    .sort((a, b) => (scoreOf(b) - scoreOf(a)))
+                    .map(l => {
+                      const sL = calcSaude(l)
+                      const ec = ETAPA_COLORS[l.etapa] || '#888'
+                      return (
+                        <div key={l.id}
+                          style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'7px 10px', borderRadius:7, marginBottom:3, background:'white', border:'1px solid #E5E7EB' }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:8, minWidth:0, flex:1 }}>
+                            <span style={{ width:7, height:7, borderRadius:'50%', background:sL.dot, flexShrink:0 }}/>
+                            <span style={{ fontSize:13, color:'#111', fontWeight:500, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{l.nome}</span>
+                            <span style={{ fontSize:10, padding:'1px 6px', borderRadius:4, background:ec+'22', color:ec, border:`1px solid ${ec}44`, flexShrink:0 }}>{l.etapa}</span>
+                            {l.g12 && <span style={{ fontSize:9, color:W.purpleD, background:W.purpleF, borderRadius:3, padding:'1px 5px', fontWeight:700 }}>G12</span>}
+                            <span style={{ fontSize:10, color:'#9CA3AF', flexShrink:0 }}>{l.resp?.split(' ')[0]}</span>
+                          </div>
+                          <button onClick={() => addToS2(l)}
+                            style={{ fontSize:11, padding:'3px 10px', borderRadius:5, border:`1px solid ${W.purple}40`, background:W.purpleF, color:W.purpleD, cursor:'pointer', fontWeight:600, flexShrink:0, marginLeft:8 }}>
+                            + Incluir
+                          </button>
+                        </div>
+                      )
+                    })
+                  }
+                </div>
+              </div>
+
+              <InfoBox style={{ marginTop:12 }}>Remover um lead desta seção não o exclui do pipeline. Edições de narrativa são independentes entre leads.</InfoBox>
             </div>
           )}
 
