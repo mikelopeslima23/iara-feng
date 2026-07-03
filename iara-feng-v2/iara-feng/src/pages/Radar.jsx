@@ -866,24 +866,24 @@ export default function Radar() {
           periodo={periodo}
           weekNum={weekNum}
           onClose={() => setWizardOpen(false)}
-          onSave={async (blocks) => {
-            try {
-              setNarrativas(blocks.narrativas)
-              setRiscos(blocks.riscos || [])
-              const title = `Radar Pipeline — Sem ${weekNum} (${periodo})`
-              const snap = await saveRadarSnapshot(title, JSON.stringify(blocks), user.nome)
-              if (snap?.id) setLastSnapshotId(snap.id)
-              const s = await getRadarSnapshots()
-              setSnapshots(s)
-            } catch(e) {
-              console.error('[IAra] Erro ao salvar snapshot do Radar:', e)
-              // Mesmo com erro no snapshot, fecha o wizard e aplica os dados em tela
-              alert('Relatório aplicado. Erro ao salvar snapshot: ' + (e?.message || e) + '\nVerifique o console para detalhes.')
-            } finally {
-              // SEMPRE fecha o wizard independente do resultado
-              setWizardOpen(false)
-              setSecOpen({ 1:true, 2:true, 3:true, 4:true, 5:true })
-            }
+          onSave={(blocks) => {
+            // 1. FECHA IMEDIATAMENTE — síncrono, garantido
+            setWizardOpen(false)
+            setSecOpen({ 1:true, 2:true, 3:true, 4:true, 5:true })
+
+            // 2. Aplica os dados na tela — síncrono
+            setNarrativas(blocks.narrativas)
+            setRiscos(blocks.riscos || [])
+
+            // 3. Salva snapshot em background — async, não bloqueia o usuário
+            const title = `Radar Pipeline — Sem ${weekNum} (${periodo})`
+            saveRadarSnapshot(title, JSON.stringify(blocks), user.nome)
+              .then(snap => {
+                if (snap?.id) setLastSnapshotId(snap.id)
+                return getRadarSnapshots()
+              })
+              .then(s => setSnapshots(s))
+              .catch(e => console.error('[IAra] Erro ao salvar snapshot (não crítico):', e))
           }}
         />
       )}
