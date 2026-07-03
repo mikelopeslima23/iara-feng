@@ -537,6 +537,8 @@ ${txt}`
 
   // ── Fechar e salvar ───────────────────────────────────────────────────────
   function handleSave() {
+    // Monta os dados — se falhar aqui, mostra alert
+    let blocks
     try {
       const final = polished || {
         sec1: s1,
@@ -544,24 +546,22 @@ ${txt}`
         sec3: s3Narrativa,
         sec4: s4Narrativa,
       }
-      const blocks = {
+      blocks = {
         dtIni, dtFim, periodo, weekNum,
         narrativas: final,
         g12Leads:    s2Items.map(it => it.id),
         outrosLeads: leadsAtivos(s3Leads).map(l => l.id),
         riscos:      s4Riscos,
       }
-      // chama onSave sem await — Radar.jsx gerencia o fluxo async com finally
-      const result = onSave(blocks)
-      if (result && typeof result.catch === 'function') {
-        result.catch(e => {
-          console.error('[IAra] Erro no onSave do wizard:', e)
-        })
-      }
     } catch(e) {
-      console.error('[IAra] Erro ao preparar dados do Radar:', e)
-      alert('Erro ao fechar wizard: ' + (e?.message || e))
+      console.error('[IAra] Erro ao montar dados:', e)
+      alert('Erro ao preparar os dados: ' + (e?.message || e))
+      return
     }
+
+    // Fecha o wizard IMEDIATAMENTE — independente do que acontecer no save
+    // onSave salva em background sem bloquear o usuário
+    onSave(blocks)
   }
 
   // ── RENDER ────────────────────────────────────────────────────────────────
