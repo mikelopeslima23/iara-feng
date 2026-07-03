@@ -78,7 +78,12 @@ async function callIA(userContent, parseJson = false) {
   txt = txt.replace(/\s*—\s*/g, ', ')
   if (parseJson) {
     const clean = txt.replace(/```json|```/g, '').trim()
-    return JSON.parse(clean)
+    try {
+      return JSON.parse(clean)
+    } catch(e) {
+      // Resposta truncada ou malformada — lança erro descritivo
+      throw new Error(`Resposta da IA incompleta ou inválida. Tente gerar novamente. (${e.message})`)
+    }
   }
   return txt
 }
@@ -300,60 +305,46 @@ export default function RadarWizard({ leads, activities, dtIni, dtFim, periodo, 
   function prevStep() { setStep(s => Math.max(s - 1, 1)); scrollTop() }
 
   // ── Geração IA — Seção 1 ─────────────────────────────────────────────────
-  async function gerarS1(regiao) {
-    setGenS1(regiao)
-    try {
-      const filtro = regiao === 'all' ? leads.filter(l => !l.off) :
-        regiao === 'brasil' ? leads.filter(l => (l.regiao || 'Brasil') === 'Brasil' && !l.off) :
-        regiao === 'latam'  ? leads.filter(l => l.regiao === 'LATAM' && !l.off) :
-                              leads.filter(l => ['Novos Negócios','Internacional'].includes(l.regiao) && !l.off)
+  async function gerarS1Regiao(regiao) {
+    // Geração individual por região — texto puro, sem JSON, sem risco de truncamento
+    const filtro =
+      regiao === 'brasil' ? leads.filter(l => (l.regiao || 'Brasil') === 'Brasil' && !l.off) :
+      regiao === 'latam'  ? leads.filter(l => l.regiao === 'LATAM' && !l.off) :
+                            leads.filter(l => ['Novos Negócios','Internacional'].includes(l.regiao) && !l.off)
 
-      const ctx = filtro.map(l => leadContexto(l, activities)).join('\n')
-      const periodoTxt = periodo || formatPeriodoLongo(dtIni, dtFim)
+    const ctx = filtro.map(l => leadContexto(l, activities)).join('\n')
+    const periodoTxt = periodo || formatPeriodoLongo(dtIni, dtFim)
+    const labelMap = { brasil:'🇧🇷 Brasil', latam:'🌎 LATAM', nb:'🚀 Novos Negócios / Internacional' }
 
-      const instrucao = `FORMATO OBRIGATÓRIO — bullets com ícone por região. Máximo 4 bullets por região. Omitir região sem leads.
+    const instrucao = `FORMATO OBRIGATÓRIO — bullets com ícone. Máximo 4 bullets.
+Ícones: ✅ Avanço 🔄 Em andamento 🚀 Novo ⚠️ Atenção
+Formato: [ícone] [Nome] ([Serviço se houver]) — [o que aconteceu, 1 frase direta]`
 
-Ícones (escolha um por bullet baseado no status):
-✅ Avanço — lead mudou de etapa ou ação concreta foi realizada
-🔄 Em andamento — atividade aconteceu mas sem mudança de etapa
-🚀 Novo — lead criado ou nova oportunidade identificada no período
-⚠️ Atenção — sem movimento esperado ou dependência externa identificada
-
-Formato de cada bullet:
-[ícone] [Nome do Lead] ([Serviço/Projeto se conhecido]) — [o que aconteceu, 1 frase direta]`
-
-      if (regiao === 'all') {
-        const prompt = `Gere os Highlights da Visão Executiva do Radar Pipeline FENG para o período ${periodoTxt}.
-
-${instrucao}
-
-Leads do pipeline:
-${ctx}
-
-Retorne APENAS um JSON válido (sem texto antes ou depois):
-{
-  "brasil": "- ✅ Lead A (Serviço) — o que aconteceu\\n- 🔄 Lead B — em andamento",
-  "latam":  "- ✅ Lead C — avançou para negociação",
-  "nb":     "- 🚀 Lead D — novo contato realizado"
-}
-
-Se uma região não tiver leads ativos, retorne string vazia para ela.`
-        const json = await callIA(prompt, true)
-        setS1({ brasil: json.brasil || '', latam: json.latam || '', nb: json.nb || '' })
-      } else {
-        const labelMap = { brasil:'🇧🇷 Brasil', latam:'🌎 LATAM', nb:'🚀 Novos Negócios / Internacional' }
-        const prompt = `Gere os Highlights para a região ${labelMap[regiao]} do Radar Pipeline FENG (período ${periodoTxt}).
+    const prompt = `Gere os Highlights para a região ${labelMap[regiao]} do Radar Pipeline FENG (período ${periodoTxt}).
 
 ${instrucao}
 
 Leads desta região:
 ${ctx || '(sem leads ativos nesta região)'}
 
-Retorne APENAS os bullets, um por linha, sem título de região. Ex:
-- ✅ Lead A — avançou para negociação após reunião do conselho
-- 🔄 Lead B — contato realizado, aguarda retorno do jurídico`
-        const txt = await callIA(prompt)
-        setS1(prev => ({ ...prev, [regiao]: txt }))
+Retorne APENAS os bullets, um por linha, sem título de região.`
+
+    const txt = await callIA(prompt)  // texto puro — sem JSON, sem parseJson:true
+    setS1(prev => ({ ...prev, [regiao]: txt }))
+  }
+
+  async function gerarS1(regiao) {
+    setGenS1(regiao)
+    try {
+      if (regiao === 'all') {
+        // 3 chamadas independentes em paralelo — elimina JSON e truncamento
+        await Promise.all([
+          gerarS1Regiao('brasil'),
+          gerarS1Regiao('latam'),
+          gerarS1Regiao('nb'),
+        ])
+      } else {
+        await gerarS1Regiao(regiao)
       }
     } catch(e) { alert('Erro ao gerar: ' + e.message) }
     setGenS1(null)
