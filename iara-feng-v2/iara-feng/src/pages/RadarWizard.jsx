@@ -63,26 +63,54 @@ PROIBIÇÕES ABSOLUTAS:
 FORMATO: voz ativa. Frases diretas. Máximo 3 frases por parágrafo.`
 
 // ── Chamada à API (usa o endpoint /api/chat do projeto) ──────────────────────
+function showToast(msg, type = 'erro') {
+  const bg = type === 'erro' ? '#EF4444' : '#10B981'
+  const d = document.createElement('div')
+  d.innerText = msg
+  d.style.cssText = `position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:${bg};color:white;padding:12px 22px;border-radius:8px;z-index:9999;font-size:13px;font-weight:600;max-width:420px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.3)`
+  document.body.appendChild(d)
+  setTimeout(() => d.remove(), 5000)
+}
+
 async function callIA(userContent, parseJson = false) {
-  const r = await fetch('/api/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages: [{ role: 'user', content: userContent }],
-      system: SYSTEM_PROMPT,
-    }),
-  })
+  const controller = new AbortController()
+  const tid = setTimeout(() => controller.abort(), 25000) // 25s timeout
+
+  let r
+  try {
+    r = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: userContent }],
+        system: SYSTEM_PROMPT,
+      }),
+      signal: controller.signal,
+    })
+  } catch(e) {
+    clearTimeout(tid)
+    const msg = e.name === 'AbortError'
+      ? 'Tempo esgotado (25s). Tente gerar novamente.'
+      : 'Erro de rede: ' + (e.message || 'sem conexão')
+    throw new Error(msg)
+  }
+  clearTimeout(tid)
+
+  if (!r.ok) {
+    const errText = await r.text().catch(() => r.status)
+    throw new Error(`Erro da API (${r.status}): ${String(errText).slice(0, 120)}`)
+  }
+
   const d = await r.json()
   let txt = (d.text || '').trim()
-  // Remove en-dashes residuais
   txt = txt.replace(/\s*—\s*/g, ', ')
+
   if (parseJson) {
     const clean = txt.replace(/```json|```/g, '').trim()
     try {
       return JSON.parse(clean)
     } catch(e) {
-      // Resposta truncada ou malformada — lança erro descritivo
-      throw new Error(`Resposta da IA incompleta ou inválida. Tente gerar novamente. (${e.message})`)
+      throw new Error(`Resposta incompleta. Tente gerar novamente. (${e.message})`)
     }
   }
   return txt
@@ -305,31 +333,46 @@ export default function RadarWizard({ leads, activities, dtIni, dtFim, periodo, 
   function prevStep() { setStep(s => Math.max(s - 1, 1)); scrollTop() }
 
   // ── Geração IA — Seção 1 ─────────────────────────────────────────────────
+  // Contexto enxuto para Step 1 — só o essencial para os highlights
+  function leadContextoBreve(lead) {
+    const partes = [lead.nome, lead.etapa, lead.resp || '—']
+    if (lead.mov) partes.push(String(lead.mov).slice(0, 60))
+    return partes.join(' | ')
+  }
+
   async function gerarS1Regiao(regiao) {
-    // Geração individual por região — texto puro, sem JSON, sem risco de truncamento
     const filtro =
       regiao === 'brasil' ? leads.filter(l => (l.regiao || 'Brasil') === 'Brasil' && !l.off) :
       regiao === 'latam'  ? leads.filter(l => l.regiao === 'LATAM' && !l.off) :
                             leads.filter(l => ['Novos Negócios','Internacional'].includes(l.regiao) && !l.off)
 
-    const ctx = filtro.map(l => leadContexto(l, activities)).join('\n')
+    // Limita a 12 leads com maior score — evita prompt gigante
+    const top = filtro
+      .sort((a, b) => scoreRelevancia(b, dtIni, dtFim) - scoreRelevancia(a, dtIni, dtFim))
+      .slice(0, 12)
+
+    // Contexto ENXUTO para highlights — sem histórico de atividades
+    const ctx = top.map(leadContextoBreve).join('\n')
     const periodoTxt = periodo || formatPeriodoLongo(dtIni, dtFim)
     const labelMap = { brasil:'🇧🇷 Brasil', latam:'🌎 LATAM', nb:'🚀 Novos Negócios / Internacional' }
 
-    const instrucao = `FORMATO OBRIGATÓRIO — bullets com ícone. Máximo 4 bullets.
-Ícones: ✅ Avanço 🔄 Em andamento 🚀 Novo ⚠️ Atenção
-Formato: [ícone] [Nome] ([Serviço se houver]) — [o que aconteceu, 1 frase direta]`
+    if (!ctx) {
+      setS1(prev => ({ ...prev, [regiao]: '' }))
+      return
+    }
 
     const prompt = `Gere os Highlights para a região ${labelMap[regiao]} do Radar Pipeline FENG (período ${periodoTxt}).
 
-${instrucao}
+FORMATO — bullets com ícone. Máximo 4 bullets.
+✅ Avanço 🔄 Em andamento 🚀 Novo ⚠️ Atenção
+Formato: [ícone] [Nome] ([Serviço se houver]) — [o que aconteceu, 1 frase]
 
-Leads desta região:
-${ctx || '(sem leads ativos nesta região)'}
+Leads (nome | etapa | resp | último movimento):
+${ctx}
 
-Retorne APENAS os bullets, um por linha, sem título de região.`
+Retorne APENAS os bullets, um por linha.`
 
-    const txt = await callIA(prompt)  // texto puro — sem JSON, sem parseJson:true
+    const txt = await callIA(prompt)
     setS1(prev => ({ ...prev, [regiao]: txt }))
   }
 
@@ -337,16 +380,17 @@ Retorne APENAS os bullets, um por linha, sem título de região.`
     setGenS1(regiao)
     try {
       if (regiao === 'all') {
-        // 3 chamadas independentes em paralelo — elimina JSON e truncamento
-        await Promise.all([
-          gerarS1Regiao('brasil'),
-          gerarS1Regiao('latam'),
-          gerarS1Regiao('nb'),
-        ])
+        // Sequencial para não sobrecarregar a API em paralelo
+        await gerarS1Regiao('brasil')
+        await gerarS1Regiao('latam')
+        await gerarS1Regiao('nb')
       } else {
         await gerarS1Regiao(regiao)
       }
-    } catch(e) { alert('Erro ao gerar: ' + e.message) }
+    } catch(e) {
+      showToast('Erro ao gerar resumo: ' + e.message)
+      console.error('[IAra] gerarS1 erro:', e)
+    }
     setGenS1(null)
   }
 
@@ -377,7 +421,7 @@ Português sempre. Campo ausente = "–". Sem travessões.`
       setS2Items(items => items.map(it => it.id === leadId ? { ...it, narrativa: txt, gerando: false } : it))
     } catch(e) {
       setS2Items(items => items.map(it => it.id === leadId ? { ...it, gerando: false } : it))
-      alert('Erro ao gerar: ' + e.message)
+      showToast('Erro ao gerar: ' + e.message)
     }
   }
 
@@ -423,7 +467,7 @@ Retorne APENAS o bullet, sem explicações adicionais.`
         ...prev,
         [regiao]: prev[regiao] ? `${prev[regiao]}\n${bullet}` : bullet
       }))
-    } catch(e) { alert('Erro: ' + e.message) }
+    } catch(e) { showToast('Erro: ' + e.message) }
     setGenS1(null)
   }
 
@@ -449,7 +493,7 @@ Níveis: 🔴 Risco real e imediato | 🟡 Atenção necessária | 🔍 Verifica
 Português sempre. Sem travessões.`
       const json = await callIA(prompt, true)
       setAddRisco({ ...json, lead: lead.nome, resp: lead.resp || '—', _gerado: true })
-    } catch(e) { alert('Erro ao gerar risco: ' + e.message) }
+    } catch(e) { showToast('Erro ao gerar risco: ' + e.message) }
     setGenRiscoLead(false)
     setAddRiscoLead(false)
   }
@@ -478,7 +522,7 @@ ${ctx || '(sem leads)'}
 Retorne APENAS os bullets, um por linha, sem título. Português sempre (traduzir espanhol).`
       const txt = await callIA(prompt)
       setS3Narrativa(prev => ({ ...prev, [regiao]: txt }))
-    } catch(e) { alert('Erro ao gerar: ' + e.message) }
+    } catch(e) { showToast('Erro ao gerar: ' + e.message) }
     setGenS3(null)
   }
 
@@ -494,7 +538,7 @@ ${ctx || '(nenhum risco ativo)'}
 
 Texto direto, sem tiques, sem travessões. Só o parágrafo.`
       setS4Narrativa(await callIA(prompt))
-    } catch(e) { alert('Erro ao gerar: ' + e.message) }
+    } catch(e) { showToast('Erro ao gerar: ' + e.message) }
     setGenS4(false)
   }
 
@@ -531,7 +575,7 @@ ${txt}`
       }
 
       setPolished({ sec1: { brasil: b, latam: l, nb: n }, sec2: s2p, sec3: s3p, sec4: r4 })
-    } catch(e) { alert('Erro ao polir: ' + e.message) }
+    } catch(e) { showToast('Erro ao polir: ' + e.message) }
     setPolishing(false)
   }
 
