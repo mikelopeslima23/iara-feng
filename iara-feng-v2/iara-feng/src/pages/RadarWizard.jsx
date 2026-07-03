@@ -536,8 +536,13 @@ ${txt}`
   }
 
   // ── Fechar e salvar ───────────────────────────────────────────────────────
+  const [saving, setSaving] = useState(false)
+
   function handleSave() {
-    // Monta os dados — se falhar aqui, mostra alert
+    if (saving) return
+    setSaving(true)
+
+    // Monta os dados
     let blocks
     try {
       const final = polished || {
@@ -555,13 +560,25 @@ ${txt}`
       }
     } catch(e) {
       console.error('[IAra] Erro ao montar dados:', e)
-      alert('Erro ao preparar os dados: ' + (e?.message || e))
+      setSaving(false)
+      // Usa toast em vez de alert para evitar bloqueio do browser
+      const div = document.createElement('div')
+      div.innerText = 'Erro ao preparar dados: ' + (e?.message || e)
+      div.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#EF4444;color:white;padding:12px 20px;borderRadius:8px;zIndex:9999;fontSize:14px;fontWeight:600'
+      document.body.appendChild(div)
+      setTimeout(() => div.remove(), 4000)
       return
     }
 
-    // Fecha o wizard IMEDIATAMENTE — independente do que acontecer no save
-    // onSave salva em background sem bloquear o usuário
-    onSave(blocks)
+    // 1. Fecha usando onClose — EXATAMENTE o mesmo mecanismo do botão ✕
+    onClose()
+
+    // 2. Passa os dados para Radar.jsx salvar em background
+    if (typeof onSave === 'function') {
+      try { onSave(blocks) } catch(e) { console.error('[IAra] onSave error:', e) }
+    }
+
+    setSaving(false)
   }
 
   // ── RENDER ────────────────────────────────────────────────────────────────
@@ -916,9 +933,11 @@ ${txt}`
               Avançar →
             </button>
           ) : (
-            <button onClick={handleSave}
-              style={{ padding:'8px 20px', borderRadius:8, border:'none', background:W.green, color:'white', fontWeight:700, fontSize:13, cursor:'pointer' }}>
-              💾 Fechar e Salvar Radar
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              style={{ padding:'8px 20px', borderRadius:8, border:'none', background: saving ? '#6B7280' : W.green, color:'white', fontWeight:700, fontSize:13, cursor: saving ? 'not-allowed' : 'pointer', transition:'background .2s' }}>
+              {saving ? '⏳ Salvando...' : '💾 Fechar e Salvar Radar'}
             </button>
           )}
         </div>
