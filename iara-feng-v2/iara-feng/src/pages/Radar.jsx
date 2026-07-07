@@ -364,7 +364,11 @@ export default function Radar() {
       setActs(a)
       setRiscos(buildRiscosFromActivities(a))
     })
-    getRadarSnapshots().then(setSnapshots)
+    getRadarSnapshots().then(s => {
+      setSnapshots(s)
+      // Auto-seleciona o mais recente para habilitar "Gerar link"
+      if (s.length > 0) setLastSnapshotId(s[0].id)
+    })
   }, [])
 
   const periodo = formatPeriodo(dtIni, dtFim)
@@ -842,17 +846,50 @@ export default function Radar() {
       {/* Snapshots (fora do export, com no-print) */}
       {snapshots.length > 0 && (
         <div className="no-print" style={{ maxWidth:1000, margin:'24px auto', padding:'18px 28px', background:'white', borderRadius:10, boxShadow:'0 4px 16px rgba(0,0,0,.08)' }}>
-          <div style={{ fontSize:13, fontWeight:700, marginBottom:12, color:'#444', letterSpacing:'.05em', textTransform:'uppercase' }}>
-            📁 Snapshots Salvos ({snapshots.length})
-          </div>
-          {snapshots.slice(0, 8).map((s, i) => (
-            <div key={s.id || i} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 0', borderBottom:'1px solid #f0f0f0', fontSize:12, color:'#555' }}>
-              <span style={{ fontWeight:500 }}>{s.title}</span>
-              <span style={{ color:'#999', fontSize:11 }}>
-                {new Date(s.created_at).toLocaleDateString('pt-BR')} — {s.created_by || '—'}
-              </span>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+            <div style={{ fontSize:13, fontWeight:700, color:'#444', letterSpacing:'.05em', textTransform:'uppercase' }}>
+              📁 Relatórios Salvos ({snapshots.length})
             </div>
-          ))}
+            <div style={{ fontSize:11, color:'#9CA3AF' }}>
+              Clique num relatório para selecionar e gerar o link
+            </div>
+          </div>
+          {snapshots.slice(0, 10).map((s, i) => {
+            const selected = lastSnapshotId === s.id
+            return (
+              <div key={s.id || i}
+                onClick={() => setLastSnapshotId(s.id)}
+                style={{
+                  display:'flex', alignItems:'center', justifyContent:'space-between',
+                  padding:'10px 12px', borderRadius:8, marginBottom:4, cursor:'pointer',
+                  background: selected ? '#F5F3FF' : 'transparent',
+                  border: `1px solid ${selected ? '#7C3AED' : '#f0f0f0'}`,
+                  transition: 'all .15s',
+                }}
+                onMouseEnter={e => { if (!selected) e.currentTarget.style.background = '#FAFAFA' }}
+                onMouseLeave={e => { if (!selected) e.currentTarget.style.background = 'transparent' }}
+              >
+                <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                  {selected && <span style={{ fontSize:12, color:'#7C3AED' }}>✓</span>}
+                  <span style={{ fontWeight: selected ? 700 : 500, color: selected ? '#7C3AED' : '#444', fontSize:13 }}>
+                    {s.title}
+                  </span>
+                </div>
+                <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+                  <span style={{ color:'#9CA3AF', fontSize:11 }}>
+                    {new Date(s.created_at).toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' })} · {s.created_by || '—'}
+                  </span>
+                  {selected && (
+                    <button
+                      onClick={e => { e.stopPropagation(); generateShareLink() }}
+                      style={{ fontSize:11, padding:'3px 10px', borderRadius:5, border:'none', background:'#059669', color:'white', cursor:'pointer', fontWeight:600 }}>
+                      🔗 Gerar link
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 
