@@ -26,17 +26,17 @@ function formatDate(str) {
 // ── Tabela de leads (read-only) ───────────────────────────────────────────────
 function TabelaLeads({ rows }) {
   if (!rows || rows.length === 0) return (
-    <div style={{ padding:'14px', textAlign:'center', color:'#9CA3AF', fontSize:13 }}>
+    <div style={{ padding:'14px', textAlign:'center', color:'#6B7280', fontSize:13 }}>
       Nenhum registro nesta seção.
     </div>
   )
   return (
-    <div style={{ overflowX:'auto', borderRadius:8, border:'1px solid #E5E7EB' }}>
-      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
+    <div style={{ overflowX:'auto', borderRadius:8, border:'1px solid #E5E7EB', colorScheme:'light' }}>
+      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12, background:'white' }}>
         <thead>
           <tr>
             {['Lead', 'Etapa', 'Responsável', 'Movimento', 'Próximo Passo', 'Data'].map(h => (
-              <th key={h} style={{ background:'#F5F5F5', padding:'8px 10px', fontSize:11, fontWeight:600, color:'#444', border:'1px solid #DDD', textAlign:'left', whiteSpace:'nowrap' }}>{h}</th>
+              <th key={h} style={{ background:'#F3F4F6', padding:'8px 10px', fontSize:11, fontWeight:700, color:'#1F2937', border:'1px solid #D1D5DB', textAlign:'left', whiteSpace:'nowrap' }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -44,17 +44,17 @@ function TabelaLeads({ rows }) {
           {rows.map((l, i) => {
             const ec = (ETAPA_COLORS[l.etapa] || '#888')
             return (
-              <tr key={l.id || i} style={{ background: i%2===0 ? 'white' : '#fafafa' }}>
-                <td style={{ padding:'7px 10px', fontSize:12, border:'1px solid #EEE', fontWeight:600 }}>{l.nome}</td>
-                <td style={{ padding:'7px 10px', fontSize:12, border:'1px solid #EEE' }}>
-                  <span style={{ background:ec+'22', color:ec, border:`1px solid ${ec}66`, borderRadius:4, padding:'1px 6px', fontSize:10, fontWeight:600, whiteSpace:'nowrap' }}>
+              <tr key={l.id || i} style={{ background: i%2===0 ? '#FFFFFF' : '#F9FAFB' }}>
+                <td style={{ padding:'7px 10px', fontSize:12, border:'1px solid #E5E7EB', fontWeight:700, color:'#111827' }}>{l.nome}</td>
+                <td style={{ padding:'7px 10px', fontSize:12, border:'1px solid #E5E7EB' }}>
+                  <span style={{ background:ec+'25', color:ec, border:`1px solid ${ec}88`, borderRadius:4, padding:'1px 6px', fontSize:10, fontWeight:700, whiteSpace:'nowrap' }}>
                     {l.etapa}
                   </span>
                 </td>
-                <td style={{ padding:'7px 10px', fontSize:11, border:'1px solid #EEE', color:'#666' }}>{l.resp || '—'}</td>
-                <td style={{ padding:'7px 10px', fontSize:12, border:'1px solid #EEE', maxWidth:200 }}>{(l.mov || '—').slice(0,100)}</td>
-                <td style={{ padding:'7px 10px', fontSize:12, border:'1px solid #EEE', maxWidth:160 }}>{(l.prox || '—').slice(0,80)}</td>
-                <td style={{ padding:'7px 10px', fontSize:11, border:'1px solid #EEE', whiteSpace:'nowrap' }}>{formatDate(l.dt)}</td>
+                <td style={{ padding:'7px 10px', fontSize:11, border:'1px solid #E5E7EB', color:'#374151', fontWeight:500 }}>{l.resp || '—'}</td>
+                <td style={{ padding:'7px 10px', fontSize:12, border:'1px solid #E5E7EB', maxWidth:200, color:'#1F2937' }}>{(l.mov || '—').slice(0,100)}</td>
+                <td style={{ padding:'7px 10px', fontSize:12, border:'1px solid #E5E7EB', maxWidth:160, color:'#1F2937' }}>{(l.prox || '—').slice(0,80)}</td>
+                <td style={{ padding:'7px 10px', fontSize:11, border:'1px solid #E5E7EB', whiteSpace:'nowrap', color:'#374151', fontWeight:500 }}>{formatDate(l.dt)}</td>
               </tr>
             )
           })}
@@ -86,7 +86,7 @@ function Sec({ num, titulo, sublabel, alt, children }) {
 function Loading() {
   return (
     <div style={{ minHeight:'100vh', background:F.bgDark, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:20 }}>
-      <img src="/feng-logo.png" alt="FENG" style={{ height:48, opacity:.8 }}/>
+      <img src="/feng-logo.png" alt="FENG" style={{ height:48, opacity:.8 }} onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="inline" }}/><span style={{ display:"none", fontFamily:"'Bebas Neue',system-ui", fontSize:24, color:"#fff", letterSpacing:".04em" }}>FENG</span>
       <div style={{ color:F.silver, fontSize:14, letterSpacing:'.1em' }}>Carregando relatório...</div>
       <div style={{ width:40, height:3, background:F.purple, borderRadius:2, animation:'pulse 1.2s ease-in-out infinite' }}/>
       <style>{`@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}`}</style>
@@ -98,7 +98,7 @@ function Loading() {
 function Erro({ msg }) {
   return (
     <div style={{ minHeight:'100vh', background:F.bgDark, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:16, padding:24 }}>
-      <img src="/feng-logo.png" alt="FENG" style={{ height:44, opacity:.7 }}/>
+      <img src="/feng-logo.png" alt="FENG" style={{ height:44, opacity:.7 }} onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="inline" }}/><span style={{ display:"none", fontFamily:"'Bebas Neue',system-ui", fontSize:24, color:"#fff", letterSpacing:".04em" }}>FENG</span>
       <div style={{ width:56, height:56, borderRadius:'50%', background:'rgba(239,68,68,.15)', border:'1px solid rgba(239,68,68,.4)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:24 }}>🔒</div>
       <div style={{ color:'white', fontSize:18, fontWeight:700, textAlign:'center' }}>Acesso indisponível</div>
       <div style={{ color:F.silver, fontSize:14, textAlign:'center', maxWidth:320, lineHeight:1.6 }}>{msg}</div>
@@ -159,8 +159,9 @@ export default function ReportPublic() {
     : null
 
   return (
-    <div style={{ fontFamily:"'Inter',system-ui,sans-serif", background:'#F0EEF8', minHeight:'100vh' }}>
+    <div style={{ fontFamily:"'Inter',system-ui,sans-serif", background:'#F0EEF8', minHeight:'100vh', colorScheme:'light' }}>
       <style>{`
+        :root { color-scheme: light only; }
         @media print {
           body { background: white; }
           .no-print { display: none !important; }
@@ -169,7 +170,7 @@ export default function ReportPublic() {
         .feng-orb { animation: feng-pulse 4s ease-in-out infinite; }
       `}</style>
 
-      <div style={{ maxWidth:960, margin:'0 auto', background:'white', boxShadow:'0 0 60px rgba(0,0,0,.12)' }}>
+      <div style={{ maxWidth:960, margin:'0 auto', background:'white', boxShadow:'0 0 60px rgba(0,0,0,.12)', colorScheme:'light' }}>
 
         {/* ═══ HERO ═══ */}
         <div style={{
@@ -180,7 +181,7 @@ export default function ReportPublic() {
           <div className="feng-orb" style={{ position:'absolute', bottom:30, left:40, width:60, height:60, borderRadius:'50%', background:`${F.purple}25`, filter:'blur(3px)', animationDelay:'1.5s' }}/>
 
           <div style={{ marginBottom:18, position:'relative' }}>
-            <img src="/feng-logo.png" alt="FENG" style={{ height:44, width:'auto', opacity:.92 }}/>
+            <img src="/feng-logo.png" alt="FENG" style={{ height:44, width:'auto', opacity:.92 }} onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="inline" }}/><span style={{ display:"none", fontFamily:"'Bebas Neue',system-ui", fontSize:24, color:"#fff", letterSpacing:".04em" }}>FENG</span>
           </div>
           <div style={{ fontSize:11, fontWeight:700, letterSpacing:'.4em', textTransform:'uppercase', color:F.purpleL, marginBottom:12, position:'relative' }}>
             Diretoria Comercial &amp; Sucesso do Cliente
@@ -323,7 +324,7 @@ export default function ReportPublic() {
         {/* ═══ FOOTER ═══ */}
         <div style={{ background:F.bgDark, padding:'24px 20px', textAlign:'center', borderTop:`3px solid ${F.orange}` }}>
           <div style={{ marginBottom:10 }}>
-            <img src="/feng-logo.png" alt="FENG" style={{ height:32, opacity:.8 }}/>
+            <img src="/feng-logo.png" alt="FENG" style={{ height:32, opacity:.8 }} onError={e => { e.target.style.display="none"; e.target.nextSibling.style.display="inline" }}/><span style={{ display:"none", fontFamily:"'Bebas Neue',system-ui", fontSize:24, color:"#fff", letterSpacing:".04em" }}>FENG</span>
           </div>
           <p style={{ fontSize:13, color:'white', marginBottom:6 }}>
             Conteúdo produzido pela Equipe Comercial da FENG,{' '}
