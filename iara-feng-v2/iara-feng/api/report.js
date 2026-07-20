@@ -2,16 +2,16 @@
 // Valida token de compartilhamento e retorna snapshot do Radar para visualização pública.
 //
 // VARIÁVEIS DE AMBIENTE NECESSÁRIAS (Vercel → Settings → Environment Variables):
-//   SUPABASE_URL          → mesma que VITE_SUPABASE_URL
-//   SUPABASE_SERVICE_KEY  → Project Settings → API → service_role (NUNCA expor ao client)
-//   APP_ORIGIN            → https://iara-feng.vercel.app
+//   SUPABASE_URL               → mesma que VITE_SUPABASE_URL
+//   SUPABASE_SERVICE_ROLE_KEY  → Project Settings → API → service_role (NUNCA expor ao client)
+//   APP_ORIGIN                 → https://iara-feng.vercel.app
 
 import { createClient } from '@supabase/supabase-js'
 
 // Service role key bypassa RLS — fica APENAS no servidor (sem prefixo VITE_)
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
 const ALLOWED_ORIGIN = process.env.APP_ORIGIN || 'https://iara-feng.vercel.app'
