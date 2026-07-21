@@ -264,7 +264,24 @@ export default function ReportPublic() {
 
         {/* 2ª — G12/G15 */}
         <Sec num="2" titulo="G12 / G15 — Movimentos da Quinzena" sublabel="Prioridade Estratégica" alt={true}>
-          {sec2 && <p style={{ fontSize:14, lineHeight:1.75, color:'#333', marginBottom:16 }}>{sec2}</p>}
+          {/* sec2 pode ser array [{id, narrativa}] (wizard novo) ou string (formato legado) */}
+          {Array.isArray(sec2) ? (
+            sec2.filter(it => it && it.narrativa).map((it, i) => {
+              const lead = (g12Leads || []).find(l => l.id === it.id)
+              return (
+                <div key={it.id || i} style={{ marginBottom:16, paddingBottom:16, borderBottom: i < sec2.length-1 ? '1px solid #f0f0f0' : 'none' }}>
+                  {lead && (
+                    <div style={{ fontSize:12, fontWeight:800, letterSpacing:'.1em', textTransform:'uppercase', color:'#111827', marginBottom:6 }}>
+                      {lead.nome}
+                    </div>
+                  )}
+                  <div style={{ fontSize:13, lineHeight:1.75, color:'#1F2937', whiteSpace:'pre-line' }}>{it.narrativa}</div>
+                </div>
+              )
+            })
+          ) : sec2 ? (
+            <p style={{ fontSize:14, lineHeight:1.75, color:'#1F2937', marginBottom:16 }}>{sec2}</p>
+          ) : null}
           <TabelaLeads rows={g12Leads}/>
         </Sec>
 
