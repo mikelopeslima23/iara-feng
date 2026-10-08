@@ -124,23 +124,14 @@ export default function Login() {
     if (!email.trim()) { setError('Digite seu e-mail para redefinir a senha.'); return }
     setLoading(true)
     try {
-      // Tenta via backend (gera link direto, sem rate limit)
-      const res = await fetch('/api/invite', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), nome: email.trim(), resend: true }),
-      })
-      const data = await res.json()
-      if (data.link) {
-        // Rate limit ativo — mostra link para copiar
-        setResetLink(data.link)
-        setError('')
-      } else if (data.success) {
-        setError('')
-        alert('E-mail enviado! Verifique sua caixa de entrada.')
-      } else {
-        throw new Error(data.error || 'Erro ao gerar link')
-      }
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        email.trim().toLowerCase(),
+        { redirectTo: `${window.location.origin}/login` }
+      )
+      if (resetError) throw resetError
+      setResetLink('')
+      setError('')
+      alert('Se o e-mail estiver cadastrado, você receberá as instruções para redefinir a senha.')
     } catch (err) {
       setError('Erro ao gerar link de acesso. Tente novamente.')
     }

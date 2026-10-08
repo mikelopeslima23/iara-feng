@@ -14,8 +14,25 @@ export default async function handler(req, res) {
     auth: { autoRefreshToken: false, persistSession: false }
   })
 
-  const { email, nome, iniciais, cor, admin = false, resend = false } = req.body
-  if (!email || !nome) return res.status(400).json({ error: 'email e nome são obrigatórios' })
+  // Service-role actions must never be reachable without an authenticated admin.
+  const authorization = req.headers.authorization || ''
+  const token = authorization.match(/^Bearer\\s+(.+)$/i)?.[1]
+  if (!token) return res.status(401).json({ error: 'Autenticação obrigatória' })
+
+  const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token)
+  if (authError || !authData?.user) return res.status(401).json({ error: 'Sessão inválida ou expirada' })
+
+  const { data: requester, error: requesterError } = await supabaseAdmin
+    .from('user_profiles')
+    .select('admin, ativo')
+    .eq('id', authData.user.id)
+    .single()
+  if (requesterError || !requester?.ativo || requester.admin !== true) {
+    return res.status(403).json({ error: 'Apenas administradores ativos podem convidar usuários' })
+  }
+
+  const { email, nome, iniciais, cor, admin = false, resend = false } = req.body || {}
+  if (typeof email !== 'string' || typeof nome !== 'string' || !email.trim() || !nome.trim()) return res.status(400).json({ error: 'email e nome são obrigatórios' })
 
   const appUrl = process.env.VITE_APP_URL || `https://${req.headers.host}`
   const emailNorm = email.trim().toLowerCase()

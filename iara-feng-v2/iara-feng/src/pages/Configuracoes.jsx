@@ -68,9 +68,11 @@ export default function Configuracoes() {
     setSaving(true); setMsg(null)
     try {
       const iniciais = gerarIniciais(form.nome)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Sua sessão expirou. Entre novamente na IAra.')
       const res = await fetch('/api/invite', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
           email:    form.email.trim().toLowerCase(),
           nome:     form.nome.trim(),
@@ -108,9 +110,11 @@ export default function Configuracoes() {
     setSaving(true)
     try {
       const u = users.find(u => u.email === email)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Sua sessão expirou. Entre novamente na IAra.')
       const res = await fetch('/api/invite', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
         body: JSON.stringify({
           email,
           nome: u?.nome || email,
